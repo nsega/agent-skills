@@ -1,0 +1,17 @@
+{
+  "skill_name": "illustrate-with-html",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Illustrate the current workflow of how a request flows through a token-bucket rate limiter: a request comes in, we check whether the bucket has tokens, if yes we consume one and allow it, if no we reject with 429; meanwhile the bucket refills at a steady rate. Make me something I can actually open in a browser and click through.",
+      "expected_output": "A single self-contained .html annotated flowchart (Anthropic style): inline SVG nodes with olive allow-path / rust 429-path / clay refill, clickable nodes driving a sticky detail panel. Bonus: a small live token-bucket demo.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Explain how the OAuth 2.0 authorization code flow works — I want to actually SEE it, not read five paragraphs. Walk through the redirect to the auth server, the user consenting, the code coming back, and the backend swapping the code for an access token.",
+      "expected_output": "A single self-contained .html illustration (Anthropic style). A sequence/flow across the parties with clickable steps + sticky panel showing real HTTP request/response snippets; front-channel vs back-channel made visually distinct (olive vs rust).",
+      "files": []
+    }
+  ]
+}

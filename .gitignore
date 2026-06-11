@@ -1,0 +1,5 @@
+# OS cruft
+.DS_Store
+
+# Per-skill scratch / iteration workspaces (not real skills)
+*-workspace/
