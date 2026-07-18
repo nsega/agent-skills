@@ -15,6 +15,7 @@ immediately — no copy step. The same `SKILL.md` format works for Codex.
 | `desktop-organizer` | Sort loose screenshots/PDFs into themed, dated folders |
 | `friction-log` | Maintain a personal friction log in an Obsidian vault |
 | `illustrate-with-html` | Explain/visualize anything as a single self-contained `.html` file |
+| `pr-review` | Verification-based PR review: every finding backed by a concrete check, verdicts over candidates |
 | `pr-visual-review` | PR review with sequence/class/flow diagrams (only when structurally warranted) |
 | `repo-deepwiki` | Generate a DeepWiki-style, citation-heavy architecture wiki for a repo |
 
