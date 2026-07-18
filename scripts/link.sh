@@ -4,6 +4,7 @@
 # skills directory (Claude Code or Codex).
 #
 # Usage: link.sh <install|uninstall|status> <target_dir> <src_dir> [skill...]
+#        link.sh unmanaged <target_dir> <src_dir> [src_dir...]
 #
 #   src_dir   directory holding <name>/SKILL.md skill folders to link from.
 #   skill...  optional whitelist of skill names. If omitted, every skill in
@@ -19,6 +20,10 @@
 #               * missing                  -> "linked" (created)
 #   uninstall — remove ONLY symlinks in target_dir that point into src_dir.
 #   status    — read-only report: ok / missing / wrong / blocked(non-symlink).
+#   unmanaged: read-only report of entries in target_dir that NO given source
+#              dir owns (foreign symlinks and plain files/dirs). Extra args are
+#              additional source dirs, not skill names. Missing source dirs
+#              own nothing and are skipped.
 #
 # A non-existent src_dir is a no-op (warn + exit 0), so a Makefile can list
 # optional source repos that may not be present on every machine.
@@ -32,7 +37,7 @@ shift 3 2>/dev/null || true
 names=("$@")
 
 if [ -z "$cmd" ] || [ -z "$target_dir" ] || [ -z "$src_dir" ]; then
-  echo "usage: link.sh <install|uninstall|status> <target_dir> <src_dir> [skill...]" >&2
+  echo "usage: link.sh <install|uninstall|status|unmanaged> <target_dir> <src_dir> [skill...]" >&2
   exit 2
 fi
 
@@ -132,9 +137,43 @@ do_status() {
   done < <(selected_skills)
 }
 
+# Entries in target_dir not owned by any source dir. "Owned" means a symlink
+# whose raw readlink target sits inside a source; link.sh always creates
+# absolute links, so a raw prefix match is enough (same rule as
+# points_into_src). Stale-but-owned links are silent here: plain status
+# already reports them as "wrong".
+do_unmanaged() {
+  [ -d "$target_dir" ] || return 0
+  local all=("$src_dir") srcs=() s entry name cur owned
+  if [ "${#names[@]}" -gt 0 ]; then all+=("${names[@]}"); fi
+  for s in "${all[@]}"; do
+    [ -d "$s" ] || continue
+    srcs+=("$(cd "$s" && pwd)")
+  done
+  for entry in "$target_dir"/*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    name="$(basename "$entry")"
+    if [ -L "$entry" ]; then
+      cur="$(readlink "$entry")"
+      owned=0
+      if [ "${#srcs[@]}" -gt 0 ]; then
+        for s in "${srcs[@]}"; do
+          case "$cur" in
+            "$s"/*) owned=1; break ;;
+          esac
+        done
+      fi
+      [ "$owned" -eq 1 ] || echo "unmanaged $name -> $cur"
+    else
+      echo "unmanaged $name (not a symlink)"
+    fi
+  done
+}
+
 case "$cmd" in
   install)   do_install ;;
   uninstall) do_uninstall ;;
   status)    do_status ;;
+  unmanaged) do_unmanaged ;;
   *) echo "unknown command: $cmd" >&2; exit 2 ;;
 esac

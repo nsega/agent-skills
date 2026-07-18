@@ -62,6 +62,7 @@ status:
 	  echo "==> $$d"; \
 	  $(LINK) status    "$$d" "$(REPO_SRC)"; \
 	  $(LINK) status    "$$d" "$(UPSTREAM_REPO)" $(UPSTREAM_SKILLS); \
+	  $(LINK) unmanaged "$$d" "$(REPO_SRC)" "$(UPSTREAM_REPO)"; \
 	done
 
 # --- Codex (opt-in; this repo's own skills only) ---
