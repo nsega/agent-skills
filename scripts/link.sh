@@ -21,9 +21,10 @@
 #   uninstall — remove ONLY symlinks in target_dir that point into src_dir.
 #   status    — read-only report: ok / missing / wrong / blocked(non-symlink).
 #   unmanaged: read-only report of entries in target_dir that NO given source
-#              dir owns (foreign symlinks and plain files/dirs). Extra args are
-#              additional source dirs, not skill names. Missing source dirs
-#              own nothing and are skipped.
+#              dir owns (foreign symlinks and plain files/dirs), plus owned
+#              links that dangle because their skill left the source. Extra
+#              args are additional source dirs, not skill names. Missing
+#              source dirs own nothing and are skipped.
 #
 # A non-existent src_dir is a no-op (warn + exit 0; for unmanaged it is
 # silently skipped and the remaining sources are still checked), so a
@@ -144,11 +145,13 @@ do_status() {
   done < <(selected_skills)
 }
 
-# Entries in target_dir not owned by any source dir. "Owned" means a symlink
-# whose raw readlink target sits inside a source; link.sh always creates
-# absolute links, so a raw prefix match is enough (same rule as
-# points_into_src). Stale-but-owned links are silent here: plain status
-# already reports them as "wrong".
+# Entries in target_dir not owned by any source dir, plus owned links that
+# dangle. "Owned" means a symlink whose raw readlink target sits inside a
+# source; link.sh always creates absolute links, so a raw prefix match is
+# enough (same rule as points_into_src). Healthy owned links are silent
+# (status covers name-preserving drift), but a dangling owned link (its
+# skill was renamed or deleted in the source) is invisible to status, so
+# it is reported here.
 do_unmanaged() {
   [ -d "$target_dir" ] || return 0
   local all=("$src_dir") srcs=() s entry name cur owned
@@ -170,7 +173,11 @@ do_unmanaged() {
           esac
         done
       fi
-      [ "$owned" -eq 1 ] || echo "unmanaged $name -> $cur"
+      if [ "$owned" -eq 0 ]; then
+        echo "unmanaged $name -> $cur"
+      elif [ ! -e "$entry" ]; then
+        echo "dangling $name -> $cur"
+      fi
     else
       echo "unmanaged $name (not a symlink)"
     fi

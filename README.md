@@ -84,8 +84,9 @@ CODEX_SKILLS_DIR=/tmp/t make install-codex
   so optional sources don't break `make install` on other machines.
 - `status` also lists `unmanaged` entries: anything in a target dir that no
   configured source owns (tool-installed skills such as those in
-  `~/.agents/skills`, hand-made local skill dirs, foreign symlinks).
-  Report-only; nothing is modified.
+  `~/.agents/skills`, hand-made local skill dirs, foreign symlinks), and
+  flags owned links as `dangling` when their skill no longer exists in the
+  source. Report-only; nothing is modified.
 
 ## Adding a skill
 

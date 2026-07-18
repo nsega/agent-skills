@@ -74,6 +74,7 @@ uninstall-codex:
 
 status-codex:
 	@$(LINK) status    "$(CODEX_SKILLS_DIR)" "$(REPO_SRC)"
+	@$(LINK) unmanaged "$(CODEX_SKILLS_DIR)" "$(REPO_SRC)"
 
 # --- Scaffold ---
 new:
