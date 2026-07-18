@@ -25,8 +25,10 @@
 #              additional source dirs, not skill names. Missing source dirs
 #              own nothing and are skipped.
 #
-# A non-existent src_dir is a no-op (warn + exit 0), so a Makefile can list
-# optional source repos that may not be present on every machine.
+# A non-existent src_dir is a no-op (warn + exit 0; for unmanaged it is
+# silently skipped and the remaining sources are still checked), so a
+# Makefile can list optional source repos that may not be present on every
+# machine.
 #
 set -euo pipefail
 
@@ -41,12 +43,17 @@ if [ -z "$cmd" ] || [ -z "$target_dir" ] || [ -z "$src_dir" ]; then
   exit 2
 fi
 
-# A missing source repo is fine — just skip it.
+# A missing source repo is fine: skip it. For unmanaged, a missing source
+# simply owns nothing (do_unmanaged skips it), so the check still runs
+# against the remaining sources.
 if [ ! -d "$src_dir" ]; then
-  echo "warn    source dir not found: $src_dir (skipping)" >&2
-  exit 0
+  if [ "$cmd" != "unmanaged" ]; then
+    echo "warn    source dir not found: $src_dir (skipping)" >&2
+    exit 0
+  fi
+else
+  src_dir="$(cd "$src_dir" && pwd)"
 fi
-src_dir="$(cd "$src_dir" && pwd)"
 
 # True if $1 (a symlink target) points somewhere inside src_dir.
 points_into_src() {
