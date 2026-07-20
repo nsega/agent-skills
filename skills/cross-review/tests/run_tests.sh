@@ -131,6 +131,50 @@ def walk(node):
 sys.exit(1 if walk(cfg) else 0)
 PY
 
+echo "== JSON extraction from reviewer output =="
+# Regression: reviewers narrate before emitting JSON, and that prose contains
+# braces. A first-"{"-to-last-"}" slice parsed the prose instead and the whole
+# review died after the model had already been paid for.
+EXTRACT="$TMP/extract.py"
+python3 - "$SKILL/scripts/glm_review.sh" "$EXTRACT" <<'PYX'
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"python3 - \"\$RAW\" \"\$OUT\" \"\$SCHEMA\" <<'PY'\n(.*?)\nPY\n", src, re.S)
+if not m:
+    sys.exit("could not lift the extractor out of glm_review.sh")
+open(sys.argv[2], "w", encoding="utf-8").write(m.group(1))
+PYX
+if [ -s "$EXTRACT" ]; then ok "extractor lifted from glm_review.sh"; else bad "extractor lifted from glm_review.sh"; fi
+
+mk_raw() { printf '%s' "$1" > "$TMP/raw.txt"; }
+run_extract() { python3 "$EXTRACT" "$TMP/raw.txt" "$TMP/out.json" "$SCHEMA" >/dev/null 2>&1; }
+
+GOOD='{"reviewer":"glm-5.2","summary":"s","overall":"approve","findings":[]}'
+
+mk_raw "$GOOD"; run_extract && ok "bare JSON object is extracted" || bad "bare JSON object is extracted"
+
+# The exact shape that broke in production.
+mk_raw "I checked provider.{p}.models.{m} first.
+$GOOD"
+if run_extract; then ok "prose containing braces before the JSON"; else bad "prose containing braces before the JSON"; fi
+
+mk_raw "prose {p} before
+\`\`\`json
+$GOOD
+\`\`\`
+trailing prose with a stray } brace"
+if run_extract; then ok "fenced JSON with braces in surrounding prose"; else bad "fenced JSON with braces in surrounding prose"; fi
+
+mk_raw "here is a decoy {\"a\":1} and the real one:
+$GOOD"
+if run_extract && python3 -c "
+import json,sys; d=json.load(open('$TMP/out.json')); sys.exit(0 if d.get('reviewer')=='glm-5.2' else 1)"; then
+  ok "decoy object is not mistaken for the findings"
+else bad "decoy object is not mistaken for the findings"; fi
+
+mk_raw "no json here at all {oops}"
+if run_extract; then bad "output with no findings object fails loudly"; else ok "output with no findings object fails loudly"; fi
+
 echo "== scripts parse =="
 for s in "$SKILL"/scripts/*.sh "$DIR"/run_tests.sh; do
   bash -n "$s" && ok "bash -n $(basename "$s")" || bad "bash -n $(basename "$s")"

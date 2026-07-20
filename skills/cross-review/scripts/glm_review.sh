@@ -126,10 +126,27 @@ python3 - "$RAW" "$OUT" "$SCHEMA" <<'PY'
 import sys, json, re
 raw = open(sys.argv[1], encoding="utf-8", errors="replace").read()
 raw = re.sub(r"```(?:json)?", "", raw)
-s, e = raw.find("{"), raw.rfind("}")
-if s == -1 or e == -1 or e < s:
-    sys.exit("could not locate JSON object in GLM output")
-obj = json.loads(raw[s:e+1])                      # syntactic check
+
+# Do NOT use first-"{" to last-"}": reviewers narrate before the JSON, and that
+# prose contains braces (observed in the wild: a review citing the config path
+# `provider.{p}.models.{m}` made the slice start at "{p}" and fail to parse).
+# Instead try to decode an object at every "{" and keep the largest complete one
+# that looks like a findings document.
+dec = json.JSONDecoder()
+obj = None
+for i, ch in enumerate(raw):
+    if ch != "{":
+        continue
+    try:
+        cand, _ = dec.raw_decode(raw, i)
+    except ValueError:
+        continue
+    if isinstance(cand, dict) and "findings" in cand and "reviewer" in cand:
+        if obj is None or len(json.dumps(cand)) > len(json.dumps(obj)):
+            obj = cand
+if obj is None:
+    sys.exit("could not locate a findings JSON object in GLM output "
+             f"(kept at {sys.argv[1]} for inspection)")
 schema = json.load(open(sys.argv[3]))
 try:
     import jsonschema
