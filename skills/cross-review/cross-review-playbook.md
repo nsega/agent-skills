@@ -24,7 +24,7 @@
 - What to review
 ```
 
-**Two levels, full and minimal** (see G). Even `minimal` keeps **purpose, non-goals, diff, and test results**; it is never omitted entirely.
+**Two levels, full and minimal** (see G). Even `minimal` keeps **purpose, non-goals, diff, and test results**; the packet itself is never skipped.
 
 ---
 
@@ -134,12 +134,12 @@ This is what turns a majority vote into a design decision.
 A full re-review is unnecessary. What matters after a fix is **the correctness of the diff**, not the whole design again.
 
 ```
-default      : Claude self-check (fix diff against the must-fix F-IDs)
-high risk    : GLM delta-review ... pass the fix diff plus "the must-fix F-IDs to verify",
-               and have it check only two things: (a) is each finding resolved,
-               (b) did the fix introduce a regression
-major design : have a fresh-session GLM review the fix diff (restores independence)
-change
+default             : Claude self-check (fix diff against the must-fix F-IDs)
+high risk           : GLM delta-review ... pass the fix diff plus "the must-fix F-IDs
+                      to verify", and have it check only two things: (a) is each
+                      finding resolved, (b) did the fix introduce a regression
+major design change : have a fresh-session GLM review the fix diff (restores
+                      independence)
 ```
 
 High risk = security / data loss / migration / public API. GLM never re-reads the whole artifact, so the cost stays low.
@@ -200,7 +200,7 @@ package it (Claude fills the author fields)
 1. Added **Evidence + Failure case** to findings (required for critical/high and correctness/security, exempt for nits). Enforced by the schema.
 2. Introduced **finding IDs** (reviewer prefixes G-/C-, renumbered to F-### at synthesis). Fixes, re-review, and the summary are tracked by ID.
 3. **A minimal packet is required even in lite** (dropped the option of omitting it entirely).
-4. **Made conflict escalation conditional** (stopped sending everything to a human; limited to high or above, security and similar, reject vs must fix, and low-confidence x high-severity).
+4. **Made conflict escalation conditional** (stopped sending everything to a human; the conditions live in section 7 and are not restated here, so they cannot drift).
 5. **Delta-review** (fix diff + must-fix IDs only, GLM when high risk, fresh session when major).
 6. **Scoped the independence discount** (discount Claude's self-review only on design conflicts, not on correctness; the main lever is subagent isolation).
 7. Unified severity to **critical/high/medium/low** (matching the schema, rubric, and SKILL.md).
