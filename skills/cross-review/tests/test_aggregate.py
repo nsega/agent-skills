@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Unit tests for aggregate_passes.py. Standalone: python3 tests/test_aggregate.py"""
+import json, os, shutil, subprocess, sys, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SKILL = os.path.join(HERE, "..")
+AGG = os.path.join(SKILL, "scripts", "aggregate_passes.py")
+SCHEMA = os.path.join(SKILL, "references", "findings.schema.json")
+FIX = os.path.join(HERE, "fixtures")
+
+def run(passes_dir):
+    out = os.path.join(passes_dir, "agg.json")
+    r = subprocess.run([sys.executable, AGG, passes_dir, SCHEMA, out],
+                       capture_output=True, text=True)
+    return r, out
+
+def _stage(*names):
+    d = tempfile.mkdtemp()
+    for i, n in enumerate(names, 1):
+        shutil.copy(os.path.join(FIX, n), os.path.join(d, f"pass-{i}.json"))
+    return d
+
+def test_union_scores_and_never_drops_singletons():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        r, out = run(d)
+        assert r.returncode == 0, r.stderr
+        doc = json.load(open(out))
+        assert doc["passes_total"] == 3
+        by_loc = {}
+        for f in doc["findings"]:
+            key = f["location"].split(":")[0]
+            by_loc[key] = f["pass_count"]
+        assert by_loc["src/a.py"] == 3
+        assert by_loc["src/b.py"] == 2
+        assert by_loc["src/c.py"] == 1
+        assert by_loc["src/d.py"] == 1
+        assert len(doc["findings"]) == 4
+    finally:
+        shutil.rmtree(d)
+
+def test_highest_severity_instance_wins_cluster():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        _, out = run(d)
+        doc = json.load(open(out))
+        a = next(f for f in doc["findings"] if f["location"].startswith("src/a.py"))
+        assert a["severity"] == "critical"  # pass-2 raised it critical
+    finally:
+        shutil.rmtree(d)
+
+def test_sorted_by_pass_count_then_severity():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        _, out = run(d)
+        doc = json.load(open(out))
+        counts = [f["pass_count"] for f in doc["findings"]]
+        assert counts == sorted(counts, reverse=True)
+        assert doc["findings"][0]["location"].startswith("src/a.py")  # 3/3 first
+    finally:
+        shutil.rmtree(d)
+
+def test_degraded_two_of_three():
+    d = _stage("pass-1.json", "pass-2.json")  # only two passes present
+    try:
+        r, out = run(d)
+        assert r.returncode == 0, r.stderr
+        doc = json.load(open(out))
+        assert doc["passes_total"] == 2
+        a = next(f for f in doc["findings"] if f["location"].startswith("src/a.py"))
+        assert a["pass_count"] == 2
+    finally:
+        shutil.rmtree(d)
+
+def test_no_valid_passes_fails():
+    d = tempfile.mkdtemp()
+    try:
+        r, _ = run(d)
+        assert r.returncode != 0
+    finally:
+        shutil.rmtree(d)
+
+if __name__ == "__main__":
+    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
+    for fn in fns:
+        fn(); print(f"  ok   {fn.__name__}")
+    print(f"{len(fns)} passed")
