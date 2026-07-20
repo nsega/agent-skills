@@ -36,13 +36,4 @@
       }
     }
   }
-
-  // Free tiers: authoritative control is the Zen WORKSPACE model-access setting
-  // (admin → disable these org-wide). This list is defense-in-depth only.
-  // Do not use:
-  //   opencode/deepseek-v4-flash-free
-  //   opencode/big-pickle
-  //   opencode/north-mini-code-free
-  //   opencode/nemotron-3-ultra-free
-  //   opencode/mimo-v2.5-free
 }
