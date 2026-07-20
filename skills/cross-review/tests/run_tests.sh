@@ -54,9 +54,15 @@ results.append(expect("high finding without failure_case is rejected", d, False)
 d = json.loads(json.dumps(base)); d["findings"] = []
 results.append(expect("empty findings array is valid", d, True))
 
+d = json.loads(json.dumps(base)); d["passes_total"] = 3; d["findings"][0]["pass_count"] = 2
+results.append(expect("pass_count + passes_total validate", d, True))
+
+d = json.loads(json.dumps(base)); d["findings"][0]["pass_count"] = 0
+results.append(expect("pass_count below 1 is rejected", d, False))
+
 sys.exit(0 if all(results) else 1)
 PY
-if [ $? -eq 0 ]; then pass=$((pass+6)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
 
 echo "== disagreement checker =="
 OUT="$("$SKILL/scripts/check_disagreements.sh" "$FIX/claude-disagree.json" "$FIX/glm-disagree.json" 2>&1)"; RC=$?
