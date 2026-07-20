@@ -39,14 +39,14 @@ view up; on **correctness**, your author knowledge is an asset, do not discount 
 
 ## Stakes first: lite vs full
 
-Pick the tier before doing work (effort-routing):
+Pick the tier before doing work. It scales the **packet, process, and report**,
+not GLM's effort — GLM always runs at max (an A/B found effort made no reliable
+difference; the README records it).
 
 - **lite** (daily PR): minimal packet, GLM one pass + your synthesis, `must fix`
-  only, Claude self-check, brief summary. GLM at **High** effort (pass `lite` to
-  `glm_review.sh`).
+  only, Claude self-check, brief summary.
 - **full** (high-risk PR / system design): full packet, both review blind, full
-  disposition + conflict isolation, delta-review, F-ID-tracked summary. GLM at **Max**
-  (pass `full`).
+  disposition + conflict isolation, delta-review, F-ID-tracked summary.
 
 ## Step 1 — Identify the target
 
@@ -72,12 +72,12 @@ Kick off GLM first; **do not open `glm-findings.json` until step 4.**
 
 ```bash
 scripts/glm_review.sh <packet> references/rubric.md \
-  references/findings.schema.json /tmp/glm-findings.json <lite|full>
+  references/findings.schema.json /tmp/glm-findings.json
 ```
 
-**Pass the tier.** It is what sets GLM's reasoning effort (`lite` → high,
-`full` → max); omitting it silently gets you `full`/max and a lite run that costs
-like a full one. The script echoes the tier and effort it used to stderr.
+GLM runs at max effort; the script echoes it to stderr. To re-run the effort
+experiment, set `ZEN_VARIANT=high` (or `low`/`minimal`); it does not otherwise
+vary by tier.
 
 Then do your own review against `references/rubric.md` (read it + the schema now).
 Emit `/tmp/claude-findings.json` per `references/findings.schema.json`,

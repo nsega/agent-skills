@@ -87,34 +87,32 @@ json.dump(a,open('$TMP/agree.json','w'))
 OUT3="$("$SKILL/scripts/check_disagreements.sh" "$TMP/agree.json" "$FIX/glm-disagree.json" 2>&1)"; RC3=$?
 check "full agreement exits 0" "$RC3" "0"
 
-echo "== tier -> effort routing =="
-# opencode accepts an unknown --variant silently, so the mapping is validated in
-# glm_review.sh and pinned here. These run with a nonexistent bundle: argument
-# validation must happen before any network call, so a bad tier never costs money.
-tier_rc() { "$SKILL/scripts/glm_review.sh" /nonexistent-bundle "$SCHEMA" "$SCHEMA" /dev/null "$1" 2>&1; }
+echo "== effort / input validation =="
+# Effort is always max (the lite/full tier no longer routes it). opencode accepts
+# an unknown --variant silently, so ZEN_VARIANT is validated in-script. Input
+# checks must precede any network call, so a bad invocation never costs money.
+gr() { "$SKILL/scripts/glm_review.sh" "$@" 2>&1; }
 
-OUT="$(tier_rc typo)"; check "unknown tier is rejected" "$?" "2"
-case "$OUT" in *"want lite|full"*) ok "unknown tier names the valid values";; *) bad "unknown tier names the valid values";; esac
+OUT="$(ZEN_VARIANT=turbo gr /nonexistent-bundle "$SCHEMA" "$SCHEMA" /dev/null)"
+check "unknown ZEN_VARIANT is rejected" "$?" "2"
+case "$OUT" in *"want minimal|low|high|max"*) ok "bad ZEN_VARIANT names the valid values";; *) bad "bad ZEN_VARIANT names the valid values";; esac
 
-OUT="$(ZEN_VARIANT=turbo tier_rc full)"; check "unknown ZEN_VARIANT is rejected" "$?" "2"
+# A missing bundle must fail on the input check (exit 2, "no such file"), proving
+# validation runs before opencode; if it did not, this would hang on a live call.
+OUT="$(gr /nonexistent-bundle "$SCHEMA" "$SCHEMA" /dev/null)"
+case "$OUT" in
+  *"no such file"*) ok "missing bundle fails on the input check, before any spend";;
+  *) bad "missing bundle: unexpected output '$OUT'";;
+esac
 
-# A valid tier must get PAST tier validation and then fail on the missing bundle.
-# Both exit 2, so distinguish on the message. This also pins that input checks
-# happen before any network call: if they did not, these would hang on a live run.
-for t in lite full; do
-  OUT="$(tier_rc "$t")"
-  case "$OUT" in
-    *"no such file"*) ok "valid tier '$t' passes validation, then fails on the bundle";;
-    *"want lite|full"*) bad "valid tier '$t' was rejected as a bad tier";;
-    *) bad "valid tier '$t': unexpected output '$OUT'";;
-  esac
-done
+# Empty bundle: use a real empty file so the -s check is actually the one reached
+# (a char device like /dev/null would trip the earlier -f check instead).
+EMPTY="$TMP/empty.md"; : > "$EMPTY"
+OUT="$(gr "$EMPTY" "$SCHEMA" "$SCHEMA" /dev/null)"; check "empty bundle exits 2" "$?" "2"
+case "$OUT" in *"bundle is empty"*) ok "empty bundle is refused by the -s check";; *) bad "empty bundle is refused by the -s check (got '$OUT')";; esac
 
-OUT="$("$SKILL/scripts/glm_review.sh" /dev/null "$SCHEMA" "$SCHEMA" /dev/null full 2>&1)"
-check "empty bundle is refused before spending" "$?" "2"
-
-grep -q 'lite) TIER_VARIANT="high"' "$SKILL/scripts/glm_review.sh" && ok "lite maps to high" || bad "lite maps to high"
-grep -q 'full) TIER_VARIANT="max"'  "$SKILL/scripts/glm_review.sh" && ok "full maps to max"  || bad "full maps to max"
+grep -q 'ZEN_VARIANT:-max' "$SKILL/scripts/glm_review.sh" && ok "effort defaults to max" || bad "effort defaults to max"
+grep -q 'TIER_VARIANT\|bad tier' "$SKILL/scripts/glm_review.sh" && bad "tier->effort routing is fully removed" || ok "tier->effort routing is fully removed"
 grep -q -- '--variant' "$SKILL/scripts/glm_review.sh" && ok "effort is passed per-run via --variant" || bad "effort is passed per-run via --variant"
 # Check the PARSED config, not the raw text: the file explains in a comment why
 # the key is absent, and a plain grep would match that explanation.

@@ -73,9 +73,9 @@ scripts/check_disagreements.sh /tmp/claude.json /tmp/glm.json   # exits 1 if any
 A couple of opencode keys move between releases — confirm against current docs:
 
 - Reasoning effort is **not** set in the config. `glm_review.sh` passes it per-run
-  as `opencode run --variant <high|max>`, mapped from the tier. Note opencode
-  accepts an unknown `--variant` silently (exit 0, review proceeds), so a typo
-  degrades effort without an error; the script validates the value itself.
+  as `opencode run --variant max` (always max; override with `ZEN_VARIANT`). Note
+  opencode accepts an unknown `--variant` silently (exit 0, review proceeds), so a
+  typo degrades effort without an error; the script validates the value itself.
 - `permission` / `share` value spellings.
 
 The shell and JSON are syntax-validated, and `tests/run_tests.sh` covers the

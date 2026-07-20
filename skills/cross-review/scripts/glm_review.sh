@@ -4,38 +4,33 @@
 # Evidence/failure_case rules) before accepting the output.
 #
 # Usage:
-#   glm_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [TIER]
-#
-#   TIER is lite|full (default: full). It is the ONLY place the stakes tier maps
-#   to reasoning effort: lite -> high, full -> max, matching SKILL.md's
-#   effort-routing table. Passed per-run via `opencode run --variant`.
+#   glm_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON>
 #
 # Env:
 #   ZEN_MODEL       opencode model id            (default: opencode/glm-5.2)
 #   OPENCODE_CONFIG path to hardened config       (default: <skill>/config/opencode.zen.json)
-#   ZEN_VARIANT     override the effort variant outright (skips the tier mapping)
+#   ZEN_VARIANT     reasoning-effort variant     (default: max)
+#
+# Effort is always max. The lite/full stakes tier is NOT wired to effort: an A/B
+# over one identical packet (see README "Effort and run-to-run variance") found
+# run-to-run variance at least as large as any high-vs-max difference, so tiering
+# effort bought nothing measurable. ZEN_VARIANT remains only to re-run that
+# experiment. The tier still drives packet level and report scope, elsewhere.
 #
 # Notes:
 # - Review-only. We ask GLM for findings, never for a patch, and run opencode in
 #   a non-interactive single-shot ("run") so it does not edit the repo.
 # - opencode ACCEPTS AN UNKNOWN --variant SILENTLY (verified: a bogus value exits
 #   0 and reviews anyway), so a typo would quietly downgrade effort with no
-#   signal. That is why the tier mapping is validated here rather than trusted to
-#   the CLI.
+#   signal. That is why ZEN_VARIANT is validated here rather than trusted to the CLI.
 set -euo pipefail
 
 BUNDLE="${1:?need bundle path}"
 RUBRIC="${2:?need rubric path}"
 SCHEMA="${3:?need schema path}"
 OUT="${4:?need output json path}"
-TIER="${5:-full}"
 
-case "$TIER" in
-  lite) TIER_VARIANT="high" ;;
-  full) TIER_VARIANT="max"  ;;
-  *) echo "bad tier: '$TIER' (want lite|full)" >&2; exit 2 ;;
-esac
-ZEN_VARIANT="${ZEN_VARIANT:-$TIER_VARIANT}"
+ZEN_VARIANT="${ZEN_VARIANT:-max}"
 case "$ZEN_VARIANT" in
   minimal|low|high|max) ;;
   *) echo "bad ZEN_VARIANT: '$ZEN_VARIANT' (want minimal|low|high|max)" >&2; exit 2 ;;
@@ -116,7 +111,7 @@ $SCHEMA_TXT
 The artifact to review follows on stdin."
 
 RAW="$(mktemp /tmp/glm-raw.XXXXXX.txt)"
-echo "reviewer #2: $ZEN_MODEL, tier=$TIER, effort=$ZEN_VARIANT" >&2
+echo "reviewer #2: $ZEN_MODEL, effort=$ZEN_VARIANT" >&2
 cat "$BUNDLE" | opencode run --variant "$ZEN_VARIANT" --model "$ZEN_MODEL" "$FULL_PROMPT" > "$RAW" 2>/tmp/glm-err.log || {
   echo "opencode run failed; see /tmp/glm-err.log" >&2; sed -n '1,20p' /tmp/glm-err.log >&2; exit 1;
 }
