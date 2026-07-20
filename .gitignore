@@ -1,6 +1,10 @@
 # OS cruft
 .DS_Store
 
+# Python bytecode cache (from the cross-review helper scripts' imports)
+__pycache__/
+*.pyc
+
 # Local Claude Code settings (per-machine permissions)
 .claude/settings.local.json
 
