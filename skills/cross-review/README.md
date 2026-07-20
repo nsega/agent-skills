@@ -72,9 +72,33 @@ scripts/check_disagreements.sh /tmp/claude.json /tmp/glm.json   # exits 1 if any
 
 A couple of opencode keys move between releases — confirm against current docs:
 
-- `provider.opencode.models["glm-5.2"].options` — exact **reasoning-effort** key
-  (this config uses `reasoningEffort: "max"`).
+- Reasoning effort is **not** set in the config. `glm_review.sh` passes it per-run
+  as `opencode run --variant <high|max>`, mapped from the tier. Note opencode
+  accepts an unknown `--variant` silently (exit 0, review proceeds), so a typo
+  degrades effort without an error; the script validates the value itself.
 - `permission` / `share` value spellings.
 
-These were not end-to-end tested in the environment that generated this skill
-(no opencode auth / network there); the shell and JSON are syntax-validated.
+The shell and JSON are syntax-validated, and `tests/run_tests.sh` covers the
+contract, the disagreement checker, tier routing and JSON extraction offline.
+What no test covers: whether `--variant` changes glm-5.2's behavior at all. See
+"Effort and run-to-run variance" below.
+
+## Effort and run-to-run variance
+
+Measured, 3 runs over one identical packet (same prompt, same schema, only
+`--variant` differing):
+
+| run | effort | findings | verdict |
+|---|---|---|---|
+| 1 | high | 3 | approve_with_nits |
+| 2 | high | 0 | approve |
+| 3 | max | 2 | request_changes |
+
+The two `high` runs shared **zero** findings with each other; `high` run 1 and
+the `max` run shared one. Run-to-run variance is therefore at least as large as
+any effort difference, and a single reviewer-#2 pass is not a reliable detector:
+the same diff drew both "approve, nothing to report" and "request_changes".
+
+Practical reading: do not treat one clean GLM pass as evidence of no problems,
+and do not assume `full` is more accurate than `lite` — that is unmeasured here.
+If a review matters, more passes buy more than more effort does.
