@@ -53,7 +53,11 @@ Hard rules (these mirror the rubric and the schema — obey them):
 - It MUST validate against the JSON schema below. reviewer = "glm-5.2".
 - Number your findings with a "G-" prefix: "G-001", "G-002", ...
 - Field names are exactly: id, severity, category, location, issue, evidence,
-  failure_case, suggestion, confidence, speculative.
+  failure_case, suggestion, confidence, recommendation, speculative.
+- recommendation is REQUIRED on every finding: one of must_fix / should_fix /
+  defer / nit. It is your recommended action, separate from severity (impact),
+  and the synthesizer may overrule it. There is no "reject" value: you do not
+  reject a finding you just raised. See the rubric's Recommendation section.
 - Evidence is mandatory for every critical/high finding AND every
   correctness/security finding (any severity). For critical/high also give a
   failure_case. (The schema enforces this — a finding missing them is rejected.)

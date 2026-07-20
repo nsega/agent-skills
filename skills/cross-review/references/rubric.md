@@ -14,6 +14,26 @@ not apply rather than inventing findings.
 - **low** — optional; include only when style/clarity creates real maintenance
   risk, or when the user explicitly asks for nits.
 
+## Recommendation (your call on your own finding)
+
+Every finding carries a `recommendation`. Severity is **impact**; recommendation
+is **action**. They are allowed to diverge, and the divergence is informative.
+
+- **must_fix** — do not merge / sign off until this is addressed.
+- **should_fix** — fix it, but it need not gate.
+- **defer** — real, but belongs in separate work (out of scope here, or blocked
+  on a decision this change should not make).
+- **nit** — optional polish. Use sparingly; the discipline rules still apply.
+
+You recommend, you do not decide: the synthesizer assigns the canonical
+disposition and may overrule you, with a reason. There is deliberately no
+`reject` value here, because you never reject a finding you just raised. Only
+the synthesizer rejects.
+
+Examples of legitimate divergence from severity: a `low` finding with a one-line
+fix can be `must_fix`; a `high` finding that is genuinely outside this change's
+scope can be `defer` (say so in `issue`).
+
 ## Category values (must match findings.schema.json `category` enum)
 
 `correctness · security · testing · performance · failure_modes · observability ·

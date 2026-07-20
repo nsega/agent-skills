@@ -78,6 +78,11 @@ Emit `/tmp/claude-findings.json` per `references/findings.schema.json`,
 `"reviewer": "claude-opus-4.8"`. **Each reviewer prefixes its finding ids**
 (`C-001…` for you, `G-001…` for GLM). Honor the schema: Evidence is required for
 critical/high and for correctness/security; critical/high also need a failure_case.
+Every finding also needs a `recommendation` (`must_fix` / `should_fix` / `defer` /
+`nit`) — that is your reviewer-hat call, and it is what makes the "reviewers
+disagree" escalation triggers in Step 4 checkable. Commit to it here, before you
+have seen GLM's, and do not revise it during synthesis; overruling it later is a
+**disposition**, recorded as such.
 
 ## Step 4 — Synthesize (the actual work)
 
@@ -90,9 +95,10 @@ Read `/tmp/glm-findings.json` now. Then:
    confidence — a `low confidence × high severity` item still reaches a human.
 4. **Isolate conflicts, but escalate only the ones that matter.** Send to the
    human a conflict when ANY of:
-   - severity high+ and the two reviewers' calls differ;
+   - severity high+ and the two reviewers' `recommendation` values differ;
    - it touches security / data loss / migration / public API;
-   - one says `reject`, the other `must fix`;
+   - you are about to disposition `reject` on a finding the other reviewer
+     recommended `must_fix`;
    - low confidence but high severity;
    - **you are downgrading a GLM finding it rated high+ to `defer` or `reject`.**
      You are the disputant here, so that call is not yours to make privately.
@@ -152,7 +158,7 @@ scripts/glm_review.sh /tmp/fix-bundle.md references/rubric.md \
 **Verdict:** <approve | approve_with_nits | request_changes | block>
 
 ## ⚠️ Escalated to human (high-risk conflicts)
-- [F-00x][<location>] Claude: <call> · GLM: <call> — <why it matters>
+- [F-00x][<location>] Claude rec: <must_fix|should_fix|defer|nit> · GLM rec: <…> · my disposition: <…> — <why it matters>
 
 ## Consensus findings (both reviewers)
 - **[F-00x][severity][category]** <location> — <issue>. *Evidence:* <…>. *Fix:* <…>

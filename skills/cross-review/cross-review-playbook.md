@@ -70,6 +70,9 @@ Evidence:     the basis (diff line, relevant spec, observed behavior); guards ag
 Failure case: when it actually bites (input, ordering, load)
 Suggested fix:
 Confidence:   high / medium / low
+Recommendation: must_fix / should_fix / defer / nit (your call on your own
+              finding; severity is impact, this is action. No "reject": you do
+              not reject what you just raised, only the synthesizer does)
 Speculative:  yes / no
 ```
 
@@ -95,9 +98,10 @@ A spot where the two reviewers rule opposite ways is a stronger signal than a si
 
 ```
 To the human:
-- high or above, and the two calls differ
+- high or above, and the two reviewers' `recommendation` values differ
 - touches security / data loss / migration / public API
-- one says reject, the other says must fix
+- Claude is about to disposition `reject` on a finding the other reviewer
+  recommended `must_fix`
 - low confidence but high severity
 - Claude is downgrading a finding GLM rated high or above to defer / reject
 Other, lower-risk conflicts:
