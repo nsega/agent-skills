@@ -27,6 +27,21 @@ export OPENCODE_CONFIG="${OPENCODE_CONFIG:-$SKILL_DIR/config/opencode.zen.json}"
 
 command -v opencode >/dev/null || { echo "opencode not found on PATH" >&2; exit 127; }
 
+# opencode reads its stored credential only in interactive sessions; a
+# non-interactive `run` needs the key in the env or it dies with "Missing API key"
+# despite auth.json being present and valid.
+AUTH_JSON="${OPENCODE_AUTH_JSON:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json}"
+if [ -z "${OPENCODE_API_KEY:-}" ] && [ -f "$AUTH_JSON" ]; then
+  OPENCODE_API_KEY="$(python3 -c 'import json,sys
+try: print(json.load(open(sys.argv[1]))["opencode"]["key"])
+except Exception: pass' "$AUTH_JSON")" || true
+  [ -n "$OPENCODE_API_KEY" ] && export OPENCODE_API_KEY
+fi
+if [ -z "${OPENCODE_API_KEY:-}" ]; then
+  echo "no OpenCode Zen key: set OPENCODE_API_KEY, or run 'opencode auth login' (expected at $AUTH_JSON)" >&2
+  exit 3
+fi
+
 PROMPT=$(cat <<'EOF2'
 You are an INDEPENDENT senior reviewer. You have not seen any other reviewer's
 output. Review the artifact piped to you (a PR diff or a system-design document)
