@@ -1,0 +1,48 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Hardened opencode config for the cross-review sub-reviewer. Activate by
+  // exporting OPENCODE_CONFIG=<this file> (glm_review.sh does this by default).
+  // opencode parses JSONC comments even in a .json-named file; "//"-keyed
+  // pseudo-comments are rejected by opencode's strict config schema.
+
+  "model": "opencode/glm-5.2",
+
+  // Background calls (titles/summaries) MUST NOT leak code to a free
+  // tier or to the default Zen title model (Claude Haiku, 30-day retention).
+  // Pin to a cheap PAID, zero-retention model.
+  "small_model": "opencode/deepseek-v4-flash",
+
+  // Never auto-publish review sessions.
+  "share": "disabled",
+
+  // Review-only posture: no edits, no shell side effects.
+  "permission": {
+    "edit": "deny",
+    "bash": "deny",
+    "webfetch": "deny"
+  },
+
+  "provider": {
+    "opencode": {
+      "models": {
+        "glm-5.2": {
+          // Max reasoning effort for review depth. VERIFY the exact key
+          // against current opencode/Zen docs — effort key naming changes.
+          "options": {
+            "reasoningEffort": "max"
+          }
+        }
+      }
+    }
+  }
+
+  // Free tiers: authoritative control is the Zen WORKSPACE model-access setting
+  // (admin → disable these org-wide). This list is defense-in-depth only.
+  // Do not use:
+  //   opencode/deepseek-v4-flash-free
+  //   opencode/big-pickle
+  //   opencode/north-mini-code-free
+  //   opencode/nemotron-3-ultra-free
+  //   opencode/mimo-v2.5-free
+}

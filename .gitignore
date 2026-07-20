@@ -6,3 +6,7 @@
 
 # Per-skill scratch / iteration workspaces (not real skills)
 *-workspace/
+
+# cross-review outputs (default to /tmp, but never commit them if redirected here)
+*.findings.json
+cross-review-packet.*
