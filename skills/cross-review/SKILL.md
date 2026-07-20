@@ -103,14 +103,23 @@ Read `/tmp/glm-findings.json` now. Then:
    - **Tie-break toward escalation.** If it is arguable whether a conflict clears
      the bar, it clears the bar. A spurious escalation costs one line; a
      suppressed blocker costs the incident.
-   - **No self-resolution on design.** On design/architecture conflicts you may
-     not settle in your own favor with author knowledge as the reason. Either
-     GLM's read stands, or the conflict goes to the human. Author knowledge
-     settles **correctness** conflicts, not taste or structure.
+   - **No self-resolution on design.** On a design/architecture conflict, if
+     author knowledge is your only ground for your side, you may not settle it:
+     either GLM's read stands, or it goes to the human. Author knowledge settles
+     **correctness** conflicts, not taste or structure. Design conflicts you can
+     settle on grounds visible in the artifact itself still follow the normal
+     escalation bar above.
+     **Do not launder a design conflict into a correctness one.** You assign the
+     category at synthesis, so it is the one lever that could void this rule:
+     for a GLM-raised finding use **GLM's** original category, and if it is
+     arguable whether a conflict is correctness or design, treat it as design.
    - **Account for every dropped GLM finding.** Any GLM finding you do not adopt
+     ("not adopted" = it never received an F-ID; a GLM finding that got an F-ID
+     and was then rejected belongs under Disposition with its reject reason)
      gets listed under "Not adopted" with a reason, even below the escalation
      bar. Silent drops are the failure mode this whole topology exists to
-     prevent.
+     prevent. **In lite one grouped line suffices** (`Not adopted: G-002, G-005
+     — below must-fix bar`); itemized per-finding reasons are required in full.
 5. **Disposition** each finding: `must fix` / `should fix` / `defer` / `reject`.
    `reject` requires a reason. This turns the review into a design decision, not
    an AI vote.

@@ -107,8 +107,9 @@ Other, lower-risk conflicts:
 **Claude is both a disputant and the chair**, so three additional rules bind it:
 
 - **When in doubt, fall toward escalating.** One extra line costs less than a suppressed blocker.
-- **Do not self-resolve design/architecture conflicts in your own favor.** Author knowledge is grounds only in **correctness** conflicts. For design and structural conflicts there are two options: GLM's reading stands, or it goes to the human.
-- **Always record dropped GLM findings.** Even below the escalation bar, they belong under "Not adopted" with a reason. Dropping them silently is the exact failure this topology exists to prevent.
+- **Do not self-resolve design/architecture conflicts in your own favor.** Author knowledge is grounds only in **correctness** conflicts. When author knowledge is your only ground on a design conflict, there are two options: GLM's reading stands, or it goes to the human. Design conflicts you can settle on grounds visible in the artifact still follow the normal escalation bar.
+  **The category is the loophole:** Claude assigns it at synthesis, so for a GLM-raised finding use GLM's original category, and when it is arguable whether a conflict is correctness or design, treat it as design.
+- **Always record dropped GLM findings.** Even below the escalation bar, they belong under "Not adopted" with a reason ("not adopted" means it never received an F-ID; a rejected finding that did get one goes under Disposition instead). Dropping them silently is the exact failure this topology exists to prevent. In lite, one grouped line is enough; itemized reasons are required in full.
 
 ### 8. Disposition and the finding ID lifecycle
 At synthesis, Claude assigns each finding a canonical **F-###** and classifies it.
@@ -169,7 +170,7 @@ High risk = security / data loss / migration / public API. GLM never re-reads th
 | Independent review (B) | GLM one pass + Claude synthesis | both fully blind (Claude via subagent if possible) |
 | Disposition (D) | must fix only | all classes + reject reasons + conflict isolation |
 | Re-review (E) | Claude self-check | delta-review (GLM when high risk, fresh session when major) |
-| Human summary (F) | brief | full (F-ID tracked) |
+| Human summary (F) | brief (dropped GLM findings as one grouped line) | full (F-ID tracked, itemized "Not adopted" reasons) |
 | **GLM effort** | **High** | **Max** |
 | **Claude deep pass** | medium | high / max |
 
