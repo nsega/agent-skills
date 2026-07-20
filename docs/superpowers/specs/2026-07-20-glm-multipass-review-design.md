@@ -39,9 +39,12 @@ it.
   singleton). Recurrence ranks findings; it never removes them.
 - **Not multi-pass for Claude.** Reviewer #1 stays a single author-aware pass and
   remains the synthesizer. The variance and reliability problems are GLM's.
-- **No semantic cross-pass matching.** Clustering is by normalized location only,
-  the same approximation `check_disagreements.sh` already uses. Documented as the
-  floor, not the ceiling.
+- **No semantic cross-pass matching.** Aggregation clusters by EXACT normalized
+  location (file:line kept) via a distinct `loc_key()` helper, so distinct
+  same-file findings are never merged and `pass_count` counts distinct passes
+  (never exceeding `passes_total`). The checker still uses the line-stripping
+  `norm()` for cross-reviewer matching; the two helpers live together in
+  `_findings_lib.py`. Documented as the floor, not the ceiling.
 - **No configurable vote threshold.** There is no threshold: nothing is dropped.
 
 ## Design
@@ -81,9 +84,13 @@ but still reach the synthesizer and remain fully eligible for Step 4 escalation.
 - Invoked by the wrapper, but a standalone script so it can be tested offline
   against fixture pass files without any opencode call.
 - Reads every `pass-*.json` in `out_dir` that is schema-valid.
-- Unions all findings; clusters by normalized location using the same `norm()`
-  rule as `check_disagreements.sh` (lowercase, strip line numbers and
-  parentheticals). A shared helper avoids two copies drifting.
+- Unions all findings; clusters by EXACT normalized location (file:line kept)
+  via the `loc_key()` helper, distinct from the line-stripping `norm()` used by
+  `check_disagreements.sh` for cross-reviewer matching. Both helpers live in
+  `_findings_lib.py` so they cannot drift apart even though they normalize
+  differently on purpose: passes review the SAME packet, so the same issue
+  cites the same line, while different reviewers may cite nearby lines for the
+  same issue.
 - For each cluster, emit one finding: keep the **highest-severity** instance
   (ties → the one with the longest evidence), and set:
   - `pass_count` = number of passes in the cluster,
@@ -151,8 +158,9 @@ Add to `tests/run_tests.sh`:
   aggregation still validates.
 - Aggregator output validates against `findings.schema.json` (including the new
   optional fields).
-- The shared `norm()` helper is exercised so it cannot drift from
-  `check_disagreements.sh`.
+- A distinct same-file-findings fixture proves `loc_key()` keeps file:line, so
+  distinct findings in the same file are never merged; both helpers live in
+  `_findings_lib.py` so `loc_key()` cannot drift from `norm()`.
 
 ## Decisions locked
 

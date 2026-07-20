@@ -106,6 +106,29 @@ def test_singletons_sort_by_severity():
     finally:
         shutil.rmtree(d)
 
+def test_distinct_same_file_findings_both_survive():
+    d = tempfile.mkdtemp()
+    try:
+        shutil.copy(os.path.join(FIX, "pass-samefile.json"), os.path.join(d, "pass-1.json"))
+        r, out = run(d)
+        assert r.returncode == 0, r.stderr
+        doc = json.load(open(out))
+        assert doc["passes_total"] == 1
+        locs = sorted(f["location"] for f in doc["findings"])
+        assert locs == ["src/e.py:10", "src/e.py:200"], locs  # neither dropped
+    finally:
+        shutil.rmtree(d)
+
+def test_pass_count_never_exceeds_passes_total():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        _, out = run(d)
+        doc = json.load(open(out))
+        for f in doc["findings"]:
+            assert f["pass_count"] <= doc["passes_total"], f
+    finally:
+        shutil.rmtree(d)
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:

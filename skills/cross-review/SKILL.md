@@ -78,7 +78,7 @@ scripts/glm_review_passes.sh <packet> references/rubric.md \
 Reviewer #2 runs **3 independent passes** (override with a trailing count or
 `GLM_PASSES`), unioned into one `glm-findings.json`. Each finding carries
 `pass_count` out of `passes_total`. GLM runs at max effort; the wrapper echoes
-`<M>/<N> passes succeeded` to stderr. To re-run the effort experiment set
+`reviewer #2: <M>/<N> passes succeeded` to stderr. To re-run the effort experiment set
 `ZEN_VARIANT=high`.
 
 Then do your own review against `references/rubric.md` (read it + the schema now).

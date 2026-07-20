@@ -238,6 +238,9 @@ OUT="$TMP/agg-none.json"; rm -f "$OUT"; STUB_FAIL="1 2 3" wrap "$OUT" 3; check "
 # Bad N -> exit 2.
 STUB_FAIL="" wrap "$TMP/agg-badN.json" "notanumber"; check "bad N: exit 2" "$?" "2"
 
+# Bad GLM_PASS_RETRIES -> exit 2.
+STUB_FAIL="" GLM_PASS_RETRIES=abc wrap "$TMP/agg-badR.json" 3; check "bad GLM_PASS_RETRIES: exit 2" "$?" "2"
+
 # Summary line reports the success ratio.
 STUB_FAIL="2" wrap "$TMP/agg-sum.json" 3
 case "$(cat "$TMP/wrap.err")" in *"2/3 passes succeeded"*) ok "wrapper reports M/N passes";; *) bad "wrapper reports M/N passes";; esac

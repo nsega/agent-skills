@@ -25,7 +25,7 @@ B="${2:?need glm findings json}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}" python3 - "$A" "$B" <<'PY'
-import json, sys, re
+import json, sys
 from _findings_lib import norm, load_findings as load
 
 try:

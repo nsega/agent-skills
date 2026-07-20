@@ -17,6 +17,15 @@ def norm(loc):
     return re.sub(r"\s+", " ", loc).strip(" .,:;-")
 
 
+def loc_key(location):
+    """Exact-location key for aggregating repeated passes over the SAME packet.
+    Keeps file:line (the same issue cites the same line across passes), unlike
+    norm(), which strips the line for cross-REVIEWER matching in the checker."""
+    loc = (location or "").lower().strip()
+    loc = re.sub(r"\(.*?\)", "", loc)
+    return re.sub(r"\s+", " ", loc).strip(" .,:;-")
+
+
 def load_findings(path):
     """Load a findings document. Raises OSError / json.JSONDecodeError on failure."""
     with open(path, encoding="utf-8") as fh:

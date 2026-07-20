@@ -28,6 +28,7 @@ RETRIES="${GLM_PASS_RETRIES:-1}"
 
 case "$N" in ''|*[!0-9]*) echo "bad N: '$N' (want a positive integer)" >&2; exit 2 ;; esac
 [ "$N" -ge 1 ] || { echo "bad N: '$N' (must be >= 1)" >&2; exit 2; }
+case "$RETRIES" in ''|*[!0-9]*) echo "bad GLM_PASS_RETRIES: '$RETRIES' (want a non-negative integer)" >&2; exit 2 ;; esac
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GLM_REVIEW_BIN="${GLM_REVIEW_BIN:-$SKILL_DIR/scripts/glm_review.sh}"
