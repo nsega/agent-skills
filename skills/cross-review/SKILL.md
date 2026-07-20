@@ -71,13 +71,15 @@ findings. Even `minimal` keeps purpose + non-goals + diff + test results.
 Kick off GLM first; **do not open `glm-findings.json` until step 4.**
 
 ```bash
-scripts/glm_review.sh <packet> references/rubric.md \
-  references/findings.schema.json /tmp/glm-findings.json
+scripts/glm_review_passes.sh <packet> references/rubric.md \
+  references/findings.schema.json /tmp/glm-findings.json 3
 ```
 
-GLM runs at max effort; the script echoes it to stderr. To re-run the effort
-experiment, set `ZEN_VARIANT=high` (or `low`/`minimal`); it does not otherwise
-vary by tier.
+Reviewer #2 runs **3 independent passes** (override with a trailing count or
+`GLM_PASSES`), unioned into one `glm-findings.json`. Each finding carries
+`pass_count` out of `passes_total`. GLM runs at max effort; the wrapper echoes
+`<M>/<N> passes succeeded` to stderr. To re-run the effort experiment set
+`ZEN_VARIANT=high`.
 
 Then do your own review against `references/rubric.md` (read it + the schema now).
 Emit `/tmp/claude-findings.json` per `references/findings.schema.json`,
@@ -111,7 +113,10 @@ the floor, not the ceiling: it matches on location, so it cannot see the cases i
    differ on a clustered finding, **record the higher one**.
 2. **Reassign canonical ids** `F-001, F-002, …` to merged findings.
 3. **Order** by `severity × confidence` (`high × high` first). Never filter on
-   confidence — a `low confidence × high severity` item still reaches a human.
+   confidence: a `low confidence × high severity` item still reaches a human.
+   For GLM findings also weigh `pass_count / passes_total`: high agreement raises
+   priority, but a `1/3` finding is **not** filtered: it escalates on its own
+   merits exactly as a single-pass finding would.
 4. **Isolate conflicts, but escalate only the ones that matter.** Send to the
    human a conflict when ANY of:
    - **either** reviewer rated it high+ and the two reviewers' `recommendation`
@@ -197,6 +202,7 @@ scripts/glm_review.sh /tmp/fix-bundle.md references/rubric.md \
 - **[F-00x][severity][category]** <location> — <issue>. *Evidence:* <…>. *Fix:* <…>
 
 ## Single-reviewer findings
+<!-- For a GLM finding, append its agreement, e.g. "(GLM 1/3)". -->
 - **[F-00x][severity][category][C|G]** <location> — <issue>. *Fix:* <…>
 
 ## Disposition
@@ -229,12 +235,15 @@ was checked, not skipped.
 
 ## Files
 
-- `scripts/gather_artifact.sh` — build the packet (`--level full|minimal`, `--tests`).
-- `scripts/glm_review.sh` — run reviewer #2, capture JSON findings.
-- `scripts/check_disagreements.sh` — list the pairs that trip the Step 4 triggers
+- `scripts/gather_artifact.sh`: build the packet (`--level full|minimal`, `--tests`).
+- `scripts/glm_review.sh`: run reviewer #2, capture JSON findings.
+- `scripts/glm_review_passes.sh`: reviewer #2 as N passes, unioned (wraps `glm_review.sh`).
+- `scripts/aggregate_passes.py`: union passes by location, score by `pass_count`.
+- `scripts/_findings_lib.py`: shared `norm()`/`load_findings` for the checker + aggregator.
+- `scripts/check_disagreements.sh`: list the pairs that trip the Step 4 triggers
   (location-matched; the floor, not the ceiling).
-- `tests/run_tests.sh` — offline regression tests for the contract + the checker.
-- `references/rubric.md` — severity/category source of truth + lenses (read before reviewing).
-- `references/findings.schema.json` — findings contract (Evidence/Failure-case rules, ids).
-- `config/opencode.zen.json` — hardened opencode config (Zen + GLM-5.2 Max).
-- `cross-review-playbook.md` — the method/rationale (human-facing).
+- `tests/run_tests.sh`: offline regression tests for the contract + the checker.
+- `references/rubric.md`: severity/category source of truth + lenses (read before reviewing).
+- `references/findings.schema.json`: findings contract (Evidence/Failure-case rules, ids).
+- `config/opencode.zen.json`: hardened opencode config (Zen + GLM-5.2 Max).
+- `cross-review-playbook.md`: the method/rationale (human-facing).

@@ -52,7 +52,7 @@ Or drive the sub-reviewer directly:
 
 ```bash
 B=$(scripts/gather_artifact.sh pr origin/main)
-scripts/glm_review.sh "$B" references/rubric.md references/findings.schema.json /tmp/glm.json
+scripts/glm_review_passes.sh "$B" references/rubric.md references/findings.schema.json /tmp/glm.json 3
 scripts/check_disagreements.sh /tmp/claude.json /tmp/glm.json   # exits 1 if any pair escalates
 ```
 
