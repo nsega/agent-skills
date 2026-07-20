@@ -23,16 +23,16 @@
     "webfetch": "deny"
   },
 
+  // Reasoning effort is deliberately NOT set here. It is per-run and tier-
+  // dependent (lite -> high, full -> max), so glm_review.sh passes it with
+  // `opencode run --variant`. Setting it here too would be a second source of
+  // truth that silently wins or loses depending on precedence, and the old
+  // `provider.opencode.models.glm-5.2.options.reasoningEffort` key was never
+  // verified against current opencode docs anyway.
   "provider": {
     "opencode": {
       "models": {
-        "glm-5.2": {
-          // Max reasoning effort for review depth. VERIFY the exact key
-          // against current opencode/Zen docs — effort key naming changes.
-          "options": {
-            "reasoningEffort": "max"
-          }
-        }
+        "glm-5.2": {}
       }
     }
   }

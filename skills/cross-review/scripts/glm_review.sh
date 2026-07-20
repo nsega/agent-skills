@@ -4,22 +4,50 @@
 # Evidence/failure_case rules) before accepting the output.
 #
 # Usage:
-#   glm_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON>
+#   glm_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [TIER]
+#
+#   TIER is lite|full (default: full). It is the ONLY place the stakes tier maps
+#   to reasoning effort: lite -> high, full -> max, matching SKILL.md's
+#   effort-routing table. Passed per-run via `opencode run --variant`.
 #
 # Env:
 #   ZEN_MODEL       opencode model id            (default: opencode/glm-5.2)
 #   OPENCODE_CONFIG path to hardened config       (default: <skill>/config/opencode.zen.json)
+#   ZEN_VARIANT     override the effort variant outright (skips the tier mapping)
 #
 # Notes:
 # - Review-only. We ask GLM for findings, never for a patch, and run opencode in
 #   a non-interactive single-shot ("run") so it does not edit the repo.
-# - Reasoning effort is set in the opencode config (see config/opencode.zen.json).
+# - opencode ACCEPTS AN UNKNOWN --variant SILENTLY (verified: a bogus value exits
+#   0 and reviews anyway), so a typo would quietly downgrade effort with no
+#   signal. That is why the tier mapping is validated here rather than trusted to
+#   the CLI.
 set -euo pipefail
 
 BUNDLE="${1:?need bundle path}"
 RUBRIC="${2:?need rubric path}"
 SCHEMA="${3:?need schema path}"
 OUT="${4:?need output json path}"
+TIER="${5:-full}"
+
+case "$TIER" in
+  lite) TIER_VARIANT="high" ;;
+  full) TIER_VARIANT="max"  ;;
+  *) echo "bad tier: '$TIER' (want lite|full)" >&2; exit 2 ;;
+esac
+ZEN_VARIANT="${ZEN_VARIANT:-$TIER_VARIANT}"
+case "$ZEN_VARIANT" in
+  minimal|low|high|max) ;;
+  *) echo "bad ZEN_VARIANT: '$ZEN_VARIANT' (want minimal|low|high|max)" >&2; exit 2 ;;
+esac
+
+# Check inputs BEFORE spending anything. Without this a typo'd bundle path still
+# reaches opencode (`cat missing | opencode` leaves opencode reading empty stdin)
+# and bills a full paid review of nothing.
+for f in "$BUNDLE" "$RUBRIC" "$SCHEMA"; do
+  [ -f "$f" ] || { echo "no such file: $f" >&2; exit 2; }
+done
+[ -s "$BUNDLE" ] || { echo "bundle is empty: $BUNDLE" >&2; exit 2; }
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZEN_MODEL="${ZEN_MODEL:-opencode/glm-5.2}"
@@ -88,7 +116,8 @@ $SCHEMA_TXT
 The artifact to review follows on stdin."
 
 RAW="$(mktemp /tmp/glm-raw.XXXXXX.txt)"
-cat "$BUNDLE" | opencode run --model "$ZEN_MODEL" "$FULL_PROMPT" > "$RAW" 2>/tmp/glm-err.log || {
+echo "reviewer #2: $ZEN_MODEL, tier=$TIER, effort=$ZEN_VARIANT" >&2
+cat "$BUNDLE" | opencode run --variant "$ZEN_VARIANT" --model "$ZEN_MODEL" "$FULL_PROMPT" > "$RAW" 2>/tmp/glm-err.log || {
   echo "opencode run failed; see /tmp/glm-err.log" >&2; sed -n '1,20p' /tmp/glm-err.log >&2; exit 1;
 }
 

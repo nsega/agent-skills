@@ -180,7 +180,7 @@ High risk = security / data loss / migration / public API. GLM never re-reads th
 | Disposition (D) | must fix only | all classes + reject reasons + conflict isolation |
 | Re-review (E) | Claude self-check | delta-review (GLM when high risk, fresh session when major) |
 | Human summary (F) | brief (dropped GLM findings as one grouped line) | full (F-ID tracked, itemized "Not adopted" reasons) |
-| **GLM effort** | **High** | **Max** |
+| **GLM effort** | **High** (`glm_review.sh ... lite`) | **Max** (`... full`) |
 | **Claude deep pass** | medium | high / max |
 
 `small_model` (title generation and similar) stays minimal at all times. Spend high effort only on the deep passes.
