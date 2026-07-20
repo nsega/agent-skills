@@ -76,7 +76,7 @@ Recommendation: must_fix / should_fix / defer / nit (your call on your own
 Speculative:  yes / no
 ```
 
-**Evidence is required for critical/high and for correctness/security**, and critical/high also require a failure case (the schema enforces this). Nits are exempt.
+**Evidence is required for critical/high and for correctness/security**, and critical/high also require a failure case (the schema enforces this). Low-severity findings outside correctness/security are exempt; note that a `nit` **recommendation** is not an exemption, since the schema keys only on severity and category.
 
 ### 5. Discipline prompt (shared by both reviewers)
 ```
@@ -96,12 +96,17 @@ AI confidence is poorly calibrated. Work in `high severity x high confidence` or
 ### 7. Isolate conflicts, but do not send them all to a human
 A spot where the two reviewers rule opposite ways is a stronger signal than a single-reviewer finding. **Human escalation is conditional:**
 
+Run `check_disagreements.sh` on the two findings files before reasoning about any of this. The synthesizer is one of the disputants, so "did anyone disagree with me" is the last question it should answer from memory. The checker matches on location only, so it is the floor: differently-framed descriptions of one issue still need the clustering scan in section 8.
+
 ```
 To the human:
-- high or above, and the two reviewers' `recommendation` values differ
+- EITHER reviewer rated it high or above, and the two `recommendation` values
+  differ (a missing recommendation counts as differing: fail toward escalation)
 - touches security / data loss / migration / public API
 - Claude is about to disposition `reject` on a finding the other reviewer
   recommended `must_fix`
+- Claude is about to disposition `reject` / `defer` on a finding CLAUDE itself
+  recommended `must_fix` before seeing GLM's (no second reviewer catches this one)
 - low confidence but high severity
 - Claude is downgrading a finding GLM rated high or above to defer / reject
 Other, lower-risk conflicts:
@@ -201,7 +206,7 @@ package it (Claude fills the author fields)
 
 ## Feedback folded into v2
 
-1. Added **Evidence + Failure case** to findings (required for critical/high and correctness/security, exempt for nits). Enforced by the schema.
+1. Added **Evidence + Failure case** to findings (required for critical/high and correctness/security; low-severity findings outside those categories are exempt). Enforced by the schema.
 2. Introduced **finding IDs** (reviewer prefixes G-/C-, renumbered to F-### at synthesis). Fixes, re-review, and the summary are tracked by ID.
 3. **A minimal packet is required even in lite** (dropped the option of omitting it entirely).
 4. **Made conflict escalation conditional** (stopped sending everything to a human; the conditions live in section 7 and are not restated here, so they cannot drift).

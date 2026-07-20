@@ -104,14 +104,18 @@ obj = json.loads(raw[s:e+1])                      # syntactic check
 schema = json.load(open(sys.argv[3]))
 try:
     import jsonschema
-    try:
-        jsonschema.validate(obj, schema)          # enforces Evidence/failure_case rules
-    except jsonschema.ValidationError as ex:
-        path = "/".join(str(p) for p in ex.absolute_path) or "<root>"
-        sys.exit(f"GLM output violates findings.schema.json at {path}: {ex.message}")
 except ImportError:
-    sys.stderr.write("WARN: jsonschema not installed; schema rules NOT enforced. "
-                     "Run: pip install jsonschema\n")
+    # Not advisory: `recommendation`, Evidence and failure_case are only REQUIRED
+    # insofar as this validates. Warning and continuing would emit a green run
+    # whose findings silently lack the fields Step 4's triggers read.
+    sys.exit("jsonschema not installed, so the findings contract cannot be "
+             "enforced and a review would pass with unchecked output. "
+             "Run: pip install jsonschema")
+try:
+    jsonschema.validate(obj, schema)              # enforces Evidence/failure_case rules
+except jsonschema.ValidationError as ex:
+    path = "/".join(str(p) for p in ex.absolute_path) or "<root>"
+    sys.exit(f"GLM output violates findings.schema.json at {path}: {ex.message}")
 json.dump(obj, open(sys.argv[2], "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 print(sys.argv[2])
 PY

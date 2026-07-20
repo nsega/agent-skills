@@ -13,8 +13,10 @@ review. The output foregrounds **disagreements** for human adjudication.
   (or `/connect` in the TUI). Add billing/credits.
 - **python3** with **jsonschema** (`pip install jsonschema`). The GLM reviewer's
   output is hard-validated against `findings.schema.json` (the Evidence /
-  failure_case rules are enforced — a violating finding is rejected, not silently
-  accepted). Without jsonschema the script warns and skips enforcement.
+  failure_case / recommendation rules are enforced — a violating finding is
+  rejected, not silently accepted). Without jsonschema the review **aborts**: an
+  unvalidated run looks green while producing findings that the synthesis step's
+  escalation triggers cannot read.
 
 ## Install
 
@@ -29,7 +31,13 @@ cp -r cross-review ~/.claude/skills/cross-review
 Make scripts executable:
 
 ```bash
-chmod +x cross-review/scripts/*.sh
+chmod +x cross-review/scripts/*.sh cross-review/tests/run_tests.sh
+```
+
+Verify the install (offline, no API key, no cost):
+
+```bash
+cross-review/tests/run_tests.sh
 ```
 
 ## Use
@@ -45,6 +53,7 @@ Or drive the sub-reviewer directly:
 ```bash
 B=$(scripts/gather_artifact.sh pr origin/main)
 scripts/glm_review.sh "$B" references/rubric.md references/findings.schema.json /tmp/glm.json
+scripts/check_disagreements.sh /tmp/claude.json /tmp/glm.json   # exits 1 if any pair escalates
 ```
 
 ## Governance (already assumed in place)

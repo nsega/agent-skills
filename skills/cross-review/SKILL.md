@@ -86,19 +86,37 @@ have seen GLM's, and do not revise it during synthesis; overruling it later is a
 
 ## Step 4 — Synthesize (the actual work)
 
-Read `/tmp/glm-findings.json` now. Then:
+Read **both** `/tmp/claude-findings.json` and `/tmp/glm-findings.json` now, then
+run the mechanical check before you reason about any of it:
+
+```bash
+scripts/check_disagreements.sh /tmp/claude-findings.json /tmp/glm-findings.json
+```
+
+It prints the pairs that trip the escalation triggers below. Treat its output as
+the floor, not the ceiling: it matches on location, so it cannot see the cases in
+4.1 where the same issue is described two different ways.
 
 1. **Cluster + dedupe** the same issue across both reviewers; keep the clearest
-   evidence + suggestion.
+   evidence + suggestion. Disagreement is only detectable when both reviewers'
+   findings land on the **same** F-ID, so before you conclude there are no
+   conflicts, scan for adjacent locations and overlapping issues that you filed
+   separately and compare their recommendations. When the two reviewers' severities
+   differ on a clustered finding, **record the higher one**.
 2. **Reassign canonical ids** `F-001, F-002, …` to merged findings.
 3. **Order** by `severity × confidence` (`high × high` first). Never filter on
    confidence — a `low confidence × high severity` item still reaches a human.
 4. **Isolate conflicts, but escalate only the ones that matter.** Send to the
    human a conflict when ANY of:
-   - severity high+ and the two reviewers' `recommendation` values differ;
+   - **either** reviewer rated it high+ and the two reviewers' `recommendation`
+     values differ (a GLM finding with **no** `recommendation` counts as
+     differing — fail toward escalation, never toward silence);
    - it touches security / data loss / migration / public API;
    - you are about to disposition `reject` on a finding the other reviewer
      recommended `must_fix`;
+   - you are about to disposition `reject` or `defer` on a finding **you**
+     recommended `must_fix` in `/tmp/claude-findings.json`. Overruling your own
+     pre-GLM call is the one conflict with no second reviewer to catch it;
    - low confidence but high severity;
    - **you are downgrading a GLM finding it rated high+ to `defer` or `reject`.**
      You are the disputant here, so that call is not yours to make privately.
@@ -130,6 +148,15 @@ Read `/tmp/glm-findings.json` now. Then:
    `reject` requires a reason. This turns the review into a design decision, not
    an AI vote.
 
+   A **recommendation** is a reviewer's call on its own finding (`must_fix` /
+   `should_fix` / `defer` / `nit`, schema-enforced); a **disposition** is yours as
+   chair, over the merged finding. They are different vocabularies on purpose. Fill
+   the `Claude rec` and `GLM rec` cells of the report **verbatim from the two JSON
+   files**, never from memory: your own recommendation was committed in Step 3
+   before you saw GLM's, and that ordering is the only thing making the first
+   trigger meaningful. If your view has since changed, that is a disposition and
+   is recorded as one; it does not rewrite what you recommended.
+
 ## Step 5 — Fix and delta-review
 
 After fixing the `must fix` items:
@@ -158,7 +185,7 @@ scripts/glm_review.sh /tmp/fix-bundle.md references/rubric.md \
 **Verdict:** <approve | approve_with_nits | request_changes | block>
 
 ## ⚠️ Escalated to human (high-risk conflicts)
-- [F-00x][<location>] Claude rec: <must_fix|should_fix|defer|nit> · GLM rec: <…> · my disposition: <…> — <why it matters>
+- [F-00x][<location>] Claude rec: <must_fix|should_fix|defer|nit> · GLM rec: <same enum, or "not raised"> · my disposition: <must fix|should fix|defer|reject> — <why it matters>
 
 ## Consensus findings (both reviewers)
 - **[F-00x][severity][category]** <location> — <issue>. *Evidence:* <…>. *Fix:* <…>
@@ -198,6 +225,9 @@ was checked, not skipped.
 
 - `scripts/gather_artifact.sh` — build the packet (`--level full|minimal`, `--tests`).
 - `scripts/glm_review.sh` — run reviewer #2, capture JSON findings.
+- `scripts/check_disagreements.sh` — list the pairs that trip the Step 4 triggers
+  (location-matched; the floor, not the ceiling).
+- `tests/run_tests.sh` — offline regression tests for the contract + the checker.
 - `references/rubric.md` — severity/category source of truth + lenses (read before reviewing).
 - `references/findings.schema.json` — findings contract (Evidence/Failure-case rules, ids).
 - `config/opencode.zen.json` — hardened opencode config (Zen + GLM-5.2 Max).

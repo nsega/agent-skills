@@ -1,0 +1,29 @@
+{
+  "reviewer": "claude-opus-4.8",
+  "summary": "Fixture: reviewer #1 side of a planted high-severity disagreement, plus a control pair the checker must NOT flag.",
+  "overall": "request_changes",
+  "findings": [
+    {
+      "id": "C-001",
+      "severity": "high",
+      "category": "correctness",
+      "location": "src/queue.py:88",
+      "issue": "Planted disagreement: this reviewer calls the retry loop unbounded and gating.",
+      "evidence": "src/queue.py:88 retries without a ceiling.",
+      "failure_case": "A permanently failing job spins forever and starves the worker pool.",
+      "suggestion": "Bound the retry count and add backoff.",
+      "confidence": "high",
+      "recommendation": "must_fix"
+    },
+    {
+      "id": "C-002",
+      "severity": "low",
+      "category": "maintainability",
+      "location": "src/util.py:12",
+      "issue": "Control pair: both reviewers agree here, so this must not be flagged.",
+      "suggestion": "Rename the variable.",
+      "confidence": "high",
+      "recommendation": "nit"
+    }
+  ]
+}
