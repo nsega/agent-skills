@@ -129,6 +129,20 @@ def walk(node):
 sys.exit(1 if walk(cfg) else 0)
 PY
 
+echo "== reviewer is blind and tool-less =="
+# The sub-reviewer must answer from the piped bundle only. If file/exec tools are
+# enabled it reads the working tree (breaking blindness) and burns its run
+# exploring instead of emitting findings JSON (observed: a paid call that produced
+# only narration). Pin that the hardened config disables every such tool.
+python3 - "$SKILL/config/opencode.zen.json" <<'PY' && ok "hardened config disables file/exec tools" || bad "hardened config disables file/exec tools"
+import json, re, sys
+cfg = json.loads(re.sub(r"^\s*//.*$", "", open(sys.argv[1], encoding="utf-8").read(), flags=re.M))
+must_be_off = {"read","grep","glob","list","write","edit","patch","bash","webfetch","task"}
+tools = cfg.get("tools", {})
+missing = [t for t in must_be_off if tools.get(t) is not False]
+sys.exit(1 if missing else 0)
+PY
+
 echo "== JSON extraction from reviewer output =="
 # Regression: reviewers narrate before emitting JSON, and that prose contains
 # braces. A first-"{"-to-last-"}" slice parsed the prose instead and the whole

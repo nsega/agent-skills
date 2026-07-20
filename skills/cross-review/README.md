@@ -79,7 +79,8 @@ A couple of opencode keys move between releases — confirm against current docs
 - `permission` / `share` value spellings.
 
 The shell and JSON are syntax-validated, and `tests/run_tests.sh` covers the
-contract, the disagreement checker, tier routing and JSON extraction offline.
+contract, the disagreement checker, effort/input validation and JSON extraction
+offline.
 What no test covers: whether `--variant` changes glm-5.2's behavior at all. See
 "Effort and run-to-run variance" below.
 
