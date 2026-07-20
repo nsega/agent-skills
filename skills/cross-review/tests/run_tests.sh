@@ -193,6 +193,55 @@ else bad "decoy object is not mistaken for the findings"; fi
 mk_raw "no json here at all {oops}"
 if run_extract; then bad "output with no findings object fails loudly"; else ok "output with no findings object fails loudly"; fi
 
+echo "== multi-pass wrapper =="
+# A stub standing in for glm_review.sh, so the wrapper is testable with no network.
+# It keys success/failure on the pass index parsed from the output path, so a
+# retried pass keeps failing (a per-pass, not per-invocation, decision).
+STUB="$TMP/stub_review.sh"
+cat > "$STUB" <<'SH'
+#!/usr/bin/env bash
+b="$(basename "$4")"; i="${b#pass-}"; i="${i%.json}"
+case " ${STUB_FAIL:-} " in *" $i "*) exit 1 ;; esac
+cat > "$4" <<JSON
+{"reviewer":"glm-5.2","summary":"stub pass $i","overall":"approve_with_nits",
+ "findings":[{"id":"G-001","severity":"high","category":"correctness",
+ "location":"src/x.py:1","issue":"stub","evidence":"e","failure_case":"f",
+ "suggestion":"s","confidence":"high","recommendation":"must_fix"}]}
+JSON
+echo "$4"
+SH
+chmod +x "$STUB"
+wrap() { GLM_REVIEW_BIN="$STUB" "$SKILL/scripts/glm_review_passes.sh" \
+           "$EMPTY_OK" "$SCHEMA" "$SCHEMA" "$1" "${2:-}" 2>"$TMP/wrap.err"; }
+# A non-empty bundle so glm_review_passes.sh input checks (if any) pass; the stub
+# ignores its content.
+EMPTY_OK="$TMP/bundle.md"; printf 'x' > "$EMPTY_OK"
+
+# All passes succeed -> passes_total = 3, one clustered finding pass_count 3.
+OUT="$TMP/agg-all.json"; STUB_FAIL="" wrap "$OUT" 3; check "3 passes: exit 0" "$?" "0"
+python3 -c "
+import json,sys;d=json.load(open('$OUT'))
+sys.exit(0 if d.get('passes_total')==3 and d['findings'][0]['pass_count']==3 else 1)" \
+  && ok "3 passes aggregate to passes_total=3, pass_count=3" || bad "3 passes aggregate to passes_total=3, pass_count=3"
+
+# One pass fails all attempts -> skipped -> passes_total = 2, still exit 0.
+OUT="$TMP/agg-degraded.json"; STUB_FAIL="2" wrap "$OUT" 3; check "one pass fails: exit 0" "$?" "0"
+python3 -c "
+import json,sys;d=json.load(open('$OUT'))
+sys.exit(0 if d.get('passes_total')==2 else 1)" \
+  && ok "failed pass drops passes_total to 2" || bad "failed pass drops passes_total to 2"
+
+# All passes fail -> exit 3, no output file.
+OUT="$TMP/agg-none.json"; rm -f "$OUT"; STUB_FAIL="1 2 3" wrap "$OUT" 3; check "all passes fail: exit 3" "$?" "3"
+[ ! -f "$OUT" ] && ok "no output written when all passes fail" || bad "no output written when all passes fail"
+
+# Bad N -> exit 2.
+STUB_FAIL="" wrap "$TMP/agg-badN.json" "notanumber"; check "bad N: exit 2" "$?" "2"
+
+# Summary line reports the success ratio.
+STUB_FAIL="2" wrap "$TMP/agg-sum.json" 3
+case "$(cat "$TMP/wrap.err")" in *"2/3 passes succeeded"*) ok "wrapper reports M/N passes";; *) bad "wrapper reports M/N passes";; esac
+
 echo "== python unit tests =="
 for t in "$DIR"/test_*.py; do
   [ -f "$t" ] || continue
