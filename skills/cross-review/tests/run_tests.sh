@@ -187,6 +187,12 @@ else bad "decoy object is not mistaken for the findings"; fi
 mk_raw "no json here at all {oops}"
 if run_extract; then bad "output with no findings object fails loudly"; else ok "output with no findings object fails loudly"; fi
 
+echo "== python unit tests =="
+for t in "$DIR"/test_*.py; do
+  [ -f "$t" ] || continue
+  if python3 "$t" >/dev/null 2>&1; then ok "$(basename "$t")"; else bad "$(basename "$t") (run: python3 $t)"; fi
+done
+
 echo "== scripts parse =="
 for s in "$SKILL"/scripts/*.sh "$DIR"/run_tests.sh; do
   bash -n "$s" && ok "bash -n $(basename "$s")" || bad "bash -n $(basename "$s")"

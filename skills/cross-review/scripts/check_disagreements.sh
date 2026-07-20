@@ -23,20 +23,10 @@ B="${2:?need glm findings json}"
 [ -f "$A" ] || { echo "no such file: $A" >&2; exit 2; }
 [ -f "$B" ] || { echo "no such file: $B" >&2; exit 2; }
 
-python3 - "$A" "$B" <<'PY'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}" python3 - "$A" "$B" <<'PY'
 import json, sys, re
-
-def load(p):
-    with open(p, encoding="utf-8") as fh:
-        return json.load(fh)
-
-def norm(loc):
-    """Normalize a location for matching: lowercase, drop line numbers and
-    parenthetical asides, keep the file/section stem."""
-    loc = (loc or "").lower().strip()
-    loc = re.sub(r"\(.*?\)", "", loc)
-    loc = re.sub(r"[:#]\s*l?\d+(\s*[-–]\s*\d+)?", "", loc)
-    return re.sub(r"\s+", " ", loc).strip(" .,:;-")
+from _findings_lib import norm, load_findings as load
 
 try:
     a, b = load(sys.argv[1]), load(sys.argv[2])
