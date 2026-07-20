@@ -80,6 +80,32 @@ def test_no_valid_passes_fails():
     finally:
         shutil.rmtree(d)
 
+def test_evidence_length_breaks_severity_tie():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        _, out = run(d)
+        doc = json.load(open(out))
+        b = next(f for f in doc["findings"] if f["location"].startswith("src/b.py"))
+        # Both pass-1 and pass-2 findings for src/b.py are medium severity.
+        # pass-2 has longer evidence, so it should win the cluster.
+        assert b["evidence"] == "this is the much longer evidence string that should win the tie"
+    finally:
+        shutil.rmtree(d)
+
+def test_singletons_sort_by_severity():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        _, out = run(d)
+        doc = json.load(open(out))
+        # Find singletons (pass_count == 1)
+        singletons = [f for f in doc["findings"] if f["pass_count"] == 1]
+        assert len(singletons) == 2
+        # src/d.py is medium, src/c.py is low; medium should sort first
+        assert singletons[0]["location"].startswith("src/d.py")
+        assert singletons[1]["location"].startswith("src/c.py")
+    finally:
+        shutil.rmtree(d)
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:
