@@ -27,7 +27,7 @@ case "$LEVEL" in full|minimal) ;; *) echo "bad --level: $LEVEL" >&2; exit 2;; es
 OUT="$(mktemp /tmp/cross-review-packet.XXXXXX.md)"
 
 emit_tests() {
-  echo "## テスト結果"
+  echo "## Test results"
   if [ -n "$TESTS" ] && [ -f "$TESTS" ]; then echo '```'; cat "$TESTS"; echo '```'
   else echo "<!-- paste test output, or 'pass (CI link)' -->"; fi
   echo
@@ -38,7 +38,7 @@ case "$MODE" in
     BASE="${POS[0]:-origin/main}"; HEAD="${POS[1]:-}"
     RANGE="$BASE${HEAD:+...$HEAD}"
     {
-      echo "# レビューパケット — PULL REQUEST ($LEVEL)"
+      echo "# Review packet: PULL REQUEST ($LEVEL)"
       echo
       echo "- repo: $(git rev-parse --show-toplevel 2>/dev/null || echo '?')"
       echo "- branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
@@ -46,21 +46,21 @@ case "$MODE" in
       echo "- generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
       echo
       if [ "$LEVEL" = "full" ]; then
-        echo "## 背景"; echo "<!-- fill -->"; echo
+        echo "## Background"; echo "<!-- fill -->"; echo
       fi
-      echo "## 目的"; echo "<!-- fill -->"; echo
-      echo "## 非目的 (non-goals)"; echo "<!-- fill — 範囲外指摘を防ぐ -->"; echo
+      echo "## Purpose"; echo "<!-- fill -->"; echo
+      echo "## Non-goals"; echo "<!-- fill: prevents out-of-scope findings -->"; echo
       if [ "$LEVEL" = "full" ]; then
-        echo "## 主要な設計判断"; echo "<!-- fill -->"; echo
-        echo "## 既知の不安点"; echo "<!-- fill — レビューの照準 -->"; echo
+        echo "## Key design decisions"; echo "<!-- fill -->"; echo
+        echo "## Known worries"; echo "<!-- fill: aims the review -->"; echo
       fi
-      echo "## 変更ファイル"; echo '```'
+      echo "## Changed files"; echo '```'
       git diff --stat "$RANGE" 2>/dev/null || git diff --stat "$BASE"; echo '```'; echo
       echo "## Diff"; echo '```diff'
       git diff -U3 "$RANGE" 2>/dev/null || git diff -U3 "$BASE"; echo '```'; echo
       emit_tests
       if [ "$LEVEL" = "full" ]; then
-        echo "## レビューしてほしい観点"; echo "<!-- fill -->"
+        echo "## What to review"; echo "<!-- fill -->"
       fi
     } > "$OUT"
     ;;
@@ -68,16 +68,16 @@ case "$MODE" in
     DOC="${POS[0]:?design mode needs a document path}"
     [ -f "$DOC" ] || { echo "no such file: $DOC" >&2; exit 1; }
     {
-      echo "# レビューパケット — SYSTEM DESIGN ($LEVEL)"
+      echo "# Review packet: SYSTEM DESIGN ($LEVEL)"
       echo
       echo "- document: $DOC"
       echo "- generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
       echo
-      echo "## 目的"; echo "<!-- fill -->"; echo
-      echo "## 非目的 (non-goals)"; echo "<!-- fill -->"; echo
+      echo "## Purpose"; echo "<!-- fill -->"; echo
+      echo "## Non-goals"; echo "<!-- fill -->"; echo
       if [ "$LEVEL" = "full" ]; then
-        echo "## 既知の不安点"; echo "<!-- fill -->"; echo
-        echo "## レビューしてほしい観点"; echo "<!-- fill -->"; echo
+        echo "## Known worries"; echo "<!-- fill -->"; echo
+        echo "## What to review"; echo "<!-- fill -->"; echo
       fi
       echo "## Document"; echo; cat "$DOC"; echo
       emit_tests

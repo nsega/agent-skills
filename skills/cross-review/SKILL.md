@@ -18,6 +18,10 @@ spots do not line up. You (Claude Code / Opus 4.8) are reviewer #1 **and** the
 synthesizer. GLM-5.2 via opencode is reviewer #2, tilted toward dissent. The
 value is in the **disagreements** — surface them, never average them away.
 
+> **"Cross" means cross-lab, not reciprocal.** The two reviewers never see each
+> other's findings; you synthesize both. You are therefore a disputant *and* the
+> chair, which is a standing bias, not a detail. Step 4 exists to contain it.
+
 ## Topology
 
 ```
@@ -55,7 +59,8 @@ scripts/gather_artifact.sh design docs/rfc.md  --level full --tests test.out
 ```
 
 The script fills mechanical fields (changed files, diff/doc, test results). **You
-fill the author fields** (背景/目的/非目的/主要判断/既知の不安点/レビュー観点)
+fill the author fields** (background / purpose / non-goals / key decisions /
+known worries / what to review)
 before sending to reviewers — non-goals and known-worries cut the most off-target
 findings. Even `minimal` keeps purpose + non-goals + diff + test results.
 
@@ -88,9 +93,24 @@ Read `/tmp/glm-findings.json` now. Then:
    - severity high+ and the two reviewers' calls differ;
    - it touches security / data loss / migration / public API;
    - one says `reject`, the other `must fix`;
-   - low confidence but high severity.
+   - low confidence but high severity;
+   - **you are downgrading a GLM finding it rated high+ to `defer` or `reject`.**
+     You are the disputant here, so that call is not yours to make privately.
    Lower-risk conflicts: make a provisional call yourself and just note it in the
    summary. Do not inflate verdicts to look thorough.
+
+   Three rules bind you specifically, because you are also the chair:
+   - **Tie-break toward escalation.** If it is arguable whether a conflict clears
+     the bar, it clears the bar. A spurious escalation costs one line; a
+     suppressed blocker costs the incident.
+   - **No self-resolution on design.** On design/architecture conflicts you may
+     not settle in your own favor with author knowledge as the reason. Either
+     GLM's read stands, or the conflict goes to the human. Author knowledge
+     settles **correctness** conflicts, not taste or structure.
+   - **Account for every dropped GLM finding.** Any GLM finding you do not adopt
+     gets listed under "Not adopted" with a reason, even below the escalation
+     bar. Silent drops are the failure mode this whole topology exists to
+     prevent.
 5. **Disposition** each finding: `must fix` / `should fix` / `defer` / `reject`.
    `reject` requires a reason. This turns the review into a design decision, not
    an AI vote.
@@ -133,6 +153,9 @@ scripts/glm_review.sh /tmp/fix-bundle.md references/rubric.md \
 
 ## Disposition
 - must fix: F-001, F-004 · should fix: F-006 · defer: F-002 · reject: F-007 (<reason>)
+
+## Not adopted (GLM findings I dropped)
+- [G-00x][<location>] <finding> — <why not adopted>
 
 ## After fix
 - F-001 fixed · F-004 fixed · delta-review: <clean | findings>
