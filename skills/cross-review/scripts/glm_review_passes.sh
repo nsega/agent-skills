@@ -52,6 +52,17 @@ for i in $(seq 1 "$N"); do
 done
 
 echo "reviewer #2: $succeeded/$N passes succeeded" >&2
-[ "$succeeded" -ge 1 ] || { echo "all $N passes failed; no review produced" >&2; exit 3; }
+if [ "$succeeded" -lt 1 ]; then
+  # The EXIT trap is about to delete $WORK. On the all-failed path the per-pass
+  # stderr is the only clue why, and the user has already paid for N calls, so
+  # surface it before it is wiped.
+  echo "all $N passes failed; no review produced. per-pass stderr follows:" >&2
+  for e in "$WORK"/pass-*.err; do
+    [ -f "$e" ] || continue
+    echo "----- $(basename "$e") -----" >&2
+    sed -n '1,40p' "$e" >&2
+  done
+  exit 3
+fi
 
 python3 "$SKILL_DIR/scripts/aggregate_passes.py" "$WORK" "$SCHEMA" "$OUT"

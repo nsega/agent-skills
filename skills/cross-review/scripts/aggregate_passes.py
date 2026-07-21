@@ -11,6 +11,7 @@ Usage: aggregate_passes.py <passes_dir> <schema> <out_json>
 """
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,11 +21,18 @@ SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 OVERALL_ORDER = ["approve", "approve_with_nits", "request_changes", "block"]
 
 
+def _pass_num(name):
+    """Numeric index of a pass file name, or -1 if it is not one. Used to sort
+    numerically (pass-2 before pass-10), not lexically."""
+    m = re.match(r"pass-(\d+)\.json$", name)
+    return int(m.group(1)) if m else -1
+
+
 def valid_passes(passes_dir, schema):
     import jsonschema
     docs = []
-    for name in sorted(os.listdir(passes_dir)):
-        if not (name.startswith("pass-") and name.endswith(".json")):
+    for name in sorted(os.listdir(passes_dir), key=_pass_num):
+        if _pass_num(name) < 0:
             continue
         path = os.path.join(passes_dir, name)
         try:
@@ -47,8 +55,16 @@ def worst_overall(docs):
 def aggregate(docs):
     clusters, order = {}, []
     for i, doc in enumerate(docs):
+        # Two findings from the SAME pass at the same location are, by definition,
+        # distinct issues (a pass does not list one finding twice). An occurrence
+        # index keeps them in separate clusters so neither is dropped; across
+        # passes the first finding at a location still merges with the first, etc.
+        seen = {}
         for f in doc.get("findings", []):
-            key = loc_key(f.get("location"))
+            base = loc_key(f.get("location"))
+            occ = seen.get(base, 0)
+            seen[base] = occ + 1
+            key = (base, occ)
             if key not in clusters:
                 clusters[key] = []
                 order.append(key)
@@ -64,6 +80,11 @@ def aggregate(docs):
         out["pass_count"] = len({i for i, _ in group})   # DISTINCT passes, never > passes_total
         merged.append(out)
     merged.sort(key=lambda f: (-f["pass_count"], SEV_ORDER.get(f.get("severity"), 9)))
+    # Cluster winners kept their pass-local ids (each pass numbers from G-001), so
+    # two clusters could collide on the same id. Renumber to keep them unique and
+    # honor the schema's "stable within this review" id contract.
+    for n, f in enumerate(merged, 1):
+        f["id"] = f"G-{n:03d}"
     return merged
 
 

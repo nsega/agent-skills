@@ -12,5 +12,5 @@ __pycache__/
 *-workspace/
 
 # cross-review outputs (default to /tmp, but never commit them if redirected here)
-*.findings.json
+*-findings.json
 cross-review-packet.*

@@ -1,0 +1,13 @@
+{
+  "reviewer": "glm-5.2",
+  "summary": "one pass, two DISTINCT issues at the exact same location",
+  "overall": "request_changes",
+  "findings": [
+    {"id": "G-001", "severity": "high", "category": "correctness", "location": "src/f.py:5 (read path)",
+     "issue": "the read path mishandles empty input", "evidence": "line 5 reads before checking",
+     "failure_case": "x", "suggestion": "guard first", "confidence": "high", "recommendation": "must_fix"},
+    {"id": "G-002", "severity": "high", "category": "correctness", "location": "src/f.py:5 (write path)",
+     "issue": "the write path double-frees on error", "evidence": "line 5 frees twice",
+     "failure_case": "y", "suggestion": "free once", "confidence": "high", "recommendation": "must_fix"}
+  ]
+}

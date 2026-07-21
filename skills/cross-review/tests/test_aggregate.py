@@ -129,6 +129,59 @@ def test_pass_count_never_exceeds_passes_total():
     finally:
         shutil.rmtree(d)
 
+def test_distinct_findings_at_same_location_both_survive():
+    # Two different issues one pass raises at the exact same location (they only
+    # differ by a parenthetical loc_key strips) must NOT collapse into one.
+    d = tempfile.mkdtemp()
+    try:
+        shutil.copy(os.path.join(FIX, "pass-samelocation.json"), os.path.join(d, "pass-1.json"))
+        r, out = run(d)
+        assert r.returncode == 0, r.stderr
+        doc = json.load(open(out))
+        assert len(doc["findings"]) == 2, doc["findings"]  # neither dropped
+        issues = sorted(f["issue"] for f in doc["findings"])
+        assert issues == ["the read path mishandles empty input",
+                          "the write path double-frees on error"], issues
+        for f in doc["findings"]:
+            assert f["pass_count"] == 1
+    finally:
+        shutil.rmtree(d)
+
+def test_ids_are_unique_and_renumbered():
+    d = _stage("pass-1.json", "pass-2.json", "pass-3.json")
+    try:
+        _, out = run(d)
+        doc = json.load(open(out))
+        ids = [f["id"] for f in doc["findings"]]
+        assert len(ids) == len(set(ids)), ids           # no duplicate ids
+        assert ids == [f"G-{n:03d}" for n in range(1, len(ids) + 1)], ids  # sequential in output order
+    finally:
+        shutil.rmtree(d)
+
+def test_same_id_across_passes_does_not_collide():
+    # Each pass numbers from G-001; two singletons that both arrive as G-001 from
+    # different passes must end up with distinct ids in the aggregate.
+    d = tempfile.mkdtemp()
+    try:
+        with open(os.path.join(d, "pass-1.json"), "w") as fh:
+            json.dump({"reviewer": "glm-5.2", "summary": "p1", "overall": "approve",
+                       "findings": [{"id": "G-001", "severity": "high", "category": "correctness",
+                                     "location": "src/a.py:5", "issue": "A", "evidence": "e",
+                                     "failure_case": "f", "suggestion": "s", "confidence": "high",
+                                     "recommendation": "must_fix"}]}, fh)
+        with open(os.path.join(d, "pass-2.json"), "w") as fh:
+            json.dump({"reviewer": "glm-5.2", "summary": "p2", "overall": "approve",
+                       "findings": [{"id": "G-001", "severity": "high", "category": "correctness",
+                                     "location": "src/b.py:9", "issue": "B", "evidence": "e",
+                                     "failure_case": "f", "suggestion": "s", "confidence": "high",
+                                     "recommendation": "must_fix"}]}, fh)
+        _, out = run(d)
+        doc = json.load(open(out))
+        ids = [f["id"] for f in doc["findings"]]
+        assert len(ids) == len(set(ids)) == 2, ids
+    finally:
+        shutil.rmtree(d)
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:
