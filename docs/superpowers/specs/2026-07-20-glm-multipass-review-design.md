@@ -39,12 +39,15 @@ it.
   singleton). Recurrence ranks findings; it never removes them.
 - **Not multi-pass for Claude.** Reviewer #1 stays a single author-aware pass and
   remains the synthesizer. The variance and reliability problems are GLM's.
-- **No semantic cross-pass matching.** Aggregation clusters by EXACT normalized
-  location (file:line kept) via a distinct `loc_key()` helper, so distinct
-  same-file findings are never merged and `pass_count` counts distinct passes
-  (never exceeding `passes_total`). The checker still uses the line-stripping
-  `norm()` for cross-reviewer matching; the two helpers live together in
-  `_findings_lib.py`. Documented as the floor, not the ceiling.
+- **No fuzzy cross-pass matching.** Aggregation clusters by the pair
+  `(loc_key(location), issue_norm(issue))`: exact normalized location (file:line
+  kept) AND a normalized issue-text signal. Two findings merge only when BOTH
+  match, so distinct findings at one location are never merged or paired by
+  position, and `pass_count` counts distinct passes (never exceeding
+  `passes_total`). A reworded restatement under-counts agreement rather than risk
+  a wrong merge, so `pass_count` is a floor on agreement, not an exact count. The
+  checker still uses the line-stripping `norm()` for cross-reviewer matching; all
+  normalization helpers share `_normalize()` in `_findings_lib.py`.
 - **No configurable vote threshold.** There is no threshold: nothing is dropped.
 
 ## Design
@@ -84,13 +87,13 @@ but still reach the synthesizer and remain fully eligible for Step 4 escalation.
 - Invoked by the wrapper, but a standalone script so it can be tested offline
   against fixture pass files without any opencode call.
 - Reads every `pass-*.json` in `out_dir` that is schema-valid.
-- Unions all findings; clusters by EXACT normalized location (file:line kept)
-  via the `loc_key()` helper, distinct from the line-stripping `norm()` used by
-  `check_disagreements.sh` for cross-reviewer matching. Both helpers live in
-  `_findings_lib.py` so they cannot drift apart even though they normalize
-  differently on purpose: passes review the SAME packet, so the same issue
-  cites the same line, while different reviewers may cite nearby lines for the
-  same issue.
+- Unions all findings; clusters by `(loc_key(location), issue_norm(issue))`,
+  distinct from the line-stripping `norm()` used by `check_disagreements.sh` for
+  cross-reviewer matching. All three share `_normalize()` in `_findings_lib.py`
+  so they cannot drift apart even though they normalize differently on purpose.
+  The merged finding takes the highest-severity instance's text but the
+  **strongest** recommendation in the cluster (recommendation drives escalation,
+  so a `must_fix` is never hidden behind a wordier `nit`).
 - For each cluster, emit one finding: keep the **highest-severity** instance
   (ties → the one with the longest evidence), and set:
   - `pass_count` = number of passes in the cluster,

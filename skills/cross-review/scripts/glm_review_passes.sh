@@ -27,8 +27,10 @@ N="${5:-${GLM_PASSES:-3}}"
 RETRIES="${GLM_PASS_RETRIES:-1}"
 
 case "$N" in ''|*[!0-9]*) echo "bad N: '$N' (want a positive integer)" >&2; exit 2 ;; esac
+N=$((10#$N))   # force base-10 so a leading-zero value is not read as octal
 [ "$N" -ge 1 ] || { echo "bad N: '$N' (must be >= 1)" >&2; exit 2; }
 case "$RETRIES" in ''|*[!0-9]*) echo "bad GLM_PASS_RETRIES: '$RETRIES' (want a non-negative integer)" >&2; exit 2 ;; esac
+RETRIES=$((10#$RETRIES))
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GLM_REVIEW_BIN="${GLM_REVIEW_BIN:-$SKILL_DIR/scripts/glm_review.sh}"
@@ -38,8 +40,11 @@ succeeded=0
 for i in $(seq 1 "$N"); do
   attempt=0
   while :; do
+    # Success requires BOTH a zero exit AND a non-empty output file: a reviewer
+    # that exits 0 without writing must not be counted as a pass (else the
+    # aggregator later finds nothing and fails past the all-failed diagnostic).
     if "$GLM_REVIEW_BIN" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$WORK/pass-$i.json" \
-         > "$WORK/pass-$i.out" 2> "$WORK/pass-$i.err"; then
+         > "$WORK/pass-$i.out" 2> "$WORK/pass-$i.err" && [ -s "$WORK/pass-$i.json" ]; then
       succeeded=$((succeeded + 1)); break
     fi
     attempt=$((attempt + 1))

@@ -176,7 +176,7 @@ High risk = security / data loss / migration / public API. GLM never re-reads th
 | | lite (daily PR) | full (important design / high-risk PR) |
 |---|---|---|
 | Packet (A) | **minimal** (purpose, non-goals, diff, test results) | full |
-| Independent review (B) | GLM one pass + Claude synthesis | both fully blind (Claude via subagent if possible) |
+| Independent review (B) | GLM 3 passes (or `1` for cheap lite) + Claude synthesis | both fully blind (Claude via subagent if possible) |
 | Disposition (D) | must fix only | all classes + reject reasons + conflict isolation |
 | Re-review (E) | Claude self-check | delta-review (GLM when high risk, fresh session when major) |
 | Human summary (F) | brief (dropped GLM findings as one grouped line) | full (F-ID tracked, itemized "Not adopted" reasons) |

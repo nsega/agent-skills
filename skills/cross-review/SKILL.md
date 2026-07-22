@@ -43,8 +43,10 @@ Pick the tier before doing work. It scales the **packet, process, and report**,
 not GLM's effort — GLM always runs at max (an A/B found effort made no reliable
 difference; the README records it).
 
-- **lite** (daily PR): minimal packet, GLM one pass + your synthesis, `must fix`
-  only, Claude self-check, brief summary.
+- **lite** (daily PR): minimal packet, `must fix` only, Claude self-check, brief
+  summary. Reviewer #2 still runs 3 passes by default; pass a trailing `1` to
+  `glm_review_passes.sh` for a cheaper single-pass lite run (trades away the
+  multi-pass reliability/recall).
 - **full** (high-risk PR / system design): full packet, both review blind, full
   disposition + conflict isolation, delta-review, F-ID-tracked summary.
 
@@ -77,9 +79,15 @@ scripts/glm_review_passes.sh <packet> references/rubric.md \
 
 Reviewer #2 runs **3 independent passes** (override with a trailing count or
 `GLM_PASSES`), unioned into one `glm-findings.json`. Each finding carries
-`pass_count` out of `passes_total`. GLM runs at max effort; the wrapper echoes
-`reviewer #2: <M>/<N> passes succeeded` to stderr. To re-run the effort experiment set
-`ZEN_VARIANT=high`.
+`pass_count` out of `passes_total` (findings merge only when both location AND
+issue text match, so a `pass_count` is a floor on agreement, and the aggregator
+renumbers the merged findings `G-001…` by rank, so a `G-` id in the aggregated
+file is the aggregator's numbering, not any single pass's). GLM runs at max
+effort; the wrapper echoes `reviewer #2: <M>/<N> passes succeeded` to stderr. To
+re-run the effort experiment set `ZEN_VARIANT=high`.
+
+The passes run **serially**, so this call takes roughly 3x a single pass. Kick it
+off in the background (or accept the wait) so it overlaps your own review below.
 
 Then do your own review against `references/rubric.md` (read it + the schema now).
 Emit `/tmp/claude-findings.json` per `references/findings.schema.json`,
@@ -176,15 +184,17 @@ After fixing the `must fix` items:
 - **high-risk** (security / data loss / migration / public API): run a GLM
   **delta-review** — pass only the fix diff + the F-IDs it should resolve, and
   ask GLM two things: (a) is each listed finding actually resolved, (b) did the
-  fix introduce a regression. Do not re-send the whole artifact.
+  fix introduce a regression. Do not re-send the whole artifact. Use the
+  **multi-pass** wrapper here too: this is the highest-stakes verdict, exactly
+  where a single flaky pass is least acceptable.
 - **major design change**: run the delta-review in a **fresh GLM session** to
   restore independence.
 
 ```bash
 git diff > /tmp/fix.diff
 # wrap /tmp/fix.diff + "verify F-001,F-004 resolved; check for regressions" as the bundle
-scripts/glm_review.sh /tmp/fix-bundle.md references/rubric.md \
-  references/findings.schema.json /tmp/glm-delta.json
+scripts/glm_review_passes.sh /tmp/fix-bundle.md references/rubric.md \
+  references/findings.schema.json /tmp/glm-delta.json 3
 ```
 
 ## Output — ALWAYS use this exact template

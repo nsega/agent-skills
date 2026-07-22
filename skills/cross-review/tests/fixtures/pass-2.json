@@ -3,12 +3,38 @@
   "summary": "pass 2",
   "overall": "approve_with_nits",
   "findings": [
-    {"id": "G-001", "severity": "critical", "category": "correctness", "location": "src/a.py:10",
-     "issue": "shared A, seen as critical here", "evidence": "the whole loop at 10-12 is the proof and this is the longer evidence string",
-     "failure_case": "x", "suggestion": "fix a harder", "confidence": "high", "recommendation": "must_fix"},
-    {"id": "G-002", "severity": "medium", "category": "design", "location": "src/b.py:20",
-     "issue": "shared B", "evidence": "this is the much longer evidence string that should win the tie", "suggestion": "fix b", "confidence": "medium", "recommendation": "should_fix"},
-    {"id": "G-004", "severity": "medium", "category": "testing", "location": "src/d.py:40",
-     "issue": "singleton D", "suggestion": "fix d", "confidence": "medium", "recommendation": "should_fix"}
+    {
+      "id": "G-001",
+      "severity": "critical",
+      "category": "correctness",
+      "location": "src/a.py:10",
+      "issue": "shared A",
+      "evidence": "the whole loop at 10-12 is the proof and this is the longer evidence string",
+      "failure_case": "x",
+      "suggestion": "fix a harder",
+      "confidence": "high",
+      "recommendation": "must_fix"
+    },
+    {
+      "id": "G-002",
+      "severity": "medium",
+      "category": "design",
+      "location": "src/b.py:20",
+      "issue": "shared B",
+      "evidence": "this is the much longer evidence string that should win the tie",
+      "suggestion": "fix b",
+      "confidence": "medium",
+      "recommendation": "should_fix"
+    },
+    {
+      "id": "G-004",
+      "severity": "medium",
+      "category": "testing",
+      "location": "src/d.py:40",
+      "issue": "singleton D",
+      "suggestion": "fix d",
+      "confidence": "medium",
+      "recommendation": "should_fix"
+    }
   ]
 }
