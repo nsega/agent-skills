@@ -25,7 +25,7 @@ import json,sys,jsonschema
 jsonschema.Draft7Validator.check_schema(json.load(open(sys.argv[1])))
 PY
 
-python3 - "$SCHEMA" "$FIX" <<'PY'
+SCHEMA_OUT="$(python3 - "$SCHEMA" "$FIX" <<'PY'
 import json, sys, jsonschema
 schema = json.load(open(sys.argv[1]))
 v = jsonschema.Draft7Validator(schema)
@@ -60,9 +60,14 @@ results.append(expect("pass_count + passes_total validate", d, True))
 d = json.loads(json.dumps(base)); d["findings"][0]["pass_count"] = 0
 results.append(expect("pass_count below 1 is rejected", d, False))
 
-sys.exit(0 if all(results) else 1)
+print(f"SCHEMA_COUNTS {sum(1 for r in results if r)} {sum(1 for r in results if not r)}")
 PY
-if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
+)"
+printf '%s\n' "$SCHEMA_OUT" | grep -v '^SCHEMA_COUNTS '
+sp=$(printf '%s\n' "$SCHEMA_OUT" | sed -n 's/^SCHEMA_COUNTS \([0-9]*\) .*/\1/p')
+sf=$(printf '%s\n' "$SCHEMA_OUT" | sed -n 's/^SCHEMA_COUNTS [0-9]* \([0-9]*\)/\1/p')
+pass=$((pass + ${sp:-0})); fail=$((fail + ${sf:-0}))
+[ -n "$sp" ] || { echo "  FAIL schema block did not run to completion" >&2; fail=$((fail + 1)); }
 
 echo "== disagreement checker =="
 OUT="$("$SKILL/scripts/check_disagreements.sh" "$FIX/claude-disagree.json" "$FIX/glm-disagree.json" 2>&1)"; RC=$?

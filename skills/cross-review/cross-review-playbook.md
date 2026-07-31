@@ -49,7 +49,7 @@ Claude Code : synthesis and disposition -> (after fixes) delta-review (see E)
 ### 3. Do not stack roles, but do not hard-partition them either
 There is only one sub-reviewer, so the topics cannot be split in two:
 
-- **GLM-5.2**: full review plus a **dissent, alternative-design, and hidden-assumption** lens (where a different lab pays off most). Reviewer #2 runs as N independent passes (default 3) unioned by location; a finding's `pass_count` is agreement across passes, a ranking signal only, never a gate (real findings rarely recur, so singletons are kept).
+- **GLM-5.2**: full review plus a **dissent, alternative-design, and hidden-assumption** lens (where a different lab pays off most). Reviewer #2 runs as N independent passes (default 3) unioned by (location, issue text); a finding's `pass_count` is agreement across passes, a ranking signal only, never a gate (real findings rarely recur, so singletons are kept).
 - **Claude Code**: full review (reviewer #1) plus synthesis, trade-off judgment, and the final patch.
 
 Do not restrict a reviewer to "look at security only." Weight the primary focus, but **always require findings outside that area too**, so nothing falls through the gaps or gets quietly dropped.

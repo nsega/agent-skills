@@ -112,8 +112,11 @@ The artifact to review follows on stdin."
 
 RAW="$(mktemp /tmp/glm-raw.XXXXXX.txt)"
 echo "reviewer #2: $ZEN_MODEL, effort=$ZEN_VARIANT" >&2
-cat "$BUNDLE" | opencode run --variant "$ZEN_VARIANT" --model "$ZEN_MODEL" "$FULL_PROMPT" > "$RAW" 2>/tmp/glm-err.log || {
-  echo "opencode run failed; see /tmp/glm-err.log" >&2; sed -n '1,20p' /tmp/glm-err.log >&2; exit 1;
+# Send opencode's stderr to THIS script's stderr, not a shared /tmp file, so a
+# multi-pass wrapper's per-pass `2> pass-i.err` captures it in full (on success
+# and failure) and concurrent runs never clobber a shared log.
+cat "$BUNDLE" | opencode run --variant "$ZEN_VARIANT" --model "$ZEN_MODEL" "$FULL_PROMPT" > "$RAW" || {
+  echo "opencode run failed (its stderr is above)" >&2; exit 1;
 }
 
 # Extract the JSON object, then ENFORCE the schema (Evidence/failure_case rules).

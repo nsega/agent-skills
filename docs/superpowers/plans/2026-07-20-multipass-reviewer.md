@@ -1,5 +1,12 @@
 # Multi-pass Reviewer #2 Implementation Plan
 
+> **Superseded on the clustering detail.** This plan (and its Task 3 code) shows
+> the original `norm()`-only location clustering. Review found that collapsed
+> distinct same-location findings, so the shipped aggregator clusters on
+> `(loc_key(location), issue_norm(issue))`. Treat
+> `docs/superpowers/specs/2026-07-20-glm-multipass-review-design.md` as the
+> source of truth for the final design; do not replay this plan's Task 3 verbatim.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Run reviewer #2 (GLM) as N independent passes and union their findings, scoring each finding by how many passes raised it, so a single failed or unlucky pass no longer sinks the review.

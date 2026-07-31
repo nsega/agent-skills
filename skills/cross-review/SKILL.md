@@ -248,8 +248,8 @@ was checked, not skipped.
 - `scripts/gather_artifact.sh`: build the packet (`--level full|minimal`, `--tests`).
 - `scripts/glm_review.sh`: run reviewer #2, capture JSON findings.
 - `scripts/glm_review_passes.sh`: reviewer #2 as N passes, unioned (wraps `glm_review.sh`).
-- `scripts/aggregate_passes.py`: union passes by location, score by `pass_count`.
-- `scripts/_findings_lib.py`: shared `norm()`/`load_findings` for the checker + aggregator.
+- `scripts/aggregate_passes.py`: union passes by (location, issue text), score by `pass_count`.
+- `scripts/_findings_lib.py`: shared `load_findings` plus `_normalize` (which backs `norm()` for the checker and `loc_key()`/`issue_norm()` for the aggregator).
 - `scripts/check_disagreements.sh`: list the pairs that trip the Step 4 triggers
   (location-matched; the floor, not the ceiling).
 - `tests/run_tests.sh`: offline regression tests for the contract + the checker.
