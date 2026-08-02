@@ -18,11 +18,6 @@
       "type": "string",
       "enum": ["approve", "approve_with_nits", "request_changes", "block"]
     },
-    "passes_total": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Multi-pass only: how many reviewer-#2 passes produced valid output and were aggregated. The honest denominator for pass_count. Absent on single-pass output."
-    },
     "findings": {
       "type": "array",
       "items": {
@@ -56,12 +51,7 @@
           "recommendation": {
             "type": "string",
             "enum": ["must_fix", "should_fix", "defer", "nit"],
-            "description": "This reviewer's recommended CALL on its own finding. Distinct from the synthesizer's canonical disposition: a reviewer recommends, the chair decides. There is deliberately no 'reject' value, since a blind reviewer never rejects a finding it just raised; only the synthesizer rejects. Severity is impact, recommendation is action, and they may diverge (a low-severity item with a one-line fix can be must_fix; a high-severity item outside this change's scope can be defer). Required so that 'the two reviewers' recommendation values differ' is derivable from reviewer output rather than guessed."
-          },
-          "pass_count": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Multi-pass only: how many reviewer-#2 passes raised this finding (out of passes_total). Written by aggregate_passes.py, never by a single pass. A ranking/confidence signal, never a filter: a pass_count of 1 is still a real finding."
+            "description": "This reviewer's recommended CALL on its own finding, distinct from the synthesizer's disposition: a reviewer recommends, the chair decides. No 'reject' value, since a blind reviewer never rejects a finding it just raised. Severity is impact; recommendation is action; they may diverge (a low-severity item with a one-line fix can be must_fix; a high-severity item outside this change's scope can be defer)."
           },
           "speculative": {
             "type": "boolean",

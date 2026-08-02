@@ -11,18 +11,14 @@
 #   OPENCODE_CONFIG path to hardened config       (default: <skill>/config/opencode.zen.json)
 #   ZEN_VARIANT     reasoning-effort variant     (default: max)
 #
-# Effort is always max. The lite/full stakes tier is NOT wired to effort: an A/B
-# over one identical packet (see README "Effort and run-to-run variance") found
-# run-to-run variance at least as large as any high-vs-max difference, so tiering
-# effort bought nothing measurable. ZEN_VARIANT remains only to re-run that
-# experiment. The tier still drives packet level and report scope, elsewhere.
-#
 # Notes:
 # - Review-only. We ask GLM for findings, never for a patch, and run opencode in
 #   a non-interactive single-shot ("run") so it does not edit the repo.
 # - opencode ACCEPTS AN UNKNOWN --variant SILENTLY (verified: a bogus value exits
 #   0 and reviews anyway), so a typo would quietly downgrade effort with no
 #   signal. That is why ZEN_VARIANT is validated here rather than trusted to the CLI.
+# - For a high-stakes review, run this two or three times into different OUT_JSON
+#   files and union the findings by hand: one GLM pass is a noisy detector.
 set -euo pipefail
 
 BUNDLE="${1:?need bundle path}"
@@ -71,7 +67,7 @@ output. Review the artifact piped to you (a PR diff or a system-design document)
 strictly against the rubric below, and FOLLOW the rubric's "Output discipline"
 section exactly.
 
-Hard rules (these mirror the rubric and the schema — obey them):
+Hard rules (these mirror the rubric and the schema, so obey them):
 - Output ONLY a single valid JSON object. No prose, no markdown, no code fences.
 - It MUST validate against the JSON schema below. reviewer = "glm-5.2".
 - Number your findings with a "G-" prefix: "G-001", "G-002", ...
@@ -83,7 +79,7 @@ Hard rules (these mirror the rubric and the schema — obey them):
   reject a finding you just raised. See the rubric's Recommendation section.
 - Evidence is mandatory for every critical/high finding AND every
   correctness/security finding (any severity). For critical/high also give a
-  failure_case. (The schema enforces this — a finding missing them is rejected.)
+  failure_case. (The schema enforces this: a finding missing them is rejected.)
 - location format: PR => "path/to/file.ext:line" (or file + hunk/function);
   design => section heading / diagram name / requirement id. No coarse locations.
 - suggestion must be concrete enough to act on. No vague advice.
@@ -112,9 +108,8 @@ The artifact to review follows on stdin."
 
 RAW="$(mktemp /tmp/glm-raw.XXXXXX.txt)"
 echo "reviewer #2: $ZEN_MODEL, effort=$ZEN_VARIANT" >&2
-# Send opencode's stderr to THIS script's stderr, not a shared /tmp file, so a
-# multi-pass wrapper's per-pass `2> pass-i.err` captures it in full (on success
-# and failure) and concurrent runs never clobber a shared log.
+# opencode's stderr goes to THIS script's stderr (not a shared /tmp file), so the
+# caller sees it in full and concurrent runs never clobber a shared log.
 cat "$BUNDLE" | opencode run --variant "$ZEN_VARIANT" --model "$ZEN_MODEL" "$FULL_PROMPT" > "$RAW" || {
   echo "opencode run failed (its stderr is above)" >&2; exit 1;
 }
@@ -149,9 +144,9 @@ schema = json.load(open(sys.argv[3]))
 try:
     import jsonschema
 except ImportError:
-    # Not advisory: `recommendation`, Evidence and failure_case are only REQUIRED
+    # Not advisory: recommendation, Evidence and failure_case are only REQUIRED
     # insofar as this validates. Warning and continuing would emit a green run
-    # whose findings silently lack the fields Step 4's triggers read.
+    # whose findings silently lack the fields the synthesis step reads.
     sys.exit("jsonschema not installed, so the findings contract cannot be "
              "enforced and a review would pass with unchecked output. "
              "Run: pip install jsonschema")
