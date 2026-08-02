@@ -1,7 +1,7 @@
 ---
-name: cross-review
+name: dual-model-review
 description: >-
-  Run a two-model cross-review of a pull request or a system-design document.
+  Run a two-model review of a pull request or a system-design document.
   Claude Code is the main reviewer and synthesizer; a second, independent
   reviewer runs through opencode + GLM-5.2 (OpenCode Zen, paid key) for
   decorrelated blind spots. Use this whenever the user asks to "cross-review",
@@ -11,7 +11,7 @@ description: >-
   diff or design and ask "what did we miss?".
 ---
 
-# cross-review
+# dual-model-review
 
 Two independent reviewers from two different labs (Anthropic + Z.ai), so their
 blind spots do not line up. You are reviewer #1 **and** the synthesizer; GLM-5.2

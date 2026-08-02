@@ -1,7 +1,7 @@
 # OS cruft
 .DS_Store
 
-# Python bytecode cache (from the cross-review helper scripts' imports)
+# Python bytecode cache
 __pycache__/
 *.pyc
 
@@ -11,6 +11,6 @@ __pycache__/
 # Per-skill scratch / iteration workspaces (not real skills)
 *-workspace/
 
-# cross-review outputs (default to /tmp, but never commit them if redirected here)
+# dual-model-review outputs (default to /tmp, but never commit them if redirected here)
 *-findings.json
-cross-review-packet.*
+dual-model-review-packet.*

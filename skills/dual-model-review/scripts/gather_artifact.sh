@@ -24,7 +24,7 @@ while [ $# -gt 0 ]; do
 done
 case "$LEVEL" in full|minimal) ;; *) echo "bad --level: $LEVEL" >&2; exit 2;; esac
 
-OUT="$(mktemp /tmp/cross-review-packet.XXXXXX.md)"
+OUT="$(mktemp /tmp/dual-model-review-packet.XXXXXX.md)"
 
 emit_tests() {
   echo "## Test results"
