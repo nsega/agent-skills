@@ -14,6 +14,7 @@
 - **No `config/` dir.** codex hardening is done entirely with flags: `--ignore-user-config --skip-git-repo-check --ephemeral --sandbox read-only -C <scratch>`. This is a deliberate difference from the review skill (which needs `OPENCODE_CONFIG`).
 - **codex facts (verified):** the flag is `--sandbox read-only` (`-s`); model via `-m` (default `gpt-5.6-sol`); reasoning effort via `-c model_reasoning_effort=<minimal|low|medium|high>`; the model's final message is captured with `-o <file>`; prompt is the arg, piped stdin is appended as a `<stdin>` block.
 - **Every bash script:** starts with `#!/usr/bin/env bash` and `set -euo pipefail`; validates inputs and spends nothing on a bad path; lets codex's stderr flow to the caller; never edits the repo.
+- **Test scripts are bash scripts too:** they also start with `set -euo pipefail` and are made executable (`chmod +x`). Under `set -e`, capture a command's exit code with `rc=0; cmd || rc=$?` (never a bare `cmd; rc=$?`, which `set -e` aborts before the capture). Leave the happy-path `p="$(cmd)"` assignments as-is (they exit 0).
 - **Writing style (user rule):** no em-dashes anywhere (prose, comments, commit messages). Use commas, colons, parentheses, or `·`. En-dashes in numeric ranges and `→` are fine.
 - **Commits:** Conventional Commits 1.0.0. Every commit message ends with these two trailer lines:
   ```
@@ -55,7 +56,8 @@ Create `skills/dual-model-debate/tests/test_build_packet.sh`:
 
 ```bash
 #!/usr/bin/env bash
-# Plain assertions; no `set -e` so we can inspect exit codes.
+set -euo pipefail
+# Plain assertions; capture exit codes with `rc=0; cmd || rc=$?` under set -e.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BP="$HERE/../scripts/build_packet.sh"
 pass=0; fail=0
@@ -63,7 +65,7 @@ ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 
 # 1: no question -> exit 2
-"$BP" >/dev/null 2>&1; rc=$?
+rc=0; "$BP" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "no question should exit 2 (got $rc)"
 
 # 2: question only -> packet has the question, framing, and the no-context note
@@ -80,7 +82,7 @@ grep -q "### $(basename "$tmpc")" "$p2" && ok || bad "packet missing context bas
 grep -q "SENTINEL_CONTENT_42" "$p2"     && ok || bad "packet missing context contents"
 
 # 4: nonexistent context file -> exit 2
-"$BP" "Q?" /no/such/file >/dev/null 2>&1; rc=$?
+rc=0; "$BP" "Q?" /no/such/file >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "missing context file should exit 2 (got $rc)"
 
 echo "build_packet: $pass passed, $fail failed"
@@ -152,7 +154,7 @@ OUT="$(mktemp /tmp/dual-model-debate-packet.XXXXXX.md)"
 echo "$OUT"
 ```
 
-Then make it executable: `chmod +x skills/dual-model-debate/scripts/build_packet.sh`
+Then make both executable: `chmod +x skills/dual-model-debate/scripts/build_packet.sh skills/dual-model-debate/tests/test_build_packet.sh`
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -301,7 +303,9 @@ Create `skills/dual-model-debate/tests/test_codex_turn.sh`:
 
 ```bash
 #!/usr/bin/env bash
-# CODEX_FAKE stub keeps this free: no real codex call. Plain assertions.
+set -euo pipefail
+# CODEX_FAKE stub keeps this free: no real codex call. Capture exit codes with
+# `rc=0; cmd || rc=$?` under set -e.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CT="$HERE/../scripts/codex_turn.sh"
 pass=0; fail=0
@@ -313,20 +317,20 @@ canned="$(mktemp)"; printf '**Position:** Yes\n**Argument:** Because sentinel_AB
 tr="$(mktemp)"; : > "$tr"   # empty transcript (round 0)
 
 # 1: bad role kind -> exit 2
-CODEX_FAKE="$canned" "$CT" "GPT" 0 bogus "$pk" "$tr" >/dev/null 2>&1; rc=$?
+rc=0; CODEX_FAKE="$canned" "$CT" "GPT" 0 bogus "$pk" "$tr" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "bad role kind should exit 2 (got $rc)"
 
 # 2: bad effort -> exit 2
-CODEX_EFFORT=bogus CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$pk" "$tr" >/dev/null 2>&1; rc=$?
+rc=0; CODEX_EFFORT=bogus CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$pk" "$tr" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "bad effort should exit 2 (got $rc)"
 
 # 3: empty packet -> exit 2
 empty="$(mktemp)"; : > "$empty"
-CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$empty" "$tr" >/dev/null 2>&1; rc=$?
+rc=0; CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$empty" "$tr" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "empty packet should exit 2 (got $rc)"
 
 # 4: fake opening appended under the harness header
-CODEX_FAKE="$canned" "$CT" "GPT (gpt-5.6-sol)" 0 opening "$pk" "$tr" >/dev/null; rc=$?
+rc=0; CODEX_FAKE="$canned" "$CT" "GPT (gpt-5.6-sol)" 0 opening "$pk" "$tr" >/dev/null || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "fake turn should succeed (got $rc)"
 grep -q "### GPT (gpt-5.6-sol) (round 0)" "$tr" && ok || bad "transcript missing turn header"
 grep -q "sentinel_ABC" "$tr"                     && ok || bad "transcript missing turn body"
@@ -446,7 +450,7 @@ fi
 echo "$TRANSCRIPT"
 ```
 
-Then: `chmod +x skills/dual-model-debate/scripts/codex_turn.sh`
+Then make both executable: `chmod +x skills/dual-model-debate/scripts/codex_turn.sh skills/dual-model-debate/tests/test_codex_turn.sh`
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -484,6 +488,7 @@ Create `skills/dual-model-debate/tests/test_docs.sh`:
 
 ```bash
 #!/usr/bin/env bash
+set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL="$HERE/../SKILL.md"
 PROTO="$HERE/../references/protocol.md"
@@ -508,6 +513,8 @@ grep -q "references/protocol.md" "$SKILL"                && ok || bad "does not 
 echo "docs: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
 ```
+
+Then make it executable: `chmod +x skills/dual-model-debate/tests/test_docs.sh`
 
 - [ ] **Step 2: Run the docs test to verify it fails**
 
@@ -700,6 +707,7 @@ Create `skills/dual-model-debate/tests/test_integration.sh`:
 
 ```bash
 #!/usr/bin/env bash
+set -euo pipefail
 # End-to-end wiring in fake mode: build a packet, seed a Claude opening block,
 # run a GPT opening via the runner (CODEX_FAKE), assert the transcript carries
 # both. No paid calls.
@@ -727,6 +735,8 @@ grep -q "### GPT (gpt-5.6-sol) (round 0)" "$tr"  && ok || bad "missing GPT heade
 echo "integration: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
 ```
+
+Then make it executable: `chmod +x skills/dual-model-debate/tests/test_integration.sh`
 
 - [ ] **Step 2: Run it to verify it passes**
 
