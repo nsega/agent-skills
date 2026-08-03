@@ -123,7 +123,7 @@ OUT="$(mktemp /tmp/dual-model-debate-packet.XXXXXX.md)"
   echo
   echo "## Question"
   echo
-  echo "$QUESTION"
+  printf '%s\n' "$QUESTION"
   echo
   echo "## Framing (author fills before the debate)"
   echo
@@ -443,7 +443,7 @@ fi
 {
   echo "### $ROLE (round $ROUND)"
   echo
-  echo "$MSG"
+  printf '%s\n' "$MSG"
   echo
 } >> "$TRANSCRIPT"
 
@@ -601,7 +601,7 @@ Read both openings as the chair.
   ```
 
   Stop early the moment a round adds no new substantive argument (the chair's
-  stall check in the protocol). This caps GPT at 3 paid calls.
+  stall check in the protocol). This caps GPT at 3 paid calls. Use round 2 for the second rebuttal.
 - **If they converge** on the same answer: run ONE forced-opposition round.
   Assign codex the contrarian job, so the chair Claude never argues against a
   conclusion it is about to judge:
