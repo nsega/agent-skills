@@ -73,11 +73,11 @@ $PROTOCOL_TXT"
         -m "$CODEX_MODEL" -c model_reasoning_effort="$CODEX_EFFORT" \
         -o "$OUTMSG" "$FULL_PROMPT" >/dev/null; then
     echo "codex exec failed (its stderr is above)" >&2
-    rm -rf "$SCRATCH"
+    rm -rf "$SCRATCH" "$OUTMSG"
     exit 1
   fi
   MSG="$(cat "$OUTMSG")"
-  rm -rf "$SCRATCH"
+  rm -rf "$SCRATCH" "$OUTMSG"
 fi
 
 [ -n "$MSG" ] || { echo "empty turn from $ROLE (round $ROUND)" >&2; exit 1; }
