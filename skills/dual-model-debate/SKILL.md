@@ -37,7 +37,10 @@ packet.
 
 ## Step 2: Round 0, blind openings
 
-Openings must be blind: neither debater sees the other's opening.
+Openings must be blind: neither debater sees the other's opening. Working files
+and the saved transcript go in `${DMD_OUT_DIR:-/tmp}`: set `DMD_OUT_DIR` to use a
+dedicated directory, or leave it unset for `/tmp` (the same directory
+`build_packet.sh` writes the packet to).
 
 1. Dispatch a **subagent** to write Claude's opening from the packet only, using
    the "Honest opening (round 0)" role in `references/protocol.md`, returning
@@ -50,26 +53,27 @@ Openings must be blind: neither debater sees the other's opening.
    <the four fields the subagent returned>
    ```
 
-   For example: `printf '### Claude (opus) (round 0)\n\n%s\n\n' "$CLAUDE_OPENING" > /tmp/dmd-transcript.md`
+   For example: `printf '### Claude (opus) (round 0)\n\n%s\n\n' "$CLAUDE_OPENING" > "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"`
 2. Produce GPT's opening against a FRESH empty transcript so it cannot see
    Claude's:
 
    ```bash
-   : > /tmp/dmd-gpt.md
-   scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 0 opening <packet> /tmp/dmd-gpt.md
+   D="${DMD_OUT_DIR:-/tmp}"; : > "$D/dmd-gpt.md"
+   scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 0 opening <packet> "$D/dmd-gpt.md"
    ```
-3. Append GPT's opening to the transcript: `cat /tmp/dmd-gpt.md >> /tmp/dmd-transcript.md`
+3. Append GPT's opening to the transcript:
+   `D="${DMD_OUT_DIR:-/tmp}"; cat "$D/dmd-gpt.md" >> "$D/dmd-transcript.md"`
 
 ## Step 3: Exchange or stress-test
 
 Read both openings as the chair.
 
 - **If they disagree:** run up to 2 rebuttal rounds. Each round, first dispatch
-  the subagent for Claude's rebuttal (it reads `/tmp/dmd-transcript.md` so far
-  and appends its block), then run GPT's:
+  the subagent for Claude's rebuttal (it reads `${DMD_OUT_DIR:-/tmp}/dmd-transcript.md`
+  so far and appends its block), then run GPT's:
 
   ```bash
-  scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 1 rebuttal <packet> /tmp/dmd-transcript.md
+  scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 1 rebuttal <packet> "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
   ```
 
   Stop early the moment a round adds no new substantive argument (the chair's
@@ -79,15 +83,18 @@ Read both openings as the chair.
   conclusion it is about to judge:
 
   ```bash
-  scripts/codex_turn.sh "GPT (devil's advocate)" 1 forced <packet> /tmp/dmd-transcript.md
+  scripts/codex_turn.sh "GPT (devil's advocate)" 1 forced <packet> "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
   ```
 
 ## Step 4: Synthesize the decision
 
 As the chair, read the whole transcript and write the brief with the template
-below. Save the transcript file and link it. Apply the escalation rule: on an
-unresolved subjective call where your only tiebreak is your own preference,
-escalate to the human rather than ruling for Claude's side.
+below. Save the working transcript under a descriptive name in the same output
+directory and link that path, for example:
+`D="${DMD_OUT_DIR:-/tmp}"; cp "$D/dmd-transcript.md" "$D/dual-model-debate-<slug>-transcript.md"`.
+Apply the escalation rule: on an unresolved subjective call where your only
+tiebreak is your own preference, escalate to the human rather than ruling for
+Claude's side.
 
 ```markdown
 # Dual-model debate: <question>
@@ -131,7 +138,9 @@ checked, not skipped.
   secrets through it.
 - **Parameters.** `CODEX_MODEL` (default `gpt-5.6-sol`), `CODEX_EFFORT` (default
   `high`; minimal|low|medium|high). Set `CODEX_FAKE=<file>` to replay a canned
-  turn instead of calling codex, for a free dry run.
+  turn instead of calling codex, for a free dry run. `DMD_OUT_DIR` sets the
+  directory for the packet and the saved transcript (created if missing; default
+  `/tmp`).
 
 ## Files
 

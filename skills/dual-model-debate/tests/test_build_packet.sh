@@ -28,5 +28,15 @@ grep -q "SENTINEL_CONTENT_42" "$p2"     && ok || bad "packet missing context con
 rc=0; "$BP" "Q?" /no/such/file >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "missing context file should exit 2 (got $rc)"
 
+# 5: DMD_OUT_DIR set -> packet lands in that dir (created if missing)
+outdir="$(mktemp -d)/nested"   # nested = not pre-created, so we also test mkdir -p
+p3="$(DMD_OUT_DIR="$outdir" "$BP" "Q?")"
+case "$p3" in "$outdir"/*) ok ;; *) bad "packet not under DMD_OUT_DIR (got $p3)" ;; esac
+[ -f "$p3" ] && ok || bad "packet under DMD_OUT_DIR should exist"
+
+# 6: no DMD_OUT_DIR -> default /tmp
+p4="$("$BP" "Q?")"
+case "$p4" in /tmp/*) ok ;; *) bad "default packet should be under /tmp (got $p4)" ;; esac
+
 echo "build_packet: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

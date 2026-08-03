@@ -3,6 +3,10 @@
 # and print its path on stdout. The mechanical assembly is done here; the author
 # fills the framing (constraints / non-goals / what a good decision looks like)
 # before the debate. Sibling to dual-model-review's gather_artifact.sh.
+#
+# Env: DMD_OUT_DIR   optional output directory for the packet (created if
+#                    missing); default /tmp. The transcript is saved to the same
+#                    directory by the SKILL.md playbook.
 set -euo pipefail
 
 QUESTION="${1:-}"
@@ -14,7 +18,10 @@ for f in "$@"; do
   [ -f "$f" ] || { echo "no such context file: $f" >&2; exit 2; }
 done
 
-OUT="$(mktemp /tmp/dual-model-debate-packet.XXXXXX.md)"
+# Deliverables land in $DMD_OUT_DIR when set (created if missing); default /tmp.
+OUT_DIR="${DMD_OUT_DIR:-/tmp}"
+mkdir -p "$OUT_DIR" || { echo "cannot create output dir: $OUT_DIR" >&2; exit 2; }
+OUT="$(mktemp "$OUT_DIR/dual-model-debate-packet.XXXXXX.md")"
 {
   echo "# Debate packet"
   echo
