@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "dual-model-review findings",
-  "description": "Per-reviewer output contract. Each reviewer numbers its own findings with a reviewer prefix (GLM => 'G-001', Claude => 'C-001'). The synthesizer (Claude) reassigns canonical 'F-###' ids when merging.",
+  "description": "Per-reviewer output contract, identical for every reviewer #2 backend. Each reviewer numbers its own findings with a reviewer prefix (Claude => 'C-001', reviewer #2 => 'R2-001'). The synthesizer (Claude) reassigns canonical 'F-###' ids when merging.",
   "type": "object",
   "required": ["reviewer", "summary", "findings", "overall"],
   "additionalProperties": false,
   "properties": {
     "reviewer": {
       "type": "string",
-      "description": "Reviewer id, e.g. 'glm-5.2' or 'claude-opus-4.8'."
+      "description": "The model that produced these findings, e.g. 'claude-opus-5', 'gpt-5.6-sol', or 'glm-5.2'. Records which lab said what after the merge."
     },
     "summary": {
       "type": "string",
@@ -27,7 +27,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Reviewer-prefixed id, e.g. 'G-001' (GLM) or 'C-001' (Claude). Stable within this review."
+            "description": "Reviewer-prefixed id: 'C-001' (Claude) or 'R2-001' (reviewer #2, whichever backend ran). Stable within this review."
           },
           "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
           "category": {
