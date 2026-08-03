@@ -18,6 +18,19 @@ for f in "$@"; do
   [ -f "$f" ] || { echo "no such context file: $f" >&2; exit 2; }
 done
 
+# Wrap a file in a backtick fence long enough that no backtick run inside it can
+# close the fence early (CommonMark: the opening fence must exceed the longest
+# run of backticks in the content). $1 = info string (may be empty), $2 = file.
+emit_fenced() {
+  local info="$1" file="$2" maxrun len fence
+  maxrun=$( { grep -oE '`+' "$file" || true; } | awk 'length>m{m=length} END{print m+0}' )
+  len=$(( maxrun + 1 )); [ "$len" -lt 3 ] && len=3
+  fence="$(printf '%*s' "$len" '' | tr ' ' '`')"
+  printf '%s%s\n' "$fence" "$info"
+  cat "$file"; echo          # trailing newline keeps the close fence on its own line
+  printf '%s\n' "$fence"
+}
+
 # Deliverables land in $DMD_OUT_DIR when set (created if missing); default /tmp.
 OUT_DIR="${DMD_OUT_DIR:-/tmp}"
 mkdir -p "$OUT_DIR" || { echo "cannot create output dir: $OUT_DIR" >&2; exit 2; }
@@ -49,9 +62,7 @@ OUT="$(mktemp "$OUT_DIR/dual-model-debate-packet.XXXXXX.md")"
   else
     for f in "$@"; do
       echo "### $(basename "$f")"
-      echo '```'
-      cat "$f"
-      echo '```'
+      emit_fenced "" "$f"
       echo
     done
   fi

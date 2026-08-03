@@ -38,5 +38,11 @@ case "$p3" in "$outdir"/*) ok ;; *) bad "packet not under DMD_OUT_DIR (got $p3)"
 p4="$("$BP" "Q?")"
 case "$p4" in /tmp/*) ok ;; *) bad "default packet should be under /tmp (got $p4)" ;; esac
 
+# 7: a context file that itself contains a ``` fence gets a longer wrapping fence
+fcx="$(mktemp)"; printf 'before\n```\ninside\n```\nafter FENCE_SENTINEL\n' > "$fcx"
+p5="$("$BP" "Q?" "$fcx")"
+grep -q "FENCE_SENTINEL" "$p5"  && ok || bad "packet dropped fenced context content"
+grep -qE '^`{4,}' "$p5"         && ok || bad 'packet should wrap a backtick-fenced file in a >=4 backtick fence'
+
 echo "build_packet: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
