@@ -8,7 +8,7 @@ not apply rather than inventing findings.
 - **critical**: must not merge / must not ship as designed. Correctness break,
   data loss, security hole, or a design flaw that does not survive load.
 - **high**: should fix before merge/sign-off; meaningful risk, or debt with a
-  plausible near-term operational or maintenance cost. not "someday this hurts", but "as-is, this bites soon."
+  plausible near-term operational or maintenance cost. Not "someday this hurts", but "as-is, this bites soon."
 - **medium**: worth fixing; not gating.
 - **low**: optional; include only when style/clarity creates real maintenance
   risk, or when the user explicitly asks for nits.

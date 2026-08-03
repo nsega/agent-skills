@@ -31,6 +31,10 @@ scripts/gather_artifact.sh pr     origin/main --level full   # or --level minima
 scripts/gather_artifact.sh design docs/rfc.md  --level full --tests test.out
 ```
 
+Use `--level minimal` for a routine PR (keeps purpose, non-goals, diff, and test
+results); use `--level full` for a high-risk PR or a system design (adds
+background, key decisions, known worries, and a review focus).
+
 The script fills the mechanical fields (changed files, diff/doc, test results).
 **You fill the author fields** (background / purpose / non-goals / key decisions
 / known worries / what to review) before sending it to the reviewers. Non-goals
@@ -68,12 +72,16 @@ Read both findings files now and merge them into one report:
 1. **Cluster + dedupe.** Same issue from both reviewers becomes one finding
    (renumber to `F-###`); keep the clearest evidence and suggestion. When the two
    disagree on severity for a merged finding, record the **higher** one.
-2. **Escalate real disagreements to the human.** Where you and GLM genuinely
-   differ on a **high-severity** finding, one says fix it and the other shrugs,
-   surface that conflict; do not quietly split the difference. On
-   design/architecture conflicts where your only ground is author knowledge,
+2. **Escalate the conflicts that matter to the human.** Surface a disagreement
+   (do not quietly split the difference) when ANY of:
+   - you and GLM differ on a **high-severity** finding (one says fix, one shrugs);
+   - it touches security / data loss / migration / public API, regardless of severity;
+   - low confidence but high severity;
+   - you are about to reject or defer a finding the other reviewer called `must_fix`.
+
+   On design/architecture conflicts where your only ground is author knowledge,
    GLM's read stands or it goes to the human, since you are not a neutral judge
-   there.
+   there. Lower-risk conflicts: make a provisional call and note it in the summary.
 3. **Never silently drop a GLM finding.** If you do not adopt one, say so and why
    (a one-line "not adopted: G-002, below the bar" is enough). Silent drops are
    the exact failure this two-reviewer setup exists to prevent.
@@ -81,10 +89,16 @@ Read both findings files now and merge them into one report:
    `defer` / `reject`; `reject` needs a reason. This makes the review a design
    decision, not an AI tally.
 
+**After the fix.** Self-checking the fix diff against the must-fix findings is
+enough for routine changes. For a high-risk change (security / data loss /
+migration / public API), re-run `glm_review.sh` on **just the fix diff** (wrap it
+as a small bundle asking whether each finding is resolved and whether the fix
+regressed anything); do not re-send the whole artifact.
+
 ## Output: use this template
 
 ```markdown
-# Cross-review: <target>
+# Dual-model review: <target>
 
 **Reviewers:** Claude (author-aware) · GLM-5.2 (via OpenCode Zen)
 **Verdict:** <approve | approve_with_nits | request_changes | block>
