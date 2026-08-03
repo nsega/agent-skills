@@ -38,5 +38,10 @@ after=$(wc -l < "$tr")
 [ "$after" -gt "$before" ] && ok || bad "second turn should grow the transcript"
 grep -q "(round 1)" "$tr"  && ok || bad "transcript missing round 1 header"
 
+# 6: round 0 with a non-empty transcript -> exit 2 (blindness guard)
+ne="$(mktemp)"; printf 'prior opening content\n' > "$ne"
+rc=0; CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$pk" "$ne" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 2 ] && ok || bad "round 0 with non-empty transcript should exit 2 (got $rc)"
+
 echo "codex_turn: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

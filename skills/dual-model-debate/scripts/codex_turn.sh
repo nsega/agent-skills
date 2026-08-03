@@ -12,8 +12,11 @@
 #
 # codex runs --ignore-user-config (so the caller's notify hooks, plugins, and
 # personality do not perturb a reproducible turn; auth still resolves from
-# CODEX_HOME), --sandbox read-only in a throwaway -C dir (so it cannot edit or
-# usefully crawl the repo), and --ephemeral (no session files on disk).
+# CODEX_HOME), --skip-git-repo-check + --sandbox read-only in a throwaway -C dir,
+# and --ephemeral (no session files on disk). NOTE: --sandbox read-only prevents
+# writes/edits, not reads. The debater is told not to read files, but that is
+# guidance, not a hard boundary; treat only what you place in the packet as
+# exposed to the model (and to OpenAI).
 #
 # Env:
 #   CODEX_MODEL   default gpt-5.6-sol
@@ -37,6 +40,11 @@ case "$CODEX_EFFORT" in minimal|low|medium|high) ;; *) echo "bad CODEX_EFFORT: '
 [ -f "$PACKET" ] || { echo "no such packet: $PACKET" >&2; exit 2; }
 [ -s "$PACKET" ] || { echo "packet is empty: $PACKET" >&2; exit 2; }
 touch "$TRANSCRIPT"   # may not exist on round 0
+# Round 0 must be blind: a pre-existing non-empty transcript would let this
+# debater see the other's opening. Defense-in-depth for the SKILL.md flow.
+if [ "$ROUND" = 0 ] && [ -s "$TRANSCRIPT" ]; then
+  echo "round 0 transcript must be empty for blindness: $TRANSCRIPT" >&2; exit 2
+fi
 
 MSG=""
 if [ -n "${CODEX_FAKE:-}" ]; then
@@ -63,8 +71,10 @@ run tools or read files.
 ## PROTOCOL
 $PROTOCOL_TXT"
 
-  SCRATCH="$(mktemp -d /tmp/dual-model-debate-scratch.XXXXXX)"
-  OUTMSG="$(mktemp /tmp/dual-model-debate-turn.XXXXXX.txt)"
+  D="${DMD_OUT_DIR:-/tmp}"; mkdir -p "$D"
+  SCRATCH="$(mktemp -d "$D/dual-model-debate-scratch.XXXXXX")"
+  OUTMSG="$(mktemp "$D/dual-model-debate-turn.XXXXXX.txt")"
+  trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
   echo "codex turn: $ROLE round $ROUND ($KIND), model=$CODEX_MODEL effort=$CODEX_EFFORT" >&2
   # stdin = packet + transcript so far; final message captured via -o.
   if ! cat "$PACKET" "$TRANSCRIPT" | codex exec \
@@ -73,11 +83,9 @@ $PROTOCOL_TXT"
         -m "$CODEX_MODEL" -c model_reasoning_effort="$CODEX_EFFORT" \
         -o "$OUTMSG" "$FULL_PROMPT" >/dev/null; then
     echo "codex exec failed (its stderr is above)" >&2
-    rm -rf "$SCRATCH" "$OUTMSG"
-    exit 1
+    exit 1                                # trap cleans up SCRATCH/OUTMSG
   fi
-  MSG="$(cat "$OUTMSG")"
-  rm -rf "$SCRATCH" "$OUTMSG"
+  MSG="$(cat "$OUTMSG")"                  # trap cleans up SCRATCH/OUTMSG on exit
 fi
 
 [ -n "$MSG" ] || { echo "empty turn from $ROLE (round $ROUND)" >&2; exit 1; }

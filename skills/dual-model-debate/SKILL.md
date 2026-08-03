@@ -26,10 +26,11 @@ escalation rules.
 ## Step 1: Build the packet
 
 ```bash
-scripts/build_packet.sh "Should we adopt X for Y?" docs/rfc.md notes.md
+PKT="$(scripts/build_packet.sh "Should we adopt X for Y?" docs/rfc.md notes.md)"
 ```
 
-The script assembles the packet and prints its path. **You fill the framing**
+The script assembles the packet and prints its path (captured here as `$PKT`,
+reused in Steps 2-3). **You fill the framing**
 (constraints, non-goals, what a good decision looks like) in the packet before
 the debate. Non-goals and constraints cut the most off-target arguments. Any
 file the debate needs must be attached here, because the debaters see only the
@@ -59,7 +60,7 @@ dedicated directory, or leave it unset for `/tmp` (the same directory
 
    ```bash
    D="${DMD_OUT_DIR:-/tmp}"; : > "$D/dmd-gpt.md"
-   scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 0 opening <packet> "$D/dmd-gpt.md"
+   scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 0 opening "$PKT" "$D/dmd-gpt.md"
    ```
 3. Append GPT's opening to the transcript:
    `D="${DMD_OUT_DIR:-/tmp}"; cat "$D/dmd-gpt.md" >> "$D/dmd-transcript.md"`
@@ -69,11 +70,12 @@ dedicated directory, or leave it unset for `/tmp` (the same directory
 Read both openings as the chair.
 
 - **If they disagree:** run up to 2 rebuttal rounds. Each round, first dispatch
-  the subagent for Claude's rebuttal (it reads `${DMD_OUT_DIR:-/tmp}/dmd-transcript.md`
-  so far and appends its block), then run GPT's:
+  the subagent for Claude's rebuttal (give it the packet AND
+  `${DMD_OUT_DIR:-/tmp}/dmd-transcript.md` so far, matching what GPT sees via
+  stdin; it appends its block), then run GPT's:
 
   ```bash
-  scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 1 rebuttal <packet> "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
+  scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 1 rebuttal "$PKT" "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
   ```
 
   Stop early the moment a round adds no new substantive argument (the chair's
@@ -83,7 +85,7 @@ Read both openings as the chair.
   conclusion it is about to judge:
 
   ```bash
-  scripts/codex_turn.sh "GPT (devil's advocate)" 1 forced <packet> "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
+  scripts/codex_turn.sh "GPT (devil's advocate)" 1 forced "$PKT" "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
   ```
 
 ## Step 4: Synthesize the decision
@@ -127,10 +129,15 @@ checked, not skipped.
 
 ## Governance & operating rules
 
-- **Read-only, packet-only debaters.** codex runs `--sandbox read-only` in a
-  throwaway `-C` dir with `--ignore-user-config`, so it argues from the piped
-  packet, not by crawling the repo or firing your codex notify hooks and
-  plugins. The subagent is likewise told to argue from the packet only.
+- **Read-only, packet-only debaters.** codex runs `--sandbox read-only`,
+  `--skip-git-repo-check`, and `--ephemeral` in a throwaway `-C` dir with
+  `--ignore-user-config`, so it argues from the piped packet, not by editing the
+  repo or firing your codex notify hooks and plugins. `--skip-git-repo-check`
+  only lets codex run in the non-repo scratch dir; it does not weaken the sandbox.
+  Note: `--sandbox read-only` prevents writes/edits, not reads, and "do not read
+  files" is a prompt instruction, not a hard boundary, so treat only what you put
+  in the packet as exposed to the model (and to OpenAI). The subagent is likewise
+  told to argue from the packet only.
 - **Bounded cost.** GPT turns are the only paid calls: at most 3 per run (an
   opening plus up to 2 rebuttals, or an opening plus one forced round). Effort
   prints to stderr.
