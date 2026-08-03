@@ -17,15 +17,27 @@ trap 'rm -rf "$WORK"' EXIT
 BUNDLE="$WORK/bundle.md"; printf '# Review packet\nBUNDLE_SENTINEL\n' > "$BUNDLE"
 OUT="$WORK/out.json"
 
-# A fake CLI that records what it was handed, then prints narration + a findings
+# A fake CLI that records what it was handed, then emits narration + a findings
 # object. The narration includes a brace-y string to exercise the JSON extractor.
-make_shim() {  # make_shim <shim-path> <payload-file>
+# With a third argument the shim honours `-o FILE` (what real codex does); without
+# it, the shim only writes stdout, which exercises the fallback path.
+make_shim() {  # make_shim <shim-path> <payload-file> [honour_dash_o]
   cat > "$1" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$@" > "$1.args"
 cat > "$1.stdin"
-echo "I reviewed the packet at provider.{p}.models.{m} and found issues."
-cat "$2"
+dest=""
+if [ -n "${3:-}" ]; then
+  prev=""
+  for a in "\$@"; do
+    [ "\$prev" = "-o" ] && dest="\$a"
+    prev="\$a"
+  done
+fi
+{
+  echo "I reviewed the packet at provider.{p}.models.{m} and found issues."
+  cat "$2"
+} > "\${dest:-/dev/stdout}"
 EOF
   chmod +x "$1"
 }
@@ -81,7 +93,7 @@ cat > "$BADFIND" <<'JSON'
    "confidence":"low","recommendation":"must_fix"}]}
 JSON
 
-SHIM="$WORK/codex"; make_shim "$SHIM" "$VALID"
+SHIM="$WORK/codex"; make_shim "$SHIM" "$VALID" honour-o
 if python3 -c 'import jsonschema' 2>/dev/null; then
   rm -f "$OUT"
   rc=0; CODEX_BIN="$SHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
@@ -97,6 +109,19 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   grep -qx -- "read-only" "$SHIM.args" && ok || bad "codex must run --sandbox read-only"
   grep -qx -- "model_reasoning_effort=high" "$SHIM.args" && ok || bad "codex effort should default to high"
   grep -qx -- "gpt-5.6-sol" "$SHIM.args" && ok || bad "codex model should default to gpt-5.6-sol"
+  # Blindness + reproducibility flags, matching dual-model-debate's codex_turn.sh.
+  grep -qx -- "--ignore-user-config" "$SHIM.args" && ok || bad "codex must run --ignore-user-config"
+  grep -qx -- "--ephemeral" "$SHIM.args" && ok || bad "codex must run --ephemeral"
+  grep -qx -- "features.shell_tool=false" "$SHIM.args" && ok || bad "codex must disable the shell tool"
+  grep -qx -- "-C" "$SHIM.args" && ok || bad "codex must be pointed at a scratch working root"
+
+  # The -o path above was the preferred one; stdout is the fallback when a codex
+  # build writes nothing to the -o file.
+  SHIM3="$WORK/codex-stdout"; make_shim "$SHIM3" "$VALID"
+  rm -f "$OUT"
+  rc=0; CODEX_BIN="$SHIM3" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && ok || bad "stdout fallback should exit 0 when -o writes nothing (got $rc)"
+  [ -f "$OUT" ] && grep -q '"R2-001"' "$OUT" && ok || bad "stdout fallback should still produce OUT_JSON"
 
   # glm backend still works after the refactor (opencode takes the prompt as an
   # argument and the artifact on stdin - the opposite split from codex).

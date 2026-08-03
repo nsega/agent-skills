@@ -20,6 +20,11 @@ line up. You are reviewer #1 **and** the synthesizer; reviewer #2 is a second
 lab's model, blind. The value is in the **disagreements**: surface them, never
 average them away.
 
+Sibling skill, easy to confuse: `dual-model-debate` **decides an open question**
+by having the two models argue it out. This one **reviews an artifact that
+already exists** — a diff or a design doc — and merges findings. "Should we do
+X?" is debate; "is this X any good?" is review.
+
 | | reviewer #1 | reviewer #2 (default) | reviewer #2 (alternate) |
 |---|---|---|---|
 | model | `claude-opus-5` | `gpt-5.6-sol` | `glm-5.2` |
@@ -164,19 +169,23 @@ was checked, not skipped.
   are hardened so reviewer #2 answers from the **piped packet alone** — with file
   tools available, a reviewer goes and reads the working tree (including changes
   it was meant to be blind to) instead of reviewing the diff it was handed.
-  - codex: `--sandbox read-only`, `features.shell_tool=false`, and `--cd` pointed
-    at an empty scratch dir — the working root is where codex discovers
-    `AGENTS.md`, project config, and repo context, so an empty one is what keeps
-    it blind. `web_search` is pinned to codex's default (`cached`) so a global
-    `live` setting cannot echo packet content to a search backend.
+  - codex: `features.shell_tool=false` and `-C` pointed at an empty scratch dir —
+    the working root is where codex discovers `AGENTS.md`, project config, and
+    repo context, so an empty one is what keeps it blind. Plus
+    `--ignore-user-config` (your notify hooks, plugins, personality, and any
+    `web_search = "live"` stay out of a review; auth still resolves from
+    `CODEX_HOME`) and `--ephemeral` (no session file on disk).
+    **`--sandbox read-only` blocks writes, not reads** — it is not the thing
+    keeping reviewer #2 blind, and only what you put in the bundle should be
+    treated as exposed.
   - opencode: `config/opencode.zen.json` disables the file/exec tools and pins a
     paid, zero-retention `small_model`.
 - **Retention is yours to confirm.** Check your Codex plan's data-retention and
   training terms before routing internal code through the default backend. The
   script deliberately does **not** relocate `CODEX_HOME` to ship a hardened
   `config.toml`: `auth.json` lives there too, so a fresh `CODEX_HOME` means "not
-  logged in". Overrides ride on `-c` flags instead, which are also the
-  highest-precedence config layer.
+  logged in". Hardening rides on `--ignore-user-config` plus `-c` overrides
+  instead, which is also the highest-precedence config layer.
 - **glm backend: Zen, US-hosted, paid tier only.** GLM-5.2 = `opencode/glm-5.2`
   (zero-retention). **Never** route internal code through Z.ai's own API. Z.ai is
   also on the US BIS Entity List; that backend assumes your org's compliance has

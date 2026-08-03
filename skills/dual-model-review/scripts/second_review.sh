@@ -182,37 +182,49 @@ echo "reviewer #2: $BACKEND / $R2_MODEL, effort=$R2_EFFORT" >&2
 # caller sees it in full and concurrent runs never clobber a shared log.
 case "$BACKEND" in
   codex)
-    # An EMPTY working root, not the repo under review. `--cd` selects the root
-    # codex discovers AGENTS.md, project config, and repo context from, so
-    # pointing it at a scratch dir is what keeps reviewer #2 blind — same failure
-    # we hit on the opencode side, where an enabled read/grep tool sent the
-    # reviewer off to read the working tree instead of the diff it was handed.
-    # --sandbox read-only and features.shell_tool=false are the belt and braces.
+    # Flags match the sibling dual-model-debate skill's codex_turn.sh, which is
+    # smoke-tested against real codex:
+    #   --ignore-user-config  the caller's notify hooks, plugins, personality, and
+    #                         any `web_search = "live"` must not perturb a review
+    #                         (auth still resolves from CODEX_HOME).
+    #   --ephemeral           no session file on disk; review packets are sensitive.
+    #   -C <empty scratch>    the working root is where codex discovers AGENTS.md,
+    #                         project config, and repo context, so an empty one is
+    #                         what keeps reviewer #2 blind to the tree it reviews.
+    #   -o <file>             take the final message from a file instead of
+    #                         scraping stdout.
+    # NOTE --sandbox read-only blocks writes, NOT reads. What actually stops
+    # reviewer #2 wandering into the working tree is features.shell_tool=false
+    # plus the empty -C root. Treat only what you put in the bundle as exposed.
     SCRATCH="$(mktemp -d /tmp/r2-codex-cwd.XXXXXX)"
-    trap 'rm -rf "$SCRATCH"' EXIT
+    OUTMSG="$(mktemp /tmp/r2-codex-msg.XXXXXX.txt)"
+    trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
 
-    # ONE stdin stream: prompt, then artifact, then the `-` placeholder that tells
-    # codex to read the prompt from stdin. Do NOT split them — a positional prompt
-    # takes precedence over stdin, so `cat bundle | codex exec "$PROMPT"` silently
-    # reviews NOTHING and bills the call anyway.
-    #
-    # web_search is pinned to codex's default ("cached") rather than left alone:
-    # a global `web_search = "live"` would let a live search echo packet content
-    # to a search backend.
+    # ONE stdin stream — prompt, then artifact — read via the `-` placeholder.
+    # Do NOT put the prompt in argv and pipe the bundle separately: codex's
+    # documented flag behavior is that a positional prompt takes precedence over
+    # stdin, which would review NOTHING and bill the call anyway. (The sibling
+    # skill splits them and works, so this build does deliver piped stdin as an
+    # <stdin> block — but one stream is correct under both readings, and a codex
+    # that rejects `-` fails loudly instead of silently reviewing an empty diff.)
     {
       printf '%s\n\n## ARTIFACT TO REVIEW\n\n' "$FULL_PROMPT"
       cat "$BUNDLE"
     } | "$CODEX_BIN" exec \
-          --cd "$SCRATCH" \
+          --ignore-user-config \
           --skip-git-repo-check \
+          --ephemeral \
           --sandbox read-only \
+          -C "$SCRATCH" \
           -m "$R2_MODEL" \
           -c model_reasoning_effort="$R2_EFFORT" \
           -c features.shell_tool=false \
-          -c web_search=cached \
+          -o "$OUTMSG" \
           - > "$RAW" || {
       echo "codex exec failed (its stderr is above)" >&2; exit 1;
     }
+    # Prefer the captured final message; fall back to stdout if -o wrote nothing.
+    if [ -s "$OUTMSG" ]; then cat "$OUTMSG" > "$RAW"; fi
     ;;
   glm)
     # opencode takes the prompt as an argument and the artifact on stdin.
