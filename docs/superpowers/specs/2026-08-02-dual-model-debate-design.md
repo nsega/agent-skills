@@ -84,11 +84,11 @@ skills/dual-model-debate/
 
 ### Turn format (structured markdown)
 
-Each turn emits markdown with these required headers, so the chair can parse turns
-and detect stalls while arguments stay readable:
+Each turn is these four required fields, so the chair can parse turns and detect
+stalls while arguments stay readable. The harness (the turn script) writes the
+`### <role> (round N)` heading; the model emits only the fields:
 
 ```markdown
-### <role> — round <n>
 **Position:** <one-line stance / recommended answer>
 **Argument:** <the case, prose, may be multiple paragraphs>
 **Concedes:** <points from the other side this turn grants, or "nothing yet">
@@ -141,7 +141,7 @@ The subagent split exists for these guarantees:
 - <disagreement> · Claude: <call> · GPT: <call> · why it needs you: <...>
 
 ## Key disagreements (each side's strongest argument)
-- <topic> — Claude: <strongest point> · GPT: <strongest point> · how it resolved: <...>
+- <topic> · Claude: <strongest point> · GPT: <strongest point> · how it resolved: <...>
 
 ## Genuine agreement
 - <point> (mark "agreement, not verification" where neither side independently grounded it)
