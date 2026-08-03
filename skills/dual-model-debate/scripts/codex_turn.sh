@@ -85,7 +85,7 @@ fi
 {
   echo "### $ROLE (round $ROUND)"
   echo
-  echo "$MSG"
+  printf '%s\n' "$MSG"
   echo
 } >> "$TRANSCRIPT"
 

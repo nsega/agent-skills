@@ -22,7 +22,7 @@ OUT="$(mktemp /tmp/dual-model-debate-packet.XXXXXX.md)"
   echo
   echo "## Question"
   echo
-  echo "$QUESTION"
+  printf '%s\n' "$QUESTION"
   echo
   echo "## Framing (author fills before the debate)"
   echo
