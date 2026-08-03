@@ -1,0 +1,61 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Hardened opencode config for the dual-model-review sub-reviewer. Activate by
+  // exporting OPENCODE_CONFIG=<this file> (glm_review.sh does this by default).
+  // opencode parses JSONC comments even in a .json-named file; "//"-keyed
+  // pseudo-comments are rejected by opencode's strict config schema.
+
+  "model": "opencode/glm-5.2",
+
+  // Background calls (titles/summaries) MUST NOT leak code to a free
+  // tier or to the default Zen title model (Claude Haiku, 30-day retention).
+  // Pin to a cheap PAID, zero-retention model.
+  "small_model": "opencode/deepseek-v4-flash",
+
+  // Never auto-publish review sessions.
+  "share": "disabled",
+
+  // Blind, single-shot reviewer: it must answer from the piped bundle ALONE.
+  // Disabling the file/exec tools does two jobs. (1) Independence: with read/grep
+  // enabled, GLM went and read the working tree (including changes it was meant
+  // to be blind to) instead of reviewing the diff it was handed. (2) Reliability:
+  // on a repo-shaped prompt it would spend its whole run exploring with tools and
+  // exit having emitted narration but no findings JSON, wasting a paid call. With
+  // no tools it just returns the JSON.
+  "tools": {
+    "read": false,
+    "grep": false,
+    "glob": false,
+    "list": false,
+    "write": false,
+    "edit": false,
+    "patch": false,
+    "bash": false,
+    "webfetch": false,
+    "websearch": false,
+    "task": false,
+    "todowrite": false
+  },
+
+  // Belt-and-braces on top of the tools block above, in case a key is renamed.
+  "permission": {
+    "edit": "deny",
+    "bash": "deny",
+    "webfetch": "deny"
+  },
+
+  // Reasoning effort is deliberately NOT set here. It is per-run via
+  // `opencode run --variant` (always max; ZEN_VARIANT can override for
+  // experiments). Setting it here too would be a second source of truth that
+  // silently wins or loses depending on precedence, and the old
+  // `provider.opencode.models.glm-5.2.options.reasoningEffort` key was never
+  // verified against current opencode docs anyway.
+  "provider": {
+    "opencode": {
+      "models": {
+        "glm-5.2": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "dual-model-review findings",
+  "description": "Per-reviewer output contract. Each reviewer numbers its own findings with a reviewer prefix (GLM => 'G-001', Claude => 'C-001'). The synthesizer (Claude) reassigns canonical 'F-###' ids when merging.",
+  "type": "object",
+  "required": ["reviewer", "summary", "findings", "overall"],
+  "additionalProperties": false,
+  "properties": {
+    "reviewer": {
+      "type": "string",
+      "description": "Reviewer id, e.g. 'glm-5.2' or 'claude-opus-4.8'."
+    },
+    "summary": {
+      "type": "string",
+      "description": "2-3 sentence overall read. Per the discipline prompt, findings come first; this is for the human, not a lead-in for the reviewer."
+    },
+    "overall": {
+      "type": "string",
+      "enum": ["approve", "approve_with_nits", "request_changes", "block"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "category", "location", "issue", "suggestion", "confidence", "recommendation"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Reviewer-prefixed id, e.g. 'G-001' (GLM) or 'C-001' (Claude). Stable within this review."
+          },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "category": {
+            "type": "string",
+            "enum": ["correctness", "security", "testing", "performance",
+                     "failure_modes", "observability", "maintainability",
+                     "design", "operability", "other"]
+          },
+          "location": { "type": "string", "description": "file:line for diffs, or section name for designs." },
+          "issue": { "type": "string", "description": "What is wrong (one or two sentences)." },
+          "evidence": {
+            "type": "string",
+            "description": "Concrete grounding: the diff line / spec clause / observed behavior that proves the issue. Reduces hallucinated findings."
+          },
+          "failure_case": {
+            "type": "string",
+            "description": "A concrete scenario where this bites (input, sequence, or load that triggers it)."
+          },
+          "suggestion": { "type": "string", "description": "Concrete fix." },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "recommendation": {
+            "type": "string",
+            "enum": ["must_fix", "should_fix", "defer", "nit"],
+            "description": "This reviewer's recommended CALL on its own finding, distinct from the synthesizer's disposition: a reviewer recommends, the chair decides. No 'reject' value, since a blind reviewer never rejects a finding it just raised. Severity is impact; recommendation is action; they may diverge (a low-severity item with a one-line fix can be must_fix; a high-severity item outside this change's scope can be defer)."
+          },
+          "speculative": {
+            "type": "boolean",
+            "description": "true if this is a plausible-but-unverified concern. Optional; defaults false."
+          }
+        },
+        "allOf": [
+          {
+            "//": "Evidence + failure_case are mandatory for the findings most worth grounding.",
+            "if": { "required": ["severity"], "properties": { "severity": { "enum": ["critical", "high"] } } },
+            "then": { "required": ["evidence", "failure_case"] }
+          },
+          {
+            "//": "Correctness/security claims must be grounded regardless of severity.",
+            "if": { "required": ["category"], "properties": { "category": { "enum": ["correctness", "security"] } } },
+            "then": { "required": ["evidence"] }
+          }
+        ]
+      }
+    }
+  }
+}

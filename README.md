@@ -12,6 +12,7 @@ immediately — no copy step. The same `SKILL.md` format works for Codex.
 | Skill | What it does |
 |---|---|
 | `cross-repo-context` | Work across sibling repos (`../other-repo`) as if they were a monorepo |
+| `cross-review` | Two-model cross-review of a PR or design doc (Claude + GLM-5.2 via OpenCode Zen), disagreements surfaced for the human |
 | `desktop-organizer` | Sort loose screenshots/PDFs into themed, dated folders |
 | `friction-log` | Maintain a personal friction log in an Obsidian vault |
 | `illustrate-with-html` | Explain/visualize anything as a single self-contained `.html` file |

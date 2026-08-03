@@ -1,8 +1,16 @@
 # OS cruft
 .DS_Store
 
+# Python bytecode cache
+__pycache__/
+*.pyc
+
 # Local Claude Code settings (per-machine permissions)
 .claude/settings.local.json
 
 # Per-skill scratch / iteration workspaces (not real skills)
 *-workspace/
+
+# dual-model-review outputs (default to /tmp, but never commit them if redirected here)
+*-findings.json
+dual-model-review-packet.*
