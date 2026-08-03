@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Plain assertions; no `set -e` so we can inspect exit codes.
+set -euo pipefail
+# Plain assertions; capture exit codes with `rc=0; cmd || rc=$?` under set -e.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BP="$HERE/../scripts/build_packet.sh"
 pass=0; fail=0
@@ -7,7 +8,7 @@ ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 
 # 1: no question -> exit 2
-"$BP" >/dev/null 2>&1; rc=$?
+rc=0; "$BP" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "no question should exit 2 (got $rc)"
 
 # 2: question only -> packet has the question, framing, and the no-context note
@@ -24,7 +25,7 @@ grep -q "### $(basename "$tmpc")" "$p2" && ok || bad "packet missing context bas
 grep -q "SENTINEL_CONTENT_42" "$p2"     && ok || bad "packet missing context contents"
 
 # 4: nonexistent context file -> exit 2
-"$BP" "Q?" /no/such/file >/dev/null 2>&1; rc=$?
+rc=0; "$BP" "Q?" /no/such/file >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "missing context file should exit 2 (got $rc)"
 
 echo "build_packet: $pass passed, $fail failed"
