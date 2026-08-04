@@ -20,6 +20,17 @@ rc=0; CODEX_FAKE="$canned" "$CT" "GPT" 0 bogus "$pk" "$tr" >/dev/null 2>&1 || rc
 rc=0; CODEX_EFFORT=bogus CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$pk" "$tr" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "bad effort should exit 2 (got $rc)"
 
+# 2b: the allowlist must match the real catalog (`codex debug models`): no model
+# accepts "minimal" (the API 400s on it mid-turn), and gpt-5.6-sol accepts
+# max/ultra. Getting either end wrong is a silent downgrade or a bogus rejection.
+rc=0; CODEX_EFFORT=minimal CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$pk" "$tr" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 2 ] && ok || bad "CODEX_EFFORT=minimal is not a codex effort, should exit 2 (got $rc)"
+for e in xhigh max ultra; do
+  fresh="$(mktemp)"; : > "$fresh"
+  rc=0; CODEX_EFFORT="$e" CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$pk" "$fresh" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && ok || bad "CODEX_EFFORT=$e must be accepted (got $rc)"
+done
+
 # 3: empty packet -> exit 2
 empty="$(mktemp)"; : > "$empty"
 rc=0; CODEX_FAKE="$canned" "$CT" "GPT" 0 opening "$empty" "$tr" >/dev/null 2>&1 || rc=$?
