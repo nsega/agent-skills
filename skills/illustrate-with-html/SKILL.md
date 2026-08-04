@@ -2,21 +2,18 @@
 name: illustrate-with-html
 description: >-
   Illustrate, explain, or visualize anything as a single self-contained .html
-  file instead of a wall of markdown — following "The unreasonable effectiveness
-  of HTML." Use this whenever the user wants to SEE a workflow, pipeline, plan,
-  diff, architecture/module map, concept, timeline, or report rather than read
-  about it: phrasings like "illustrate the current workflow", "show me how X
-  works", "draw the deploy pipeline", "flowchart this process", "diagram this
-  diff/architecture", "explain consistent hashing visually", "make me a status
-  report / incident timeline", or any time spatial layout, annotations, or
-  clickable interactivity would communicate better than prose. Trigger even when
-  the user doesn't say the word "HTML" or "diagram" — if the intent is to make
-  something legible at a glance, reach for this. Prefer it over frontend/app/
-  dashboard builders whenever the goal is understanding rather than a shipped
-  product. Produces one polished, openable .html in the Anthropic visual style
-  (annotated, interactive, no build step). NOT for: real web apps or React
-  dashboards, CSS/UI fixes, writing feature code, prose-only PR/code reviews,
-  slide decks (.pptx), spreadsheet charts, or animated GIFs.
+  file instead of a wall of markdown, following "The unreasonable effectiveness
+  of HTML." Use when the user wants to SEE something rather than read about it:
+  "illustrate the current workflow", "draw the deploy pipeline", "map these
+  module dependencies", "explain consistent hashing visually", "make me a status
+  report or incident timeline". Trigger too when they never say "HTML" or
+  "diagram" but spatial layout or annotation would communicate better than
+  prose. Produces one polished, openable .html in the Anthropic visual style.
+  Routing: reviewing a PR is pr-review (or pr-visual-review for its structure,
+  as Mermaid that pastes into a PR comment); a whole-repo architecture wiki is
+  repo-deepwiki; this one is for a standalone file someone opens in a browser.
+  NOT for: shipped web apps, CSS/UI fixes, writing feature code, .pptx decks, or
+  animated GIFs.
 ---
 
 # Illustrate with HTML
@@ -38,8 +35,9 @@ three ideas from the essay:
    diffs, timelines, box-and-arrow maps) instead of linearizing it.
 2. **Annotated** — margin notes, severity tags, callouts, legends. The picture
    *and* the explanation of the picture live in the same view.
-3. **Interactive** — click a step to see detail, collapse sections, toggle
-   states, hover for context. Motion and clicks say things prose can't.
+3. **Interactive** — one-way when the reader is just reading (click a step for
+   detail, collapse a section, hover for context); two-way when the reader has
+   a decision to make (sliders, toggles, editable fields).
 
 This is not "make a generic webpage." It's a focused illustration of one thing,
 done well.
@@ -60,6 +58,12 @@ done well.
   drawn from `.github/workflows/` is worth ten generic ones.
 - **Keep it to what illuminates.** Annotations should resolve confusion, not
   decorate. If a node, label, or panel isn't earning its place, cut it.
+- **If the page produces a decision, it must export it.** When the reader's
+  manipulation yields something you'd otherwise ask them to retype (a chosen
+  config, an ordering, a tuned value), the page ends in a copy button that
+  serializes exactly that: "copy as prompt", "copy as JSON", "copy as markdown",
+  "copy diff". A page you can tune but not carry back is a dead end. See the
+  export bar in `references/patterns.md`.
 
 ## Pick the format that fits the content
 
@@ -85,8 +89,9 @@ For the structure and key technique of every other pattern above, read
 ## The visual style is fixed (Anthropic look)
 
 Every output uses the same design system so they feel like one family. The full
-skeleton — palette, typography, header, card, sticky detail panel, legend,
-responsive grid — lives in `assets/base-template.html`. **Start from that file**,
+skeleton — palette, typography, header, canvas, sticky detail panel, legend,
+SVG node/edge kit, pills, export button — lives in `assets/base-template.html`.
+**Start from that file**,
 keep the `:root` tokens exactly, and fill in the body for the specific
 illustration. The tokens:
 
@@ -123,13 +128,16 @@ Conventions that make outputs cohere:
    For interactive detail (clickable nodes, tabs, collapse), follow the small
    vanilla-JS pattern in the flowchart example — a `data-*` key on each element
    and a `DETAIL` map keyed by it.
-5. **Sanity-check it renders — actually look at it.** A standalone file with no
-   network, yes, but also *visually correct*: overlap and collisions are
-   invisible in the source and glaring on screen. For any hand-authored SVG
-   diagram, render it before handing it over — serve the folder
-   (`python3 -m http.server`) and screenshot it with a headless browser, or just
-   open it — and confirm no edges cross nodes, no labels collide, nothing is
-   clipped. Then tell the user the path and one line on what to click.
+5. **Render it, then read the render.** Overlap is invisible in the source and
+   glaring on screen. The file is self-contained, so screenshot it directly, no
+   server needed:
+   `npx playwright screenshot --full-page --viewport-size=1200,1400 "file:///abs/path/to/out.html" /tmp/check.png`
+   (a global `playwright` works too; on "missing browser", run
+   `npx playwright install chromium` once). Then **read the PNG back and look at
+   it.** Taking the screenshot is not the check, reading it is. Confirm: no box
+   overlaps another, no arrowhead stops inside a node, no label sits on a
+   stroke, nothing clipped. Fix and re-render until clean, then tell the user
+   the path and one line on what to click.
 
 If the user is in a repo, write the file there (a sensible spot like `docs/` or
 the cwd). Otherwise the Desktop or cwd is fine. Always report the absolute path.
