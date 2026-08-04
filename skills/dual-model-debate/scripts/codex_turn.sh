@@ -77,7 +77,12 @@ $PROTOCOL_TXT"
   D="${DMD_OUT_DIR:-/tmp}"; mkdir -p "$D"
   SCRATCH="$(mktemp -d "$D/dual-model-debate-scratch.XXXXXX")"
   OUTMSG="$(mktemp "$D/dual-model-debate-turn.XXXXXX.txt")"
-  trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
+  # EXIT alone is not enough: a shell killed by an untrapped SIGINT/SIGTERM
+  # (Ctrl-C during the long paid turn) dies without running its EXIT trap, so the
+  # signals are trapped into a normal exit, which then fires EXIT.
+  trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   echo "codex turn: $ROLE round $ROUND ($KIND), model=$CODEX_MODEL effort=$CODEX_EFFORT" >&2
   # stdin = packet + transcript so far; final message captured via -o.
   if ! cat "$PACKET" "$TRANSCRIPT" | codex exec \
