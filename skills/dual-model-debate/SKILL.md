@@ -144,7 +144,8 @@ checked, not skipped.
 - **Data to OpenAI.** The packet is sent to OpenAI via codex. Do not route
   secrets through it.
 - **Parameters.** `CODEX_MODEL` (default `gpt-5.6-sol`), `CODEX_EFFORT` (default
-  `high`; minimal|low|medium|high). Set `CODEX_FAKE=<file>` to replay a canned
+  `high`; low|medium|high|xhigh|max|ultra, where max/ultra need a model that
+  supports them, e.g. `gpt-5.6-sol`). Set `CODEX_FAKE=<file>` to replay a canned
   turn instead of calling codex, for a free dry run. `DMD_OUT_DIR` sets the
   directory for the packet and the saved transcript (created if missing; default
   `/tmp`).

@@ -20,7 +20,7 @@
 #
 # Env:
 #   CODEX_MODEL   default gpt-5.6-sol
-#   CODEX_EFFORT  default high            (minimal|low|medium|high)
+#   CODEX_EFFORT  default high            (low|medium|high|xhigh|max|ultra)
 #   CODEX_FAKE    if set to a file path, use its contents as the model message
 #                 instead of calling codex (free dry runs and tests).
 set -euo pipefail
@@ -35,7 +35,10 @@ case "$KIND" in opening|rebuttal|forced) ;; *) echo "bad role kind: '$KIND' (wan
 
 CODEX_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
 CODEX_EFFORT="${CODEX_EFFORT:-high}"
-case "$CODEX_EFFORT" in minimal|low|medium|high) ;; *) echo "bad CODEX_EFFORT: '$CODEX_EFFORT' (want minimal|low|medium|high)" >&2; exit 2 ;; esac
+# Verified against `codex debug models`: every model in the catalog supports
+# low|medium|high|xhigh, gpt-5.6-sol/terra add max|ultra, and NO model accepts
+# "minimal" (the API rejects it with HTTP 400 after the turn has started).
+case "$CODEX_EFFORT" in low|medium|high|xhigh|max|ultra) ;; *) echo "bad CODEX_EFFORT: '$CODEX_EFFORT' (want low|medium|high|xhigh|max|ultra)" >&2; exit 2 ;; esac
 
 [ -f "$PACKET" ] || { echo "no such packet: $PACKET" >&2; exit 2; }
 [ -s "$PACKET" ] || { echo "packet is empty: $PACKET" >&2; exit 2; }
