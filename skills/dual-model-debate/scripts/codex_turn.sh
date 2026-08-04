@@ -20,7 +20,7 @@
 #
 # Env:
 #   CODEX_MODEL   default gpt-5.6-sol
-#   CODEX_EFFORT  default high            (minimal|low|medium|high)
+#   CODEX_EFFORT  default high            (low|medium|high|xhigh|max|ultra)
 #   CODEX_FAKE    if set to a file path, use its contents as the model message
 #                 instead of calling codex (free dry runs and tests).
 set -euo pipefail
@@ -35,7 +35,10 @@ case "$KIND" in opening|rebuttal|forced) ;; *) echo "bad role kind: '$KIND' (wan
 
 CODEX_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
 CODEX_EFFORT="${CODEX_EFFORT:-high}"
-case "$CODEX_EFFORT" in minimal|low|medium|high) ;; *) echo "bad CODEX_EFFORT: '$CODEX_EFFORT' (want minimal|low|medium|high)" >&2; exit 2 ;; esac
+# Verified against `codex debug models`: every model in the catalog supports
+# low|medium|high|xhigh, gpt-5.6-sol/terra add max|ultra, and NO model accepts
+# "minimal" (the API rejects it with HTTP 400 after the turn has started).
+case "$CODEX_EFFORT" in low|medium|high|xhigh|max|ultra) ;; *) echo "bad CODEX_EFFORT: '$CODEX_EFFORT' (want low|medium|high|xhigh|max|ultra)" >&2; exit 2 ;; esac
 
 [ -f "$PACKET" ] || { echo "no such packet: $PACKET" >&2; exit 2; }
 [ -s "$PACKET" ] || { echo "packet is empty: $PACKET" >&2; exit 2; }
@@ -74,7 +77,12 @@ $PROTOCOL_TXT"
   D="${DMD_OUT_DIR:-/tmp}"; mkdir -p "$D"
   SCRATCH="$(mktemp -d "$D/dual-model-debate-scratch.XXXXXX")"
   OUTMSG="$(mktemp "$D/dual-model-debate-turn.XXXXXX.txt")"
-  trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
+  # EXIT alone is not enough: a shell killed by an untrapped SIGINT/SIGTERM
+  # (Ctrl-C during the long paid turn) dies without running its EXIT trap, so the
+  # signals are trapped into a normal exit, which then fires EXIT.
+  trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   echo "codex turn: $ROLE round $ROUND ($KIND), model=$CODEX_MODEL effort=$CODEX_EFFORT" >&2
   # stdin = packet + transcript so far; final message captured via -o.
   if ! cat "$PACKET" "$TRANSCRIPT" | codex exec \
