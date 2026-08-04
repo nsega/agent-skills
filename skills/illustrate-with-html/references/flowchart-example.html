@@ -72,7 +72,7 @@
     padding: 28px;
     overflow-x: auto;
   }
-  svg.flow { display: block; width: 100%; height: auto; }
+  svg.flow { display: block; width: 100%; height: auto; min-width: 480px; }
 
   .flow text {
     font-family: var(--mono);
@@ -93,6 +93,8 @@
   .node:hover { transform: translateY(-1px); }
   .node.active rect,
   .node.active path { stroke: var(--clay); stroke-width: 2; }
+  .node:focus-visible rect,
+  .node:focus-visible path { stroke: var(--clay); stroke-width: 2; }
 
   .edge       { stroke: var(--gray-500); stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
   .edge.no    { stroke: var(--rust); stroke-dasharray: 4 4; marker-end: url(#arrow-rust); }
@@ -174,7 +176,7 @@
 
     <div>
       <div class="canvas">
-        <svg class="flow" viewBox="0 0 620 920">
+        <svg class="flow" viewBox="0 0 620 880">
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="#87867F"/>
@@ -193,82 +195,82 @@
           <path class="edge" d="M310,224 L310,262"/>
           <path class="edge yes" d="M310,326 L310,368"/>
           <text class="lbl" x="320" y="350">pass</text>
-          <path class="edge no" d="M268,294 C190,294 150,294 150,212 L150,212"/>
-          <text class="lbl" x="138" y="260" fill="#B04A3F">fail → status</text>
+          <path class="edge no" d="M268,294 C190,294 105,294 105,224"/>
+          <text class="lbl" x="130" y="272" fill="#B04A3F">fail → status</text>
           <path class="edge" d="M310,416 L310,452"/>
           <path class="edge" d="M310,500 L310,538"/>
           <path class="edge yes" d="M310,602 L310,644"/>
           <text class="lbl" x="320" y="626">healthy</text>
-          <path class="edge no" d="M352,570 C470,570 470,690 392,720"/>
-          <text class="lbl" x="448" y="636" fill="#B04A3F">canary fails</text>
+          <path class="edge no" d="M352,570 C500,570 512,620 512,690"/>
+          <text class="lbl" x="420" y="622" fill="#B04A3F">canary fails</text>
           <path class="edge" d="M310,692 L310,730"/>
           <path class="edge" d="M310,778 L310,816"/>
 
           <!-- nodes -->
-          <g class="node term" data-k="push">
+          <g class="node term" data-k="push" tabindex="0">
             <rect x="230" y="12" width="160" height="44"/>
             <text x="310" y="38" text-anchor="middle">git push main</text>
           </g>
 
-          <g class="node" data-k="ci">
+          <g class="node" data-k="ci" tabindex="0">
             <rect x="210" y="92" width="200" height="48"/>
             <text x="310" y="112" text-anchor="middle">CI · lint + typecheck</text>
             <text class="sub" x="310" y="128" text-anchor="middle">~2 min · ci.yml</text>
           </g>
 
-          <g class="node" data-k="test">
+          <g class="node" data-k="test" tabindex="0">
             <rect x="210" y="176" width="200" height="48"/>
             <text x="310" y="196" text-anchor="middle">Unit + integration tests</text>
             <text class="sub" x="310" y="212" text-anchor="middle">~6 min · 3 shards</text>
           </g>
 
-          <g class="node gate" data-k="gate-tests">
+          <g class="node gate" data-k="gate-tests" tabindex="0">
             <path d="M310,262 L352,294 L310,326 L268,294 Z"/>
             <text x="310" y="298" text-anchor="middle">pass?</text>
           </g>
 
-          <g class="node bad" data-k="status">
-            <rect x="60" y="176" width="180" height="48"/>
-            <text x="150" y="196" text-anchor="middle">Post failure status</text>
-            <text class="sub" x="150" y="212" text-anchor="middle">slack #deploys</text>
+          <g class="node bad" data-k="status" tabindex="0">
+            <rect x="20" y="176" width="170" height="48"/>
+            <text x="105" y="196" text-anchor="middle">Post failure status</text>
+            <text class="sub" x="105" y="212" text-anchor="middle">slack #deploys</text>
           </g>
 
-          <g class="node" data-k="build">
+          <g class="node" data-k="build" tabindex="0">
             <rect x="210" y="368" width="200" height="48"/>
             <text x="310" y="388" text-anchor="middle">Build + push image</text>
             <text class="sub" x="310" y="404" text-anchor="middle">ghcr.io/acme/web</text>
           </g>
 
-          <g class="node" data-k="canary">
+          <g class="node" data-k="canary" tabindex="0">
             <rect x="210" y="452" width="200" height="48"/>
             <text x="310" y="472" text-anchor="middle">Argo canary 5%</text>
             <text class="sub" x="310" y="488" text-anchor="middle">10 min soak</text>
           </g>
 
-          <g class="node gate" data-k="gate-canary">
+          <g class="node gate" data-k="gate-canary" tabindex="0">
             <path d="M310,538 L352,570 L310,602 L268,570 Z"/>
             <text x="310" y="574" text-anchor="middle">SLO ok?</text>
           </g>
 
-          <g class="node" data-k="promote">
+          <g class="node" data-k="promote" tabindex="0">
             <rect x="210" y="644" width="200" height="48"/>
             <text x="310" y="664" text-anchor="middle">Promote 25 → 50 → 100%</text>
             <text class="sub" x="310" y="680" text-anchor="middle">~8 min</text>
           </g>
 
-          <g class="node bad" data-k="rollback">
-            <rect x="392" y="700" width="170" height="48"/>
-            <text x="477" y="720" text-anchor="middle">Auto-rollback</text>
-            <text class="sub" x="477" y="736" text-anchor="middle">revert image tag</text>
+          <g class="node bad" data-k="rollback" tabindex="0">
+            <rect x="432" y="690" width="170" height="48"/>
+            <text x="517" y="710" text-anchor="middle">Auto-rollback</text>
+            <text class="sub" x="517" y="726" text-anchor="middle">revert image tag</text>
           </g>
 
-          <g class="node" data-k="smoke">
+          <g class="node" data-k="smoke" tabindex="0">
             <rect x="210" y="730" width="200" height="48"/>
             <text x="310" y="750" text-anchor="middle">Smoke tests in prod</text>
             <text class="sub" x="310" y="766" text-anchor="middle">playwright · 90s</text>
           </g>
 
-          <g class="node ok term" data-k="done">
+          <g class="node ok term" data-k="done" tabindex="0">
             <rect x="230" y="816" width="160" height="44"/>
             <text x="310" y="843" text-anchor="middle">✅ Deploy complete</text>
           </g>
@@ -378,16 +380,24 @@ const M = document.getElementById("p-meta");
 const B = document.getElementById("p-body");
 const C = document.getElementById("p-code");
 
+function activate(n) {
+  const d = DETAIL[n.dataset.k];
+  if (!d) return;                                     // guard BEFORE selecting,
+  nodes.forEach(x => x.classList.remove("active"));   // or the panel keeps
+  n.classList.add("active");                          // showing the last node
+  T.textContent = d.title;
+  M.textContent = d.meta;
+  B.innerHTML = d.body;
+  C.textContent = d.code;
+}
+
 nodes.forEach(n => {
-  n.addEventListener("click", () => {
-    nodes.forEach(x => x.classList.remove("active"));
-    n.classList.add("active");
-    const d = DETAIL[n.dataset.k];
-    if (!d) return;
-    T.textContent = d.title;
-    M.textContent = d.meta;
-    B.innerHTML = d.body;
-    C.textContent = d.code;
+  n.addEventListener("click", () => activate(n));
+  n.addEventListener("keydown", e => {            // each <g> carries tabindex="0"
+    if (e.key === "Enter" || e.key === " ") {     // so the panel is reachable
+      e.preventDefault();                         // without a mouse
+      activate(n);
+    }
   });
 });
 document.querySelector('.node[data-k="push"]').classList.add("active");
