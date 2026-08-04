@@ -7,7 +7,7 @@
 #   second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm]
 #
 # Backends. Reviewer #2 is pluggable: the packet, rubric, schema, prompt, and
-# synthesis are identical either way — only the CLI underneath changes.
+# synthesis are identical either way; only the CLI underneath changes.
 #   codex  GPT-5.6 Sol via the Codex CLI            (default)
 #   glm    GLM-5.2 via opencode + OpenCode Zen      (alternate)
 #
@@ -64,9 +64,12 @@ case "$BACKEND" in
   codex)
     R2_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
     R2_EFFORT="${CODEX_EFFORT:-high}"
+    # Verified against `codex debug models`: every model in the catalog supports
+    # low|medium|high|xhigh, gpt-5.6-sol/terra add max|ultra, and NO model accepts
+    # "minimal" (the API rejects it with HTTP 400 after the run has started).
     case "$R2_EFFORT" in
-      minimal|low|medium|high|xhigh) ;;
-      *) echo "bad CODEX_EFFORT: '$R2_EFFORT' (want minimal|low|medium|high|xhigh)" >&2; exit 2 ;;
+      low|medium|high|xhigh|max|ultra) ;;
+      *) echo "bad CODEX_EFFORT: '$R2_EFFORT' (want low|medium|high|xhigh|max|ultra)" >&2; exit 2 ;;
     esac
     ;;
   glm)
@@ -92,6 +95,14 @@ for f in "$BUNDLE" "$RUBRIC" "$SCHEMA"; do
   [ -f "$f" ] || { echo "no such file: $f" >&2; exit 2; }
 done
 [ -s "$BUNDLE" ] || { echo "bundle is empty: $BUNDLE" >&2; exit 2; }
+
+# The arguments are well-formed and the inputs exist, so THIS run now owns
+# $OUT. Drop any previous run's findings here, before the CLI/auth preflight and
+# before the call: a run that fails anywhere past this point must not leave a
+# stale file behind. SKILL.md tells you to re-run this on just the fix diff, and
+# Step 3 then reads $OUT as the fix review, so a survivor would be merged as if
+# it were fresh. (Typo exits above this line destroy nothing.)
+rm -f "$OUT"
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -198,14 +209,19 @@ case "$BACKEND" in
     # plus the empty -C root. Treat only what you put in the bundle as exposed.
     SCRATCH="$(mktemp -d /tmp/r2-codex-cwd.XXXXXX)"
     OUTMSG="$(mktemp /tmp/r2-codex-msg.XXXXXX.txt)"
-    trap 'rm -rf "$SCRATCH" "$OUTMSG" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
+    # codex echoes its banner AND the whole prompt (which is now prompt + rubric +
+    # schema + the entire bundle) back on stderr. Letting that reach our stderr
+    # dumps the full diff into the orchestrating agent's transcript and CI logs,
+    # so capture it and surface only the tail, and only when the call fails.
+    CODEXERR="$(mktemp /tmp/r2-codex-err.XXXXXX.txt)"
+    trap 'rm -rf "$SCRATCH" "$OUTMSG" "$CODEXERR" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
 
-    # ONE stdin stream — prompt, then artifact — read via the `-` placeholder.
+    # ONE stdin stream (prompt, then artifact), read via the `-` placeholder.
     # Do NOT put the prompt in argv and pipe the bundle separately: codex's
     # documented flag behavior is that a positional prompt takes precedence over
     # stdin, which would review NOTHING and bill the call anyway. (The sibling
     # skill splits them and works, so this build does deliver piped stdin as an
-    # <stdin> block — but one stream is correct under both readings, and a codex
+    # <stdin> block, but one stream is correct under both readings, and a codex
     # that rejects `-` fails loudly instead of silently reviewing an empty diff.)
     {
       printf '%s\n\n## ARTIFACT TO REVIEW\n\n' "$FULL_PROMPT"
@@ -220,8 +236,10 @@ case "$BACKEND" in
           -c model_reasoning_effort="$R2_EFFORT" \
           -c features.shell_tool=false \
           -o "$OUTMSG" \
-          - > "$RAW" || {
-      echo "codex exec failed (its stderr is above)" >&2; exit 1;
+          - > "$RAW" 2>"$CODEXERR" || {
+      echo "codex exec failed; last 20 lines of its stderr:" >&2
+      tail -20 "$CODEXERR" >&2
+      exit 1;
     }
     # Prefer the captured final message; fall back to stdout if -o wrote nothing.
     if [ -s "$OUTMSG" ]; then cat "$OUTMSG" > "$RAW"; fi
@@ -281,3 +299,8 @@ except jsonschema.ValidationError as ex:
 json.dump(obj, open(sys.argv[2], "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 print(sys.argv[2])
 PY
+
+# Success only: under `set -e` a parse/validate failure exits above, which keeps
+# $RAW on disk for the inspection the error message points at. On success it is
+# reviewer #2's full output for a sensitive packet, so do not leave it in /tmp.
+rm -f "$RAW"

@@ -3,9 +3,9 @@ name: dual-model-review
 description: >-
   Run a two-model review of a pull request or a system-design document.
   Claude Code (Opus 5, high effort) is the main reviewer and synthesizer; a
-  second, independent reviewer runs blind through another lab's model —
+  second, independent reviewer runs blind through another lab's model:
   GPT-5.6 Sol via the Codex CLI by default, GLM-5.2 via opencode as the
-  alternate — for decorrelated blind spots. Use this whenever the user asks to
+  alternate, for decorrelated blind spots. Use this whenever the user asks to
   "cross-review", wants a "second opinion" on a PR or design, says "review this
   with codex" / "review this with GPT" / "review this with GLM", "run the
   panel", or wants higher-confidence review of an architecture doc, RFC, or diff
@@ -22,7 +22,7 @@ average them away.
 
 Sibling skill, easy to confuse: `dual-model-debate` **decides an open question**
 by having the two models argue it out. This one **reviews an artifact that
-already exists** — a diff or a design doc — and merges findings. "Should we do
+already exists** (a diff or a design doc) and merges findings. "Should we do
 X?" is debate; "is this X any good?" is review.
 
 | | reviewer #1 | reviewer #2 (default) | reviewer #2 (alternate) |
@@ -92,14 +92,16 @@ required Evidence / failure_case / recommendation is rejected, not silently
 accepted). It writes `R2-###` ids and stamps the actual model in `reviewer`, so
 the merged report still records which lab said what.
 
-Override per run with `CODEX_MODEL` / `CODEX_EFFORT` (`minimal|low|medium|high|xhigh`)
-or `ZEN_MODEL` / `ZEN_VARIANT` (`minimal|low|high|max`); a bad value exits 2
-before anything is spent, since neither CLI reliably rejects one itself.
+Override per run with `CODEX_MODEL` / `CODEX_EFFORT`
+(`low|medium|high|xhigh|max|ultra`; `max`/`ultra` need a model that supports
+them, e.g. `gpt-5.6-sol`) or `ZEN_MODEL` / `ZEN_VARIANT` (`minimal|low|high|max`);
+a bad value exits 2 before anything is spent, since neither CLI reliably rejects
+one itself.
 
 > A single pass is a **noisy** detector: two passes over the same packet can
 > share few findings. Treat a clean pass as weak evidence, and for a high-stakes
-> review run `second_review.sh` two or three times into different files — or once
-> per backend — and union the findings yourself. That is the whole reliability
+> review run `second_review.sh` two or three times into different files, or once
+> per backend, and union the findings yourself. That is the whole reliability
 > story; there is no aggregation script to run.
 
 ## Step 3: Synthesize (the actual work)
@@ -166,16 +168,16 @@ was checked, not skipped.
 ## Governance & operating rules
 
 - **Read-only reviewers.** They analyze; they do not edit the repo. Both backends
-  are hardened so reviewer #2 answers from the **piped packet alone** — with file
+  are hardened so reviewer #2 answers from the **piped packet alone**, with file
   tools available, a reviewer goes and reads the working tree (including changes
   it was meant to be blind to) instead of reviewing the diff it was handed.
-  - codex: `features.shell_tool=false` and `-C` pointed at an empty scratch dir —
+  - codex: `features.shell_tool=false` and `-C` pointed at an empty scratch dir,
     the working root is where codex discovers `AGENTS.md`, project config, and
     repo context, so an empty one is what keeps it blind. Plus
     `--ignore-user-config` (your notify hooks, plugins, personality, and any
     `web_search = "live"` stay out of a review; auth still resolves from
     `CODEX_HOME`) and `--ephemeral` (no session file on disk).
-    **`--sandbox read-only` blocks writes, not reads** — it is not the thing
+    **`--sandbox read-only` blocks writes, not reads**: it is not the thing
     keeping reviewer #2 blind, and only what you put in the bundle should be
     treated as exposed.
   - opencode: `config/opencode.zen.json` disables the file/exec tools and pins a
@@ -191,7 +193,7 @@ was checked, not skipped.
   also on the US BIS Entity List; that backend assumes your org's compliance has
   approved MIT-licensed GLM weights via a US host for internal artifacts.
 - **Swapping in a third lab** (Gemini/Vertex, an Azure-hosted model) is a new
-  `case` arm in `second_review.sh` — prompt, rubric, schema, and synthesis are
+  `case` arm in `second_review.sh`: prompt, rubric, schema, and synthesis are
   already backend-agnostic.
 
 ## Files
@@ -201,4 +203,4 @@ was checked, not skipped.
 - `references/rubric.md`: severity/category source of truth + review lenses.
 - `references/findings.schema.json`: the per-reviewer findings contract.
 - `config/opencode.zen.json`: hardened opencode config (Zen, tools off, paid model), used by `--backend glm`.
-- `tests/`: `bash tests/test_*.sh` — no test spends a paid call (fake CLI shims).
+- `tests/`: `bash tests/test_*.sh`; no test spends a paid call (fake CLI shims).

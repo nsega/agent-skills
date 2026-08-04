@@ -78,7 +78,7 @@ skills/dual-model-debate/
   `codex exec -m "$CODEX_MODEL" -s read-only -C <scratch>`, with the turn
   instructions passed as the prompt argument and `packet + running transcript` on
   stdin; capture GPT's turn and append it to the transcript. Hardened the way
-  `glm_review.sh` is: validate the model id and reasoning effort, verify inputs
+  `second_review.sh` is: validate the model id and reasoning effort, verify inputs
   exist and are non-empty before spending, handle codex auth, capture codex's
   stderr for the caller, and never allow repo edits.
 

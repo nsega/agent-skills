@@ -4,6 +4,16 @@ set -euo pipefail
 #
 # No real review is ever run here: every case either fails preflight, or points
 # CODEX_BIN/OPENCODE_BIN at a fake CLI shim. Nothing reaches a paid API.
+#
+# That invariant only holds if the suite ignores the developer's environment.
+# REVIEW2_BACKEND is a documented env var, so an exported REVIEW2_BACKEND=glm
+# would silently redirect every "codex" case to the glm path, where OPENCODE_BIN
+# is unset, falling through to the REAL opencode on PATH (which auto-loads a Zen
+# key from auth.json) and billing real calls. The model/effort/config vars leak
+# into the `grep -qx` assertions the same way.
+export REVIEW2_BACKEND=codex
+unset CODEX_MODEL CODEX_EFFORT CODEX_BIN ZEN_MODEL ZEN_VARIANT OPENCODE_BIN OPENCODE_CONFIG
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/../scripts/second_review.sh"
 RUBRIC="$HERE/../references/rubric.md"
@@ -24,6 +34,7 @@ OUT="$WORK/out.json"
 make_shim() {  # make_shim <shim-path> <payload-file> [honour_dash_o]
   cat > "$1" <<EOF
 #!/usr/bin/env bash
+echo "SHIM_STDERR_NOISE" >&2
 printf '%s\n' "\$@" > "$1.args"
 cat > "$1.stdin"
 dest=""
@@ -62,6 +73,15 @@ rc=0; CODEX_EFFORT=bogus "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2
 rc=0; ZEN_VARIANT=medium "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend glm >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "ZEN_VARIANT=medium is not an opencode variant, should exit 2 (got $rc)"
 
+# 4b: the codex allowlist must match the real catalog (`codex debug models`):
+# no model accepts "minimal" (the API 400s on it), and gpt-5.6-sol does accept
+# "max". Getting either end wrong is a silent downgrade or a bogus rejection.
+rc=0; CODEX_EFFORT=minimal "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 2 ] && ok || bad "CODEX_EFFORT=minimal is not a codex effort, should exit 2 (got $rc)"
+# 127 means it passed effort validation and reached the CLI-presence check.
+rc=0; CODEX_EFFORT=max CODEX_BIN="$WORK/no-such-codex" "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 127 ] && ok || bad "CODEX_EFFORT=max must be accepted (expected 127 at the CLI check, got $rc)"
+
 # 5: missing / empty bundle -> exit 2 BEFORE any CLI call (the expensive typo)
 rc=0; "$SR" "$WORK/nope.md" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "missing bundle should exit 2 (got $rc)"
@@ -96,9 +116,21 @@ JSON
 SHIM="$WORK/codex"; make_shim "$SHIM" "$VALID" honour-o
 if python3 -c 'import jsonschema' 2>/dev/null; then
   rm -f "$OUT"
-  rc=0; CODEX_BIN="$SHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
+  # `find`, not `ls glob`: an unmatched glob makes ls exit 1, and under
+  # `set -o pipefail` that would kill the suite here.
+  rawbefore=$(find /tmp -maxdepth 1 -name 'r2-review-raw.*' 2>/dev/null | wc -l)
+  ERR="$WORK/err.txt"
+  rc=0; CODEX_BIN="$SHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>"$ERR" || rc=$?
   [ "$rc" -eq 0 ] && ok || bad "valid findings should exit 0 (got $rc)"
   [ -f "$OUT" ] && grep -q '"R2-001"' "$OUT" && ok || bad "valid findings should be written to OUT_JSON"
+
+  # The raw dump is reviewer #2's full output for a sensitive packet: keep it on
+  # a parse/validate failure (the error points at it), delete it on success.
+  rawafter=$(find /tmp -maxdepth 1 -name 'r2-review-raw.*' 2>/dev/null | wc -l)
+  [ "$rawafter" -le "$rawbefore" ] && ok || bad "a successful run must not leave its raw output in /tmp"
+
+  # codex echoes the whole prompt+bundle on stderr; that must not reach ours.
+  grep -q "SHIM_STDERR_NOISE" "$ERR" && bad "the backend's stderr must not be relayed on success (it contains the packet)" || ok
 
   # The footgun: codex takes a positional prompt over stdin, so the artifact has
   # to travel in the SAME stdin stream as the prompt, with the `-` placeholder.
@@ -133,11 +165,24 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   grep -q "You are an INDEPENDENT senior reviewer" "$GSHIM.args" && ok || bad "prompt should be an opencode argument"
   grep -qx -- "max" "$GSHIM.args" && ok || bad "opencode variant should default to max"
 
+  # When the backend itself fails, the run must fail AND surface the tail of its
+  # stderr (suppressed on success) so the operator can see why.
+  FSHIM="$WORK/codex-fail"
+  printf '#!/usr/bin/env bash\necho "SHIM_STDERR_NOISE: boom" >&2\nexit 1\n' > "$FSHIM"
+  chmod +x "$FSHIM"
+  rm -f "$OUT"; ERR2="$WORK/err2.txt"
+  rc=0; CODEX_BIN="$FSHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>"$ERR2" || rc=$?
+  [ "$rc" -ne 0 ] && ok || bad "a failing backend must fail the run (got $rc)"
+  grep -q "SHIM_STDERR_NOISE" "$ERR2" && ok || bad "on failure the tail of the backend's stderr must be surfaced"
+
   SHIM2="$WORK/codex-bad"; make_shim "$SHIM2" "$BADFIND"
-  rm -f "$OUT"
+  # Seed a PREVIOUS run's findings: a failed run must not leave them behind, or
+  # SKILL.md's "re-run on just the fix diff" step merges stale full-artifact
+  # findings as if they were the fix review.
+  printf '{"reviewer":"stale","summary":"previous run","overall":"approve","findings":[]}\n' > "$OUT"
   rc=0; CODEX_BIN="$SHIM2" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ] && ok || bad "critical finding with no evidence must be rejected (got $rc)"
-  [ ! -f "$OUT" ] && ok || bad "rejected findings must not be written to OUT_JSON"
+  [ ! -f "$OUT" ] && ok || bad "a failed run must not leave a stale OUT_JSON behind"
 else
   # Fail-closed check: with no validator installed the run must NOT pass. This is
   # the branch CI hits on a bare box; install jsonschema to exercise the rest.
