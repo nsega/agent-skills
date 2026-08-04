@@ -64,9 +64,11 @@ case "$BACKEND" in
   codex)
     R2_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
     R2_EFFORT="${CODEX_EFFORT:-high}"
-    # Verified against `codex debug models`: every model in the catalog supports
-    # low|medium|high|xhigh, gpt-5.6-sol/terra add max|ultra, and NO model accepts
-    # "minimal" (the API rejects it with HTTP 400 after the run has started).
+    # The union across the catalog (`codex debug models`): every model supports
+    # low|medium|high|xhigh, several add max, and sol/terra add ultra. NO model
+    # accepts "minimal" (the API rejects it with HTTP 400 after the run has
+    # started). This catches typos; the codex preflight below then narrows it to
+    # what THIS model actually supports.
     case "$R2_EFFORT" in
       low|medium|high|xhigh|max|ultra) ;;
       *) echo "bad CODEX_EFFORT: '$R2_EFFORT' (want low|medium|high|xhigh|max|ultra)" >&2; exit 2 ;;
@@ -95,6 +97,12 @@ for f in "$BUNDLE" "$RUBRIC" "$SCHEMA"; do
   [ -f "$f" ] || { echo "no such file: $f" >&2; exit 2; }
 done
 [ -s "$BUNDLE" ] || { echo "bundle is empty: $BUNDLE" >&2; exit 2; }
+
+# The OUTPUT path gets the same treatment as the inputs: a missing directory
+# would otherwise surface as a raw Python traceback from the final json.dump,
+# after the review has already been run and billed.
+OUT_PARENT="$(dirname "$OUT")"
+[ -d "$OUT_PARENT" ] || { echo "output directory does not exist: $OUT_PARENT" >&2; exit 2; }
 
 # The arguments are well-formed and the inputs exist, so THIS run now owns
 # $OUT. Drop any previous run's findings here, before the CLI/auth preflight and
@@ -160,6 +168,39 @@ case "$BACKEND" in
       echo "codex is not authenticated: run 'codex login' (expected $CODEX_HOME_DIR/auth.json), or set CODEX_API_KEY" >&2
       exit 3
     fi
+
+    # Narrow the static union to what THIS model supports. The effort set is
+    # per-model (gpt-5.5 tops out at xhigh, only sol/terra reach ultra), so a
+    # valid-looking pair like CODEX_MODEL=gpt-5.5 CODEX_EFFORT=max would
+    # otherwise pass the gate and 400 mid-run, which is exactly the paid failure
+    # this validation exists to prevent. `codex debug models` is a local catalog
+    # read (~50ms, no spend). If it is unavailable (older codex, unreadable
+    # catalog) keep the union check rather than blocking an otherwise fine run.
+    # `< /dev/null`: this preflight must never consume (or block on) the caller's
+    # stdin, which is the packet stream for the review itself.
+    if CATALOG="$("$CODEX_BIN" debug models </dev/null 2>/dev/null)"; then
+      SUPPORTED="$(printf '%s' "$CATALOG" | python3 -c '
+import json, sys
+raw = sys.stdin.read()
+i = raw.find("{\"models\"")
+if i < 0:
+    sys.exit(0)                      # unrecognized shape: stay silent, keep the union check
+try:
+    cat, _ = json.JSONDecoder().raw_decode(raw, i)
+except ValueError:
+    sys.exit(0)
+for m in cat.get("models") or []:
+    if m.get("slug") == sys.argv[1]:
+        print(" ".join(l["effort"] for l in m.get("supported_reasoning_levels") or []))
+        break
+' "$R2_MODEL" 2>/dev/null || true)"
+      if [ -n "$SUPPORTED" ]; then
+        case " $SUPPORTED " in
+          *" $R2_EFFORT "*) ;;
+          *) echo "bad CODEX_EFFORT for $R2_MODEL: '$R2_EFFORT' (that model supports: $SUPPORTED)" >&2; exit 2 ;;
+        esac
+      fi
+    fi
     ;;
   glm)
     OPENCODE_BIN="${OPENCODE_BIN:-opencode}"
@@ -186,6 +227,25 @@ except Exception: pass' "$AUTH_JSON")" || true
     ;;
 esac
 
+# One EXIT trap for every temp file, installed BEFORE any of them exist, so a
+# Ctrl-C during the (long, paid) call cannot leak reviewer #2's output for a
+# sensitive packet. $RAW is deleted with the rest unless KEEP_RAW is set, which
+# happens only around extraction/validation, where the error message tells the
+# operator to go read it.
+KEEP_RAW=""; RAW=""; SCRATCH=""; OUTMSG=""; CODEXERR=""
+cleanup() {
+  [ -n "$KEEP_RAW" ] || { [ -z "$RAW" ] || rm -f "$RAW"; }
+  [ -z "$SCRATCH" ]  || rm -rf "$SCRATCH"
+  [ -z "$OUTMSG" ]   || rm -f "$OUTMSG"
+  [ -z "$CODEXERR" ] || rm -f "$CODEXERR"
+}
+# EXIT alone is not enough: a shell killed by an untrapped SIGINT/SIGTERM (Ctrl-C
+# during the long paid call) dies without running the EXIT trap, leaking the raw
+# output. Trapping the signals makes them exit normally, which then fires EXIT.
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 RAW="$(mktemp /tmp/r2-review-raw.XXXXXX.txt)"
 echo "reviewer #2: $BACKEND / $R2_MODEL, effort=$R2_EFFORT" >&2
 
@@ -197,7 +257,13 @@ case "$BACKEND" in
     # smoke-tested against real codex:
     #   --ignore-user-config  the caller's notify hooks, plugins, personality, and
     #                         any `web_search = "live"` must not perturb a review
-    #                         (auth still resolves from CODEX_HOME).
+    #                         (auth still resolves from CODEX_HOME). Live web
+    #                         search is opt-in in codex (the `--search` flag,
+    #                         which we never pass), so dropping the caller's
+    #                         config is what keeps the packet off the wire.
+    #                         Deliberately NOT pinned with `-c web_search=...`:
+    #                         codex silently accepts unknown `-c` keys, so an
+    #                         unverified value would only look like a guarantee.
     #   --ephemeral           no session file on disk; review packets are sensitive.
     #   -C <empty scratch>    the working root is where codex discovers AGENTS.md,
     #                         project config, and repo context, so an empty one is
@@ -213,8 +279,7 @@ case "$BACKEND" in
     # schema + the entire bundle) back on stderr. Letting that reach our stderr
     # dumps the full diff into the orchestrating agent's transcript and CI logs,
     # so capture it and surface only the tail, and only when the call fails.
-    CODEXERR="$(mktemp /tmp/r2-codex-err.XXXXXX.txt)"
-    trap 'rm -rf "$SCRATCH" "$OUTMSG" "$CODEXERR" 2>/dev/null' EXIT   # cleanup even on Ctrl-C
+    CODEXERR="$(mktemp /tmp/r2-codex-err.XXXXXX.txt)"   # cleaned by the EXIT trap
 
     # ONE stdin stream (prompt, then artifact), read via the `-` placeholder.
     # Do NOT put the prompt in argv and pipe the bundle separately: codex's
@@ -256,6 +321,11 @@ The artifact to review follows on stdin." > "$RAW" || {
 esac
 
 # Extract the JSON object, then ENFORCE the schema (Evidence/failure_case rules).
+# From here to the end of the block, a failure means "the model answered but we
+# could not use it", so keep $RAW: the error messages tell the operator to read
+# it. Cleared again on success, where it is just an untracked copy of a
+# sensitive packet's review.
+KEEP_RAW=1
 python3 - "$RAW" "$OUT" "$SCHEMA" <<'PY'
 import sys, json, re
 raw = open(sys.argv[1], encoding="utf-8", errors="replace").read()
@@ -264,8 +334,19 @@ raw = re.sub(r"```(?:json)?", "", raw)
 # Do NOT use first-"{" to last-"}": reviewers narrate before the JSON, and that
 # prose contains braces (observed in the wild: a review citing the config path
 # `provider.{p}.models.{m}` made the slice start at "{p}" and fail to parse).
-# Instead try to decode an object at every "{" and keep the largest complete one
-# that looks like a findings document.
+# Instead try to decode an object at every "{" and keep the ones that look like a
+# findings document.
+#
+# Two rules, both load-bearing:
+#  - Check TYPES, not just key presence. The JSON schema we hand the reviewer has
+#    a `properties` object whose keys are exactly reviewer/summary/overall/
+#    findings, so a reviewer that quotes the schema back at us produces a decoy
+#    that passes a presence-only test. Its `findings`/`reviewer` are schema
+#    fragments (dicts), not a list and a string, so the types tell them apart.
+#  - Keep the LAST match, not the biggest. The real answer comes after any
+#    narration, and "no findings is a valid result" (which the prompt actively
+#    encourages) is a ~80-byte document that loses every size contest against a
+#    ~1.5KB quoted schema.
 dec = json.JSONDecoder()
 obj = None
 for i, ch in enumerate(raw):
@@ -275,9 +356,10 @@ for i, ch in enumerate(raw):
         cand, _ = dec.raw_decode(raw, i)
     except ValueError:
         continue
-    if isinstance(cand, dict) and "findings" in cand and "reviewer" in cand:
-        if obj is None or len(json.dumps(cand)) > len(json.dumps(obj)):
-            obj = cand
+    if (isinstance(cand, dict)
+            and isinstance(cand.get("findings"), list)
+            and isinstance(cand.get("reviewer"), str)):
+        obj = cand
 if obj is None:
     sys.exit("could not locate a findings JSON object in reviewer #2's output "
              f"(kept at {sys.argv[1]} for inspection)")
@@ -300,7 +382,5 @@ json.dump(obj, open(sys.argv[2], "w", encoding="utf-8"), indent=2, ensure_ascii=
 print(sys.argv[2])
 PY
 
-# Success only: under `set -e` a parse/validate failure exits above, which keeps
-# $RAW on disk for the inspection the error message points at. On success it is
-# reviewer #2's full output for a sensitive packet, so do not leave it in /tmp.
-rm -f "$RAW"
+# Parsed and validated: the EXIT trap may now delete $RAW with everything else.
+KEEP_RAW=""

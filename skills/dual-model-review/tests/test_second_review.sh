@@ -23,7 +23,13 @@ ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# The validation-failure cases deliberately leave their raw output in /tmp for
+# inspection, which is correct for a real run but would make the suite litter a
+# file per run. Clean up only what this run created (files newer than a marker),
+# never a concurrent real review's output.
+MARKER="$WORK/.started"; : > "$MARKER"
+TMPREAL="$(cd /tmp && pwd -P)"
+trap 'find "$TMPREAL" -maxdepth 1 -name "r2-review-raw.*" -newer "$MARKER" -delete 2>/dev/null; rm -rf "$WORK"' EXIT
 BUNDLE="$WORK/bundle.md"; printf '# Review packet\nBUNDLE_SENTINEL\n' > "$BUNDLE"
 OUT="$WORK/out.json"
 
@@ -117,8 +123,12 @@ SHIM="$WORK/codex"; make_shim "$SHIM" "$VALID" honour-o
 if python3 -c 'import jsonschema' 2>/dev/null; then
   rm -f "$OUT"
   # `find`, not `ls glob`: an unmatched glob makes ls exit 1, and under
-  # `set -o pipefail` that would kill the suite here.
-  rawbefore=$(find /tmp -maxdepth 1 -name 'r2-review-raw.*' 2>/dev/null | wc -l)
+  # `set -o pipefail` that would kill the suite here. $TMPREAL, not /tmp: on
+  # macOS /tmp is a symlink to private/tmp and `find /tmp` does NOT descend a
+  # symlinked start point, so the unresolved form silently counts 0 every time
+  # and turns this assertion into one that can never fail.
+  count_raw() { find "$TMPREAL" -maxdepth 1 -name 'r2-review-raw.*' 2>/dev/null | wc -l | tr -d ' '; }
+  rawbefore=$(count_raw)
   ERR="$WORK/err.txt"
   rc=0; CODEX_BIN="$SHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>"$ERR" || rc=$?
   [ "$rc" -eq 0 ] && ok || bad "valid findings should exit 0 (got $rc)"
@@ -126,7 +136,7 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
 
   # The raw dump is reviewer #2's full output for a sensitive packet: keep it on
   # a parse/validate failure (the error points at it), delete it on success.
-  rawafter=$(find /tmp -maxdepth 1 -name 'r2-review-raw.*' 2>/dev/null | wc -l)
+  rawafter=$(count_raw)
   [ "$rawafter" -le "$rawbefore" ] && ok || bad "a successful run must not leave its raw output in /tmp"
 
   # codex echoes the whole prompt+bundle on stderr; that must not reach ours.
@@ -174,6 +184,47 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   rc=0; CODEX_BIN="$FSHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>"$ERR2" || rc=$?
   [ "$rc" -ne 0 ] && ok || bad "a failing backend must fail the run (got $rc)"
   grep -q "SHIM_STDERR_NOISE" "$ERR2" && ok || bad "on failure the tail of the backend's stderr must be surfaced"
+
+  # The decoy case: the reviewer quotes the JSON schema it was handed (whose
+  # `properties` object has keys reviewer/summary/overall/findings) and then
+  # emits a short, valid "approve, no findings" document. Presence-only matching
+  # plus largest-wins would pick the ~1.5KB schema fragment over the ~80-byte
+  # real answer and fail the run AFTER the paid call.
+  DECOY="$WORK/codex-decoy"
+  cat > "$DECOY" <<EOF
+#!/usr/bin/env bash
+cat > /dev/null
+echo "Here is the schema I was asked to satisfy:"
+cat "$SCHEMA"
+echo '{"reviewer":"gpt-5.6-sol","summary":"Clean.","overall":"approve","findings":[]}'
+EOF
+  chmod +x "$DECOY"
+  rm -f "$OUT"
+  rc=0; CODEX_BIN="$DECOY" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && ok || bad "a quoted schema must not beat the real findings doc (got $rc)"
+  [ -f "$OUT" ] && grep -q '"approve"' "$OUT" && ok || bad "the real approve document should be the one written"
+
+  # An empty findings array is a valid result and must survive extraction.
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["findings"]==[] and d["reviewer"]=="gpt-5.6-sol" else 1)' "$OUT" 2>/dev/null \
+    && ok || bad "the extracted document should be the reviewer's approve result, not a schema fragment"
+
+  # Interrupt cleanup is asserted structurally, not by signalling a live run.
+  # Faithfully reproducing a Ctrl-C needs the signal to reach the whole
+  # foreground process group (bash cannot run a trap while a foreground child is
+  # running, so signalling only the script leaves it blocked behind the backend
+  # and proves nothing). That needs job control or a pty, which is not portable
+  # inside this suite, and a test that fails for harness reasons is worse than no
+  # test. The behaviour itself was verified by hand against the real script: the
+  # raw file is present mid-call and gone after SIGINT. What is checked here is
+  # that the guards which make that work are still installed.
+  grep -q "trap cleanup EXIT" "$SR" && ok || bad "the EXIT cleanup trap must stay installed"
+  grep -qE "^trap .* INT\$" "$SR" && ok || bad "an INT trap is required (EXIT alone does not fire on signal death)"
+  grep -qE "^trap .* TERM\$" "$SR" && ok || bad "a TERM trap is required (EXIT alone does not fire on signal death)"
+
+  # A bad OUT_JSON directory must be caught in preflight, not after the call.
+  rc=0; CODEX_BIN="$SHIM" CODEX_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$WORK/no-such-dir/out.json" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] && ok || bad "a missing output directory should exit 2 before spending (got $rc)"
+  [ ! -f "$SHIM.stdin" ] || [ "$(find "$WORK" -name 'no-such-dir' | wc -l)" -eq 0 ] && ok || bad "no directory should be created for a bad OUT path"
 
   SHIM2="$WORK/codex-bad"; make_shim "$SHIM2" "$BADFIND"
   # Seed a PREVIOUS run's findings: a failed run must not leave them behind, or

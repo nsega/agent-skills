@@ -168,7 +168,7 @@ was checked, not skipped.
 ## Governance & operating rules
 
 - **Read-only reviewers.** They analyze; they do not edit the repo. Both backends
-  are hardened so reviewer #2 answers from the **piped packet alone**, with file
+  are hardened so reviewer #2 answers from the **piped packet alone**: with file
   tools available, a reviewer goes and reads the working tree (including changes
   it was meant to be blind to) instead of reviewing the diff it was handed.
   - codex: `features.shell_tool=false` and `-C` pointed at an empty scratch dir,
