@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>illustrate-with-html — what the hardening changed</title>
+<style>
+  :root {
+    --ivory:   #FAF9F5;
+    --slate:   #141413;
+    --clay:    #D97757;
+    --oat:     #E3DACC;
+    --olive:   #788C5D;
+    --rust:    #B04A3F;
+    --gray-150:#F0EEE6;
+    --gray-300:#D1CFC5;
+    --gray-500:#87867F;
+    --gray-700:#3D3D3A;
+    --serif: ui-serif, Georgia, "Times New Roman", serif;
+    --sans:  system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:  ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--ivory);
+    color: var(--slate);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    padding: 56px 24px 96px;
+  }
+  .sheet { max-width: 980px; margin: 0 auto; }
+
+  header { margin-bottom: 40px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--gray-500); margin-bottom: 10px;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 500; font-size: 34px;
+    letter-spacing: -0.01em; margin-bottom: 12px;
+  }
+  h1 code { font-family: var(--mono); font-size: 0.72em; }
+  .lead { font-size: 14.5px; line-height: 1.6; color: var(--gray-700); max-width: 660px; }
+  .lead code { font-family: var(--mono); font-size: 13px; }
+
+  h2 {
+    font-family: var(--serif); font-weight: 500; font-size: 22px;
+    margin: 52px 0 6px;
+  }
+  .sub-lead { font-size: 13.5px; line-height: 1.6; color: var(--gray-700); max-width: 660px; margin-bottom: 20px; }
+  .sub-lead code { font-family: var(--mono); font-size: 12.5px; }
+
+  /* ── layout ───────────────────────────── */
+  .layout {
+    display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 32px; align-items: start;
+  }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+
+  .canvas {
+    border: 1.5px solid var(--gray-300); border-radius: 14px;
+    background: #fff; padding: 28px; overflow-x: auto;
+  }
+
+  /* ── SVG diagram kit ──────────────────── */
+  svg.flow    { display: block; width: 100%; height: auto; min-width: 320px; }
+  .flow text  { font-family: var(--mono); font-size: 12px; fill: var(--slate); pointer-events: none; }
+  .flow .sub  { font-size: 10px; fill: var(--gray-500); }
+  .flow .lbl  { font-size: 10px; fill: var(--gray-500); }
+
+  .node rect      { fill: #fff; stroke: var(--gray-300); stroke-width: 1.5; rx: 8; }
+  .node.term rect { fill: var(--gray-150); rx: 22; }
+  .node.gate path { fill: #fff; stroke: var(--gray-300); stroke-width: 1.5; }
+  .node.ok rect   { fill: rgba(120,140,93,0.12); stroke: var(--olive); }
+  .node.bad rect  { fill: rgba(176,74,63,0.10); stroke: var(--rust); }
+  .node.new rect,
+  .node.new path  { stroke: var(--clay); }
+
+  /* only the main chart is clickable; the before/after pair is a still image */
+  #loop .node { cursor: pointer; transition: transform 120ms ease; }
+  #loop .node:hover { transform: translateY(-1px); }
+  .node.active rect,
+  .node.active path        { stroke: var(--clay); stroke-width: 2.5; }
+  .node:focus-visible rect,
+  .node:focus-visible path { stroke: var(--clay); stroke-width: 2.5; }
+
+  .edge     { stroke: var(--gray-500); stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  .edge.yes { stroke: var(--olive); marker-end: url(#arrow-olive); }
+  .edge.no  { stroke: var(--rust); stroke-dasharray: 4 4; marker-end: url(#arrow-rust); }
+
+  /* ── side panel ───────────────────────── */
+  aside {
+    position: sticky; top: 24px;
+    border: 1.5px solid var(--gray-300); border-radius: 14px;
+    background: #fff; padding: 20px 20px 22px;
+  }
+  aside .hint { font-size: 12px; color: var(--gray-500); margin-bottom: 14px; }
+  aside h3    { font-family: var(--serif); font-weight: 500; font-size: 19px; margin-bottom: 6px; }
+  aside .meta { font-family: var(--mono); font-size: 11px; color: var(--gray-500); margin-bottom: 14px; }
+  aside p     { font-size: 13.5px; line-height: 1.6; color: var(--gray-700); margin-bottom: 12px; }
+  aside p code { font-family: var(--mono); font-size: 12px; }
+  aside pre {
+    font-family: var(--mono); font-size: 11px; line-height: 1.55;
+    background: var(--gray-150); border: 1px solid var(--gray-300);
+    border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; color: var(--slate);
+  }
+
+  /* ── legend ───────────────────────────── */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px;
+    font-size: 12px; color: var(--gray-700);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .chip { width: 22px; height: 14px; border: 1.5px solid var(--gray-300); border-radius: 4px; background: #fff; }
+  .chip.gate { transform: rotate(45deg); width: 12px; height: 12px; border-radius: 2px; }
+  .chip.new  { border-color: var(--clay); }
+  .chip.ok   { background: rgba(120,140,93,0.12); border-color: var(--olive); }
+
+  /* ── before / after pair ──────────────── */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 920px) { .pair { grid-template-columns: 1fr; } }
+  .pair .canvas { padding: 18px 18px 14px; }
+  .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  .tag.was { color: var(--rust); }
+  .tag.now { color: var(--olive); }
+  .caption { font-size: 12.5px; line-height: 1.55; color: var(--gray-700); margin-top: 12px; }
+  .caption code { font-family: var(--mono); font-size: 11.5px; }
+
+  /* ── follow-up picker ─────────────────── */
+  .pick { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--gray-300); }
+  .pick:last-of-type { border-bottom: 0; }
+  .pick input { margin-top: 3px; width: 15px; height: 15px; accent-color: var(--clay); flex: none; }
+  .pick .body { font-size: 13.5px; line-height: 1.55; color: var(--gray-700); }
+  .pick .body b { color: var(--slate); font-weight: 600; }
+  .pick .body code { font-family: var(--mono); font-size: 12px; }
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px;
+    padding: 2px 8px; border-radius: 999px; margin-left: 8px;
+    background: var(--gray-150); color: var(--gray-700);
+  }
+  .pill.big { background: rgba(120,140,93,0.18); }
+
+  .exportbar { display: flex; align-items: center; gap: 14px; margin-top: 22px; }
+  .copy {
+    font-family: var(--mono); font-size: 12px; cursor: pointer;
+    padding: 8px 15px; border-radius: 8px;
+    border: 1.5px solid var(--gray-300); background: #fff; color: var(--slate);
+  }
+  .copy:hover { border-color: var(--clay); color: var(--clay); }
+  .exportbar .note { font-size: 12px; color: var(--gray-500); }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header>
+    <div class="eyebrow">Illustrations &amp; Diagrams · Flowchart</div>
+    <h1>What the hardening changed</h1>
+    <p class="lead">
+      The build loop of the <code>illustrate-with-html</code> skill after two commits on
+      <code>illustrate-with-html-hardening</code>, drawn from <code>git show 62a0d05 a9480b0</code>.
+      Four steps changed and one edge is new: step&nbsp;5 can now send you back to step&nbsp;4.
+      Click any step to see what it said before and what it says now.
+    </p>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="canvas">
+        <svg class="flow" id="loop" viewBox="120 0 356 690">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#87867F"/>
+            </marker>
+            <marker id="arrow-olive" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#788C5D"/>
+            </marker>
+            <marker id="arrow-rust" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#B04A3F"/>
+            </marker>
+          </defs>
+
+          <!-- edges -->
+          <path class="edge" d="M310,56 L310,92"/>
+          <path class="edge" d="M310,140 L310,176"/>
+          <path class="edge" d="M310,224 L310,260"/>
+          <path class="edge" d="M310,308 L310,344"/>
+          <path class="edge" d="M310,392 L310,428"/>
+          <path class="edge" d="M310,476 L310,512"/>
+          <path class="edge yes" d="M310,576 L310,612"/>
+          <text class="lbl" x="320" y="598">clean</text>
+
+          <!-- the new feedback edge: not clean, go fix it -->
+          <path class="edge no" d="M268,544 L152,544 Q140,544 140,532 L140,380 Q140,368 152,368 L185,368"/>
+          <text class="lbl" x="176" y="535" fill="#B04A3F">not clean</text>
+
+          <!-- nodes -->
+          <g class="node term new" data-k="trigger" tabindex="0">
+            <rect x="205" y="12" width="210" height="44"/>
+            <text x="310" y="38" text-anchor="middle">the skill triggers</text>
+          </g>
+
+          <g class="node" data-k="s1" tabindex="0">
+            <rect x="185" y="92" width="250" height="48"/>
+            <text x="310" y="112" text-anchor="middle">1 · clarify + read source</text>
+            <text class="sub" x="310" y="128" text-anchor="middle">unchanged</text>
+          </g>
+
+          <g class="node" data-k="s2" tabindex="0">
+            <rect x="185" y="176" width="250" height="48"/>
+            <text x="310" y="196" text-anchor="middle">2 · choose the pattern</text>
+            <text class="sub" x="310" y="212" text-anchor="middle">unchanged · 8 patterns</text>
+          </g>
+
+          <g class="node new" data-k="s3" tabindex="0">
+            <rect x="185" y="260" width="250" height="48"/>
+            <text x="310" y="280" text-anchor="middle">3 · copy the template</text>
+            <text class="sub" x="310" y="296" text-anchor="middle">+106 lines of kit</text>
+          </g>
+
+          <g class="node new" data-k="s4" tabindex="0">
+            <rect x="185" y="344" width="250" height="48"/>
+            <text x="310" y="364" text-anchor="middle">4 · fill it in</text>
+            <text class="sub" x="310" y="380" text-anchor="middle">export rule applies here</text>
+          </g>
+
+          <g class="node new" data-k="s5" tabindex="0">
+            <rect x="185" y="428" width="250" height="48"/>
+            <text x="310" y="448" text-anchor="middle">5 · render + read it</text>
+            <text class="sub" x="310" y="464" text-anchor="middle">npx playwright screenshot</text>
+          </g>
+
+          <g class="node gate new" data-k="gate" tabindex="0">
+            <path d="M310,512 L352,544 L310,576 L268,544 Z"/>
+            <text x="310" y="548" text-anchor="middle">clean?</text>
+          </g>
+
+          <g class="node ok term" data-k="done" tabindex="0">
+            <rect x="205" y="612" width="210" height="44"/>
+            <text x="310" y="638" text-anchor="middle">deliver + report path</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="legend">
+        <span><i class="chip"></i> unchanged step</span>
+        <span><i class="chip new"></i> changed by this update</span>
+        <span><i class="chip gate"></i> decision</span>
+        <span><i class="chip ok"></i> done</span>
+      </div>
+    </div>
+
+    <aside id="panel">
+      <div class="hint">Click a step in the chart →</div>
+      <h3 id="p-title">the skill triggers</h3>
+      <div class="meta" id="p-meta">description · 1203 → 930 chars</div>
+      <p id="p-body">The description was over the 1024-char spec limit, so the upstream validator rejected it outright. It also claimed <code>diagram this diff/architecture</code>, colliding with two sibling skills.</p>
+      <pre id="p-code">Routing: reviewing a PR is
+pr-review (or pr-visual-review
+for its structure); a whole-repo
+wiki is repo-deepwiki.</pre>
+    </aside>
+  </div>
+
+  <h2>What the render gate caught</h2>
+  <p class="sub-lead">
+    The gate is not theoretical. Its first run was against the skill's own flagship reference,
+    <code>references/flowchart-example.html</code>, the file <code>SKILL.md</code> tells you to read before
+    drawing a flowchart. Same crop, same scale, before and after.
+  </p>
+
+  <div class="pair">
+    <div class="canvas">
+      <div class="tag was">Before · 62a0d05^</div>
+      <svg class="flow" viewBox="0 160 440 178">
+        <path class="edge no" d="M268,294 C190,294 150,294 150,212"/>
+        <text class="lbl" x="138" y="260" fill="#B04A3F">fail → status</text>
+        <g class="node">
+          <rect x="210" y="176" width="200" height="48"/>
+          <text x="310" y="196" text-anchor="middle">Unit + integration tests</text>
+          <text class="sub" x="310" y="212" text-anchor="middle">~6 min · 3 shards</text>
+        </g>
+        <g class="node bad">
+          <rect x="60" y="176" width="180" height="48"/>
+          <text x="150" y="196" text-anchor="middle">Post failure status</text>
+          <text class="sub" x="150" y="212" text-anchor="middle">slack #deploys</text>
+        </g>
+        <g class="node gate">
+          <path d="M310,262 L352,294 L310,326 L268,294 Z"/>
+          <text x="310" y="298" text-anchor="middle">pass?</text>
+        </g>
+      </svg>
+      <p class="caption">
+        Boxes overlap by 30px, so the labels print as one run-on line. The arrowhead ends at
+        <code>150,212</code>, inside the box and on top of its own <code>slack #deploys</code> sublabel.
+        The dashed curve crosses the very label naming it.
+      </p>
+    </div>
+
+    <div class="canvas">
+      <div class="tag now">After · 62a0d05</div>
+      <svg class="flow" viewBox="0 160 440 178">
+        <path class="edge no" d="M268,294 C190,294 105,294 105,224"/>
+        <text class="lbl" x="130" y="272" fill="#B04A3F">fail → status</text>
+        <g class="node">
+          <rect x="210" y="176" width="200" height="48"/>
+          <text x="310" y="196" text-anchor="middle">Unit + integration tests</text>
+          <text class="sub" x="310" y="212" text-anchor="middle">~6 min · 3 shards</text>
+        </g>
+        <g class="node bad">
+          <rect x="20" y="176" width="170" height="48"/>
+          <text x="105" y="196" text-anchor="middle">Post failure status</text>
+          <text class="sub" x="105" y="212" text-anchor="middle">slack #deploys</text>
+        </g>
+        <g class="node gate">
+          <path d="M310,262 L352,294 L310,326 L268,294 Z"/>
+          <text x="310" y="298" text-anchor="middle">pass?</text>
+        </g>
+      </svg>
+      <p class="caption">
+        The branch gets its own column, clear of the spine at <code>x=210</code>. The arrow stops on the
+        border at <code>105,224</code> like every other edge in the file, and the label sits beside its
+        curve instead of under it.
+      </p>
+    </div>
+  </div>
+
+  <h2>What is still open</h2>
+  <p class="sub-lead">
+    Four follow-ups were left undone on purpose. Tick the ones worth landing and copy the result
+    straight back into a prompt.
+  </p>
+
+  <div class="canvas">
+    <label class="pick">
+      <input type="checkbox" data-id="editor" checked>
+      <span class="body">
+        <b>Add the throwaway-editor pattern</b><span class="pill big">highest leverage</span><br>
+        A 9th row in the table and a §9 in <code>references/patterns.md</code>. The essay has a whole
+        use case for it; <code>18-editor-triage-board.html</code> in Anthropic's gallery is MIT and could be
+        vendored as a second worked reference. The export mechanic it needs now exists.
+      </span>
+    </label>
+
+    <label class="pick">
+      <input type="checkbox" data-id="starter">
+      <span class="body">
+        <b>Ship a tokens-only starter template</b><br>
+        <code>assets/base-template.html</code> is flowchart-shaped, so for 6 of the 8 patterns most of what
+        step 3 tells you to copy gets deleted immediately. Confirmed by a test agent that followed the loop.
+      </span>
+    </label>
+
+    <label class="pick">
+      <input type="checkbox" data-id="routing">
+      <span class="body">
+        <b>Make the routing reciprocal</b><br>
+        <code>pr-visual-review</code>'s description and the README table still do not point back to this skill.
+      </span>
+    </label>
+
+    <label class="pick">
+      <input type="checkbox" data-id="olive">
+      <span class="body">
+        <b>Fix the sparkline colour in §8</b><span class="pill">one line</span><br>
+        The inline-chart recipe hardcodes olive, while the style section reserves olive for
+        &ldquo;success / healthy path&rdquo;. A plain metric line is neither.
+      </span>
+    </label>
+
+    <div class="exportbar">
+      <button class="copy" id="copy">Copy as prompt</button>
+      <span class="note" id="count"></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DETAIL = {
+  trigger: {
+    title: "the skill triggers",
+    meta: "description · 1203 → 930 chars",
+    body: "The description was over the 1024-char spec limit, so the upstream validator rejected it outright. It also claimed <code>diagram this diff/architecture</code>, colliding with two sibling skills.",
+    code: "Routing: reviewing a PR is\npr-review (or pr-visual-review\nfor its structure); a whole-repo\nwiki is repo-deepwiki."
+  },
+  s1: {
+    title: "1 · clarify and read the source",
+    meta: "unchanged",
+    body: "Establish what is being illustrated and what the ground truth is, then read it. Untouched by this update, and still the step that decides whether the output is worth anything.",
+    code: "ground truth = repo files,\na diff, or the user's description"
+  },
+  s2: {
+    title: "2 · choose the pattern",
+    meta: "unchanged · 8 patterns",
+    body: "Pick from the table rather than defaulting to a flowchart. Still 8 read-only presentation patterns; a 9th for throwaway editors is the top open follow-up below.",
+    code: "flowchart · columns · diff\ntimeline · module map\nexplainer · incident · report"
+  },
+  s3: {
+    title: "3 · copy the template",
+    meta: "assets/base-template.html · +106 −0",
+    body: "The starting kit was missing the pieces it promised. Its click handler set <code>active</code> before the guard, and no <code>.active</code> rule existed at all, so selection was <em>invisible</em> in any page built from it. The container was <code>.card</code> here but <code>.canvas</code> in the reference, so lifted CSS silently failed.",
+    code: "+ .node/.edge/.flow kit\n+ 3 arrowhead marker defs\n+ .active, :focus-visible\n+ .pill, .copy\n+ tabindex + keydown"
+  },
+  s4: {
+    title: "4 · fill it in",
+    meta: "new: the export non-negotiable",
+    body: "A grep for clipboard, export, copy-as or download across the whole skill returned zero hits, so a reader who tuned something had to describe the result back in prose. The rule is scoped by predicate, not by exemption: a teaching slider needs no button, a page where the reader <em>chooses</em> does.",
+    code: "When the reader's manipulation\nyields something you'd otherwise\nask them to retype, the page ends\nin a copy button."
+  },
+  s5: {
+    title: "5 · render, then read the render",
+    meta: "SKILL.md:126-135 · rewritten",
+    body: "It used to say serve a folder and screenshot it <em>or just open it</em>. That escape hatch produced nothing observable, which is why the flagship shipped with four visible collisions while the rule sat in the file. Taking the screenshot is not the check. Reading it is.",
+    code: "npx playwright screenshot \\\n  --full-page \\\n  --viewport-size=1200,1400 \\\n  \"file:///abs/path.html\" \\\n  /tmp/check.png"
+  },
+  gate: {
+    title: "clean?",
+    meta: "decision · new",
+    body: "No box overlapping another, no arrowhead stopping inside a node, no label sitting on a stroke, nothing clipped. A fresh agent given this loop caught a legend that lied when jitter was off, and fixed it before delivering.",
+    code: "fix and re-render until clean"
+  },
+  done: {
+    title: "deliver and report the path",
+    meta: "terminal",
+    body: "Report the absolute path and one line on what to click. Unchanged, but it is now only reachable through the gate.",
+    code: "always report the absolute path"
+  }
+};
+
+const nodes = document.querySelectorAll("#loop .node");
+const T = document.getElementById("p-title");
+const M = document.getElementById("p-meta");
+const B = document.getElementById("p-body");
+const C = document.getElementById("p-code");
+
+function activate(n) {
+  const d = DETAIL[n.dataset.k];
+  if (!d) return;
+  nodes.forEach(x => x.classList.remove("active"));
+  n.classList.add("active");
+  T.textContent = d.title;
+  M.textContent = d.meta;
+  B.innerHTML = d.body;
+  C.textContent = d.code;
+}
+
+nodes.forEach(n => {
+  n.addEventListener("click", () => activate(n));
+  n.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(n); }
+  });
+});
+document.querySelector('.node[data-k="trigger"]').classList.add("active");
+
+/* ── export ─────────────────────────────── */
+const TASKS = {
+  editor: "Add the throwaway-editor pattern: a 9th row in SKILL.md's format table and a section 9 in references/patterns.md. Vendor 18-editor-triage-board.html from anthropics/html-effectiveness (MIT) as a second worked reference alongside flowchart-example.html. The description does not currently claim editors are in scope, so update it too.",
+  starter: "Ship a tokens-only starter alongside assets/base-template.html. The current one is flowchart-shaped, so for 6 of the 8 patterns most of what step 3 says to copy is deleted immediately.",
+  routing: "Make the skill routing reciprocal: add a pointer back to illustrate-with-html in pr-visual-review's description, and update the affected rows of README.md.",
+  olive: "In references/patterns.md section 8, stop hardcoding olive in the sparkline recipe. The style section reserves olive for success/healthy path, and a plain metric line is neither."
+};
+
+const boxes = document.querySelectorAll('.pick input');
+const countEl = document.getElementById("count");
+
+function picked() {
+  return [...boxes].filter(b => b.checked).map(b => b.dataset.id);
+}
+function serialize() {
+  const ids = picked();
+  if (!ids.length) return "";
+  return "On branch illustrate-with-html-hardening, land these illustrate-with-html follow-ups:\n\n"
+    + ids.map((id, i) => `${i + 1}. ${TASKS[id]}`).join("\n\n")
+    + "\n\nFollow the skill's own loop for any file it produces, including step 5.";
+}
+function refresh() {
+  const n = picked().length;
+  countEl.textContent = n ? `${n} selected` : "nothing selected";
+}
+boxes.forEach(b => b.addEventListener("change", refresh));
+refresh();
+
+document.getElementById("copy").addEventListener("click", async (e) => {
+  const text = serialize();
+  if (!text) { countEl.textContent = "tick at least one first"; return; }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  const label = e.target.textContent;
+  e.target.textContent = "Copied ✓";
+  setTimeout(() => (e.target.textContent = label), 1200);
+});
+</script>
+</body>
+</html>
