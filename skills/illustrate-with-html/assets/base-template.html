@@ -1,8 +1,9 @@
 <!--
   Base template for an HTML illustration (Anthropic style).
   Copy this file, rename it descriptively, and fill in the marked regions.
-  Keep the :root tokens and the header / card / panel / legend conventions.
+  Keep the :root tokens and the header / canvas / panel / legend conventions.
   Everything is inline and self-contained on purpose — no build, no network.
+  Delete this comment block in your copy; it is a note to you, not to the reader.
 -->
 <!doctype html>
 <html lang="en">
@@ -71,14 +72,54 @@
   }
   @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
 
-  /* ── card (the main canvas) ───────────── */
-  .card {
+  /* ── canvas (the main card) ───────────── */
+  .canvas {
     border: 1.5px solid var(--gray-300);
     border-radius: 14px;
     background: #fff;
     padding: 28px;
     overflow-x: auto;
   }
+
+  /* ── SVG diagram kit (matches references/flowchart-example.html) ── */
+  svg.flow    { display: block; width: 100%; height: auto; min-width: 480px; }
+  .flow text  { font-family: var(--mono); font-size: 12px; fill: var(--slate); pointer-events: none; }
+  .flow .sub  { font-size: 10px; fill: var(--gray-500); }
+  .flow .lbl  { font-size: 10px; fill: var(--gray-500); }
+
+  .node rect      { fill: #fff; stroke: var(--gray-300); stroke-width: 1.5; rx: 8; }
+  .node.term rect { fill: var(--gray-150); rx: 22; }
+  .node.gate path { fill: #fff; stroke: var(--gray-300); stroke-width: 1.5; }
+  .node.ok rect   { fill: rgba(120,140,93,0.12); stroke: var(--olive); }
+  .node.bad rect  { fill: rgba(176,74,63,0.10); stroke: var(--rust); }
+
+  .node { cursor: pointer; transition: transform 120ms ease; }
+  .node:hover { transform: translateY(-1px); }
+  .node.active rect,
+  .node.active path        { stroke: var(--clay); stroke-width: 2; }
+  .node:focus-visible rect,
+  .node:focus-visible path { stroke: var(--clay); stroke-width: 2; }
+
+  .edge     { stroke: var(--gray-500); stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  .edge.yes { stroke: var(--olive); marker-end: url(#arrow-olive); }
+  .edge.no  { stroke: var(--rust); stroke-dasharray: 4 4; marker-end: url(#arrow-rust); }
+
+  /* ── pill (trade-off tags, severity labels) ── */
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px;
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--gray-150); color: var(--gray-700);   /* neutral */
+  }
+  .pill.ok  { background: rgba(120,140,93,0.18); }   /* pro / healthy */
+  .pill.bad { background: rgba(176,74,63,0.14); }    /* con / risk */
+
+  /* ── export button (see the export bar in references/patterns.md) ── */
+  .copy {
+    font-family: var(--mono); font-size: 12px; cursor: pointer;
+    padding: 7px 14px; border-radius: 8px;
+    border: 1.5px solid var(--gray-300); background: #fff; color: var(--slate);
+  }
+  .copy:hover { border-color: var(--clay); color: var(--clay); }
 
   /* ── sticky side panel ────────────────── */
   aside {
@@ -106,8 +147,9 @@
   }
   .legend span { display: inline-flex; align-items: center; gap: 8px; }
   .chip { width: 22px; height: 14px; border: 1.5px solid var(--gray-300); border-radius: 4px; background: #fff; }
-  .chip.ok  { background: rgba(120,140,93,0.12); border-color: var(--olive); }
-  .chip.bad { background: rgba(176,74,63,0.10); border-color: var(--rust); }
+  .chip.gate { transform: rotate(45deg); width: 12px; height: 12px; border-radius: 2px; }
+  .chip.ok   { background: rgba(120,140,93,0.12); border-color: var(--olive); }
+  .chip.bad  { background: rgba(176,74,63,0.10); border-color: var(--rust); }
 </style>
 </head>
 <body>
@@ -124,12 +166,33 @@
 
   <div class="layout">
 
-    <!-- LEFT: the illustration. Inline SVG for diagrams, or a single .card for
+    <!-- LEFT: the illustration. Inline SVG for diagrams, or a single .canvas for
          columns / diff / timeline. Remove the aside + .layout grid if a given
          pattern doesn't need a side panel. -->
     <div>
-      <div class="card">
-        <!-- ILLUSTRATION GOES HERE -->
+      <div class="canvas">
+        <!-- ILLUSTRATION GOES HERE. For a diagram, build on this stub: lay nodes
+             out on a fixed grid in viewBox coordinates, edges first so the node
+             shapes paint over the arrow ends. Give every clickable group
+             data-k="key" and tabindex="0". Delete the <svg> for non-diagram
+             patterns (columns, diff, timeline). -->
+        <svg class="flow" viewBox="0 0 620 600">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#87867F"/>
+            </marker>
+            <marker id="arrow-olive" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#788C5D"/>
+            </marker>
+            <marker id="arrow-rust" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#B04A3F"/>
+            </marker>
+          </defs>
+
+          <!-- edges -->
+
+          <!-- nodes: <g class="node" data-k="…" tabindex="0"> … </g> -->
+        </svg>
       </div>
 
       <!-- Optional legend; keep entries to the semantic colors actually used. -->
@@ -169,17 +232,26 @@ const M = document.getElementById("p-meta");
 const B = document.getElementById("p-body");
 const C = document.getElementById("p-code");
 
+function activate(el) {
+  const d = DETAIL[el.dataset.k];
+  if (!d) return;                                     // guard BEFORE selecting,
+  items.forEach(x => x.classList.remove("active"));   // or the panel keeps
+  el.classList.add("active");                         // showing the last element
+  T.textContent = d.title;
+  M.textContent = d.meta;
+  B.innerHTML = d.body;       // body may contain <code> spans
+  C.textContent = d.code;
+}
+
 items.forEach(el => {
-  el.addEventListener("click", () => {
-    items.forEach(x => x.classList.remove("active"));
-    el.classList.add("active");
-    const d = DETAIL[el.dataset.k];
-    if (!d) return;
-    T.textContent = d.title;
-    M.textContent = d.meta;
-    B.innerHTML = d.body;       // body may contain <code> spans
-    C.textContent = d.code;
+  el.addEventListener("click", () => activate(el));
+  el.addEventListener("keydown", e => {           // needs tabindex="0" on the
+    if (e.key === "Enter" || e.key === " ") {     // element to ever fire
+      e.preventDefault();
+      activate(el);
+    }
   });
+  if (!DETAIL[el.dataset.k]) console.warn("no DETAIL entry for", el.dataset.k);
 });
 </script>
 </body>

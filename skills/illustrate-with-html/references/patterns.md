@@ -15,9 +15,10 @@ are described here because they're variations on the same kit.
 
 **Shape:** a sequence with branches, gates, and success/failure paths.
 
-**Structure:** an inline `<svg viewBox="0 0 W H">` in the left card; a sticky
-detail `<aside>` on the right. Nodes are `<g class="node" data-k="…">` groups
-containing a `<rect>` (process), a diamond `<path>` (decision), or a rounded
+**Structure:** an inline `<svg viewBox="0 0 W H">` in the left canvas; a sticky
+detail `<aside>` on the right. Nodes are `<g class="node" data-k="…"
+tabindex="0">` groups (the tabindex is what makes the panel reachable without a
+mouse) containing a `<rect>` (process), a diamond `<path>` (decision), or a rounded
 `rect` (terminal), plus `<text>`. Edges are `<path class="edge">` with arrowhead
 `<marker>`s defined once in `<defs>`. A legend maps shapes/colors to meaning.
 
@@ -46,9 +47,9 @@ broken:
   label.
 - **Give rows real breathing room** (~60px between a box's bottom and the next
   one's top) so arrowheads and labels aren't crammed against borders.
-- **Then actually look at it.** Overlap is invisible in the source and obvious on
-  screen — render it (open it, or screenshot via a quick `python3 -m http.server`
-  + headless browser) and confirm nothing collides before handing it over.
+- **Then actually look at it.** Render the file and read the PNG back, per step 5
+  of SKILL.md, before handing it over. Overlap is invisible in the source and
+  obvious on screen.
 
 ---
 
@@ -56,7 +57,7 @@ broken:
 
 **Shape:** two or three alternatives the reader should weigh against each other.
 
-**Structure:** a `display:grid` of 2–3 equal columns, each a `.card` with a mono
+**Structure:** a `display:grid` of 2–3 equal columns, each a `.canvas` with a mono
 eyebrow naming the approach, a short verdict line, the code/sketch, and a
 trade-off list. Tag each trade-off with a small pill — olive for a pro, rust for
 a con, gray for neutral.
@@ -132,6 +133,11 @@ reader *poke* the idea (e.g. move a slider and watch keys redistribute for
 consistent hashing). Build the smallest interactive thing that makes the
 mechanism click, then annotate what they're seeing.
 
+Apply the export non-negotiable by its predicate: a slider the reader pokes to
+understand a mechanism yields nothing worth carrying back, so it needs no button.
+The moment the reader is *choosing* rather than learning (a value they want kept,
+a config they'd otherwise retype), it does. Add the export bar below.
+
 ---
 
 ## 7. Incident timeline  ·  post-mortem
@@ -177,3 +183,37 @@ of a sparkline — scale your data into the `viewBox` height yourself:
 
 Keep charts small and annotated (a label + the latest value in mono) rather than
 big and bare. The point is to support a sentence, not to be a dashboard.
+
+---
+
+## Export bar · required whenever the reader can change something
+
+A page with knobs that can't hand its state back is a dead end: the user ends up
+retyping in prose what they just expressed by dragging. Serialize the current
+state to text and put a copy button on it.
+
+```html
+<button class="copy" id="copy">Copy as prompt</button>
+<script>
+document.getElementById("copy").addEventListener("click", async (e) => {
+  const text = serialize();     // you write this: build the prompt/JSON/markdown
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {                     // blocked outside a user gesture, or by a
+    const ta = document.createElement("textarea");   // stricter browser
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");   // deprecated, but still the working fallback
+    ta.remove();
+  }
+  const label = e.target.textContent;
+  e.target.textContent = "Copied ✓";
+  setTimeout(() => (e.target.textContent = label), 1200);
+});
+</script>
+```
+
+Write `serialize()` to emit exactly what the user would otherwise have to retype:
+the reordered list as markdown, the changed keys as a diff, the tuned values as a
+prompt. Name the format in the button label so they know what they're getting.
