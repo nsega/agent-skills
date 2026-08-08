@@ -107,7 +107,14 @@ which the run **fails closed** rather than accepting unchecked findings.
 
 **No call timeout is built in**, and a Zen backend can stall for tens of minutes
 (see the reliability note above). Bound it yourself when that matters:
-`timeout 900 scripts/second_review.sh ... --backend kimi`. Exit 124 means it
+
+```bash
+timeout  900 scripts/second_review.sh ... --backend kimi   # GNU coreutils
+gtimeout 900 scripts/second_review.sh ... --backend kimi   # macOS + brew coreutils
+```
+
+`timeout` is GNU coreutils and **macOS ships neither name** until you
+`brew install coreutils`, so check before relying on it. Exit 124 means it
 stalled; nothing is written to `OUT_JSON`, which is cleared before the call, so a
 timed-out run cannot leave stale findings behind.
 

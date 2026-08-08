@@ -37,9 +37,10 @@
 # - For a high-stakes review, run this two or three times into different OUT_JSON
 #   files and union the findings by hand: one pass is a noisy detector.
 # - NO call timeout is built in, and a Zen backend can stall for tens of minutes.
-#   Bound it from outside when that matters: `timeout 900 second_review.sh ...`.
-#   Exit 124 = stalled; $OUT is cleared before the call, so a timed-out run leaves
-#   no stale findings behind.
+#   Bound it from outside when that matters: `timeout 900 second_review.sh ...`
+#   (GNU coreutils; on macOS that is `gtimeout`, and neither name exists until
+#   `brew install coreutils`). Exit 124 = stalled; $OUT is cleared before the
+#   call, so a timed-out run leaves no stale findings behind.
 set -euo pipefail
 
 usage() {

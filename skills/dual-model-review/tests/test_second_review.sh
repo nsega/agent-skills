@@ -18,9 +18,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/../scripts/second_review.sh"
 RUBRIC="$HERE/../references/rubric.md"
 SCHEMA="$HERE/../references/findings.schema.json"
-pass=0; fail=0
+pass=0; fail=0; skip=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
+# A skipped assertion is NOT a pass: count it separately and print it, so a
+# missing dependency shows up as a hole in coverage instead of a green run.
+skipped() { skip=$((skip+1)); echo "SKIP: $1" >&2; }
+
+# GNU coreutils, absent from a stock macOS under either name.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 
 WORK="$(mktemp -d)"
 # The validation-failure cases deliberately leave their raw output in /tmp for
@@ -69,9 +75,19 @@ rc=0; "$SR" "$BUNDLE" "$RUBRIC" >/dev/null 2>&1 || rc=$?
 rc=0; "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend bogus >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "bad --backend should exit 2 (got $rc)"
 
-# 3: --backend with no value -> exit 2, and must not hang
-rc=0; timeout 10 "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 2 ] && ok || bad "trailing --backend should exit 2, not hang (got $rc)"
+# 3: --backend with no value -> exit 2, and must not hang.
+# `timeout` is GNU coreutils: macOS ships neither it nor `gtimeout` until you
+# `brew install coreutils`, so hardcoding it made this assertion exit 127 and
+# report a spurious failure on a stock Mac -- the platform this suite targets.
+# The bound is load-bearing here (the regression being guarded against is a HANG,
+# which would otherwise wedge the suite forever), so skip loudly rather than
+# quietly dropping the check when neither name is available.
+if [ -n "$TIMEOUT_BIN" ]; then
+  rc=0; "$TIMEOUT_BIN" 10 "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] && ok || bad "trailing --backend should exit 2, not hang (got $rc)"
+else
+  skipped "no timeout/gtimeout on PATH (brew install coreutils): skipped the no-hang assertion"
+fi
 
 # 4: bad effort per backend -> exit 2 (codex has medium/xhigh, opencode does not)
 rc=0; CODEX_EFFORT=bogus "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
@@ -304,5 +320,9 @@ else
   echo "note: jsonschema not installed - schema-enforcement cases skipped (fail-closed path checked instead)" >&2
 fi
 
-echo "second_review: $pass passed, $fail failed"
+# Not `${skip:+...}`: "0" is a non-empty string, so that prints ", 0 skipped" on
+# every clean run. And not `[ .. ] && msg=..`, which returns 1 when false and
+# would kill the suite under `set -e` right before it reports.
+if [ "$skip" -gt 0 ]; then skipmsg=", $skip skipped"; else skipmsg=""; fi
+echo "second_review: $pass passed, $fail failed$skipmsg"
 [ "$fail" -eq 0 ]
