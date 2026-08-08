@@ -18,7 +18,7 @@
   // Never auto-publish review sessions.
   "share": "disabled",
 
-  // Blind, single-shot reviewer: it must answer from the piped bundle ALONE.
+  // Blind, single-shot reviewer: it must answer from the bundle in the prompt ALONE.
   // Disabling the file/exec tools does two jobs. (1) Independence: with read/grep
   // enabled, GLM went and read the working tree (including changes it was meant
   // to be blind to) instead of reviewing the diff it was handed. (2) Reliability:

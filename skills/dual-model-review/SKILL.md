@@ -168,9 +168,12 @@ was checked, not skipped.
 ## Governance & operating rules
 
 - **Read-only reviewers.** They analyze; they do not edit the repo. Both backends
-  are hardened so reviewer #2 answers from the **piped packet alone**: with file
-  tools available, a reviewer goes and reads the working tree (including changes
-  it was meant to be blind to) instead of reviewing the diff it was handed.
+  are hardened so reviewer #2 answers from the **packet it was handed alone**:
+  with file tools available, a reviewer goes and reads the working tree
+  (including changes it was meant to be blind to) instead of reviewing the diff
+  it was handed. The transport differs by arm and is not interchangeable: codex
+  takes the packet on stdin via the `-` placeholder, opencode takes it in the
+  argv message under an explicit `## ARTIFACT TO REVIEW` header.
   - codex: `features.shell_tool=false` and `-C` pointed at an empty scratch dir,
     the working root is where codex discovers `AGENTS.md`, project config, and
     repo context, so an empty one is what keeps it blind. Plus
