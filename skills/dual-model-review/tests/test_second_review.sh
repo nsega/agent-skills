@@ -321,8 +321,12 @@ else
 fi
 
 # Not `${skip:+...}`: "0" is a non-empty string, so that prints ", 0 skipped" on
-# every clean run. And not `[ .. ] && msg=..`, which returns 1 when false and
-# would kill the suite under `set -e` right before it reports.
+# every clean run. And not `[ .. ] && skipmsg=..` either -- though NOT for the
+# reason you might expect. That form is safe under `set -e` (errexit exempts a
+# non-final command in an AND-OR list, and the list's own status does not
+# trigger it); what breaks is `set -u`, because when the test is false skipmsg
+# is never assigned and the echo below dies on an unbound variable. Verified on
+# bash 3.2.57: the && form survives errexit, then fails "skipmsg: unbound".
 if [ "$skip" -gt 0 ]; then skipmsg=", $skip skipped"; else skipmsg=""; fi
 echo "second_review: $pass passed, $fail failed$skipmsg"
 [ "$fail" -eq 0 ]
