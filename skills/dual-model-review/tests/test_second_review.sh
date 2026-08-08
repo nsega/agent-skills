@@ -187,6 +187,19 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   grep -qi "stdin" "$GSHIM.args" && bad "the glm prompt must never mention stdin" || ok
   grep -qx -- "max" "$GSHIM.args" && ok || bad "opencode variant should default to max"
 
+  # The packet travels in argv, and opencode merges any stdin it is given into
+  # the message WITHOUT a delimiter, so the call must pin stdin to /dev/null.
+  # Otherwise a piped invocation appends stray bytes to the artifact and the run
+  # returns schema-valid findings over a corrupted packet, exit 0. Feed the
+  # script a sentinel on stdin and assert the CLI saw none of it. (Removing the
+  # redirect does not merely fail this: the shim's `cat` then blocks on the
+  # inherited stdin and the whole suite hangs.)
+  rm -f "$OUT" "$GSHIM.stdin"
+  rc=0; printf 'STOWAWAY_SENTINEL\n' | OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test \
+    "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend glm >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && ok || bad "glm: piped invocation should still exit 0 (got $rc)"
+  grep -q "STOWAWAY_SENTINEL" "$GSHIM.stdin" && bad "glm: caller stdin leaked into the opencode call" || ok
+
   # An empty answer must fail HERE, loudly, naming the backend. opencode exits 0
   # with empty stdout on a large packet at max effort (seen in the wild), and
   # without this guard the run fell through to the JSON extractor and blamed the
