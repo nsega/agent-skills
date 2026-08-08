@@ -42,8 +42,16 @@ Reviewer #2 is pluggable *because only the CLI changes*: packet, rubric, schema,
 prompt, and synthesis are identical across backends. One judgment call worth
 knowing: two US frontier labs plausibly correlate more than two labs with very
 different training mixes, so on a change where decorrelation matters most (novel
-algorithm, unusual threat model) `--backend glm` is the more independent second
-opinion. Treat a unanimous clean pass as weak evidence either way.
+algorithm, unusual threat model) `--backend glm` or `--backend kimi` is the more
+independent second opinion. Treat a unanimous clean pass as weak evidence either
+way.
+
+**Reliability, as of 2026-08:** prefer `kimi` over `glm` for the opencode arm.
+GLM-5.2 via Zen has stalled repeatedly (one `low`-effort run on a 591-byte packet
+ran 44 minutes and never returned; one `max`-effort run on a 75KB packet returned
+empty after ~10 minutes), while `kimi` returned in under three minutes on the same
+packet. Re-check before trusting this note; it is two observations, not a
+benchmark.
 
 Both reviewers review **blind** (neither sees the other's findings). You also
 synthesize, so you are a disputant *and* the chair. Two habits contain that bias:
@@ -96,6 +104,12 @@ scripts/second_review.sh <packet> references/rubric.md \
 Prereqs: `codex` on PATH and logged in (`codex login`), or `opencode` plus an
 OpenCode Zen key for `--backend glm|kimi`; and `python3` with `jsonschema`, without
 which the run **fails closed** rather than accepting unchecked findings.
+
+**No call timeout is built in**, and a Zen backend can stall for tens of minutes
+(see the reliability note above). Bound it yourself when that matters:
+`timeout 900 scripts/second_review.sh ... --backend kimi`. Exit 124 means it
+stalled; nothing is written to `OUT_JSON`, which is cleared before the call, so a
+timed-out run cannot leave stale findings behind.
 
 Reviewer #2 runs blind, and its output is schema-validated (a finding missing
 required Evidence / failure_case / recommendation is rejected, not silently
