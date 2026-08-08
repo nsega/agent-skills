@@ -310,15 +310,55 @@ case "$BACKEND" in
     if [ -s "$OUTMSG" ]; then cat "$OUTMSG" > "$RAW"; fi
     ;;
   glm)
-    # opencode takes the prompt as an argument and the artifact on stdin.
-    cat "$BUNDLE" | "$OPENCODE_BIN" run --variant "$R2_EFFORT" --model "$R2_MODEL" \
-      "$FULL_PROMPT
+    # ONE argv message: the prompt, then the artifact under an explicit header —
+    # the same shape as the codex arm's single stdin stream, for the same reason.
+    #
+    # Do NOT pipe the bundle on stdin. `opencode run --help` documents no stdin at
+    # all (positional `message` is the whole input). Piping does deliver bytes on
+    # 1.18.11, but undocumented and with no delimiter between the two, which is
+    # the actual failure: told the artifact "follows on stdin", the model goes
+    # looking for a channel it cannot name. Verified against real opencode
+    # 1.18.11 — GLM-5.2 at --variant minimal quoted the piped sentinel back and in
+    # the same breath answered "there's no artifact on stdin from my
+    # perspective", then reviewed nothing. The bytes arrive; the framing breaks.
+    # In argv the ordering and the header are ours, and the word never appears.
+    GLM_MSG="$FULL_PROMPT
 
-The artifact to review follows on stdin." > "$RAW" || {
+## ARTIFACT TO REVIEW
+
+$(cat "$BUNDLE")"
+    # argv is bounded (ARG_MAX covers args + environment), so an oversized packet
+    # would die with E2BIG mid-call, after the preflight and before any output.
+    # Fail here instead, and say which lever to pull. Half of ARG_MAX is ample:
+    # real packets run 40-80KB against a 1MB cap. Measured in BYTES (`wc -c`, not
+    # `${#var}`, which counts characters and undercounts any non-ASCII diff).
+    GLM_BYTES="$(printf '%s' "$GLM_MSG" | wc -c | tr -d ' ')"
+    ARG_CAP=$(( $(getconf ARG_MAX 2>/dev/null || echo 262144) / 2 ))
+    if [ "$GLM_BYTES" -gt "$ARG_CAP" ]; then
+      echo "packet too large for the glm backend: $GLM_BYTES bytes > $ARG_CAP (half of ARG_MAX)." >&2
+      echo "Trim the bundle, or use --backend codex, which streams the packet on stdin and has no such cap." >&2
+      exit 2
+    fi
+    "$OPENCODE_BIN" run --variant "$R2_EFFORT" --model "$R2_MODEL" "$GLM_MSG" > "$RAW" || {
       echo "opencode run failed (its stderr is above)" >&2; exit 1;
     }
     ;;
 esac
+
+# An EMPTY answer is a failed review, not a formatting problem. Both CLIs can
+# exit 0 having written nothing: opencode does it on a large packet at max effort
+# (two 0-byte /tmp/r2-review-raw.* files on this machine, days apart). Without
+# this guard the run fell through to the JSON extractor below, which blamed the
+# model's formatting — "could not locate a findings JSON object" — for a file
+# that had no bytes in it at all. Catch it here, where the message can name the
+# real cause and the lever to pull. Deliberately BEFORE `KEEP_RAW=1`: an empty
+# file is nothing to inspect, so let the trap take it.
+if [ ! -s "$RAW" ]; then
+  echo "reviewer #2 ($BACKEND / $R2_MODEL, effort=$R2_EFFORT) exited 0 but produced EMPTY output." >&2
+  echo "Nothing was reviewed. This is usually the packet being too big for the model at this effort:" >&2
+  echo "trim the bundle, lower the effort, or switch --backend." >&2
+  exit 4
+fi
 
 # Extract the JSON object, then ENFORCE the schema (Evidence/failure_case rules).
 # From here to the end of the block, a failure means "the model answered but we

@@ -165,15 +165,43 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   [ "$rc" -eq 0 ] && ok || bad "stdout fallback should exit 0 when -o writes nothing (got $rc)"
   [ -f "$OUT" ] && grep -q '"R2-001"' "$OUT" && ok || bad "stdout fallback should still produce OUT_JSON"
 
-  # glm backend still works after the refactor (opencode takes the prompt as an
-  # argument and the artifact on stdin - the opposite split from codex).
+  # glm backend. The artifact travels in the SAME argv message as the prompt, the
+  # way the codex arm puts both in one stdin stream.
+  #
+  # It must NOT be piped on stdin. `opencode run --help` documents no stdin at all
+  # (positional `message` is the whole input), and relying on the undocumented
+  # merge is what produced two 0-byte /tmp/r2-review-raw.* files. Worse, it merges
+  # WITHOUT a delimiter, so a prompt that said the artifact "follows on stdin"
+  # left the model looking for a channel it cannot name: verified against real
+  # opencode 1.18.11, GLM-5.2 at --variant minimal quoted the piped sentinel back
+  # and in the same breath answered "there's no artifact on stdin from my
+  # perspective". The bytes arrive; the framing is what breaks. So the artifact
+  # gets an explicit header, and the word stdin never appears in the prompt.
   GSHIM="$WORK/opencode"; make_shim "$GSHIM" "$VALID"
   rm -f "$OUT"
   rc=0; OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend glm >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 0 ] && ok || bad "glm backend should exit 0 (got $rc)"
-  grep -q "BUNDLE_SENTINEL" "$GSHIM.stdin" && ok || bad "bundle never reached opencode stdin"
+  grep -q "BUNDLE_SENTINEL" "$GSHIM.args" && ok || bad "bundle never reached opencode argv"
   grep -q "You are an INDEPENDENT senior reviewer" "$GSHIM.args" && ok || bad "prompt should be an opencode argument"
+  grep -q "ARTIFACT TO REVIEW" "$GSHIM.args" && ok || bad "the artifact needs an explicit header, not a bare append"
+  grep -qi "stdin" "$GSHIM.args" && bad "the glm prompt must never mention stdin" || ok
   grep -qx -- "max" "$GSHIM.args" && ok || bad "opencode variant should default to max"
+
+  # An empty answer must fail HERE, loudly, naming the backend. opencode exits 0
+  # with empty stdout on a large packet at max effort (seen in the wild), and
+  # without this guard the run fell through to the JSON extractor and blamed the
+  # model's formatting: "could not locate a findings JSON object".
+  for be in codex glm; do
+    ESHIM="$WORK/empty-$be"
+    printf '#!/usr/bin/env bash\ncat > /dev/null\nexit 0\n' > "$ESHIM"; chmod +x "$ESHIM"
+    rm -f "$OUT"; EERR="$WORK/eerr-$be.txt"
+    rc=0; CODEX_BIN="$ESHIM" OPENCODE_BIN="$ESHIM" CODEX_API_KEY=test OPENCODE_API_KEY=test \
+      "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend "$be" >/dev/null 2>"$EERR" || rc=$?
+    [ "$rc" -ne 0 ] && ok || bad "$be: empty backend output must fail the run (got $rc)"
+    grep -qi "empty" "$EERR" && ok || bad "$be: the error must say the output was empty, not blame JSON extraction"
+    grep -q "could not locate a findings JSON object" "$EERR" && bad "$be: empty output must not surface as a JSON-extraction error" || ok
+    [ ! -f "$OUT" ] && ok || bad "$be: no OUT_JSON should be written for an empty answer"
+  done
 
   # When the backend itself fails, the run must fail AND surface the tail of its
   # stderr (suppressed on success) so the operator can see why.
