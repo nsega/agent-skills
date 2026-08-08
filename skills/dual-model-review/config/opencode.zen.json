@@ -8,7 +8,10 @@
   // opencode parses JSONC comments even in a .json-named file; "//"-keyed
   // pseudo-comments are rejected by opencode's strict config schema.
 
-  "model": "opencode/glm-5.2",
+  // No default "model" key on purpose. This file is shared by every opencode
+  // backend (glm, kimi), and second_review.sh ALWAYS passes --model explicitly.
+  // A default here would bind only when some future caller forgot to, silently
+  // reviewing with one vendor's model while the operator asked for another.
 
   // Background calls (titles/summaries) MUST NOT leak code to a free
   // tier or to the default Zen title model (Claude Haiku, 30-day retention).
@@ -56,7 +59,8 @@
   "provider": {
     "opencode": {
       "models": {
-        "glm-5.2": {}
+        "glm-5.2": {},
+        "kimi-k3": {}
       }
     }
   }

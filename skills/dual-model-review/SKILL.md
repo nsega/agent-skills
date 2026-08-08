@@ -4,10 +4,10 @@ description: >-
   Run a two-model review of a pull request or a system-design document.
   Claude Code (Opus 5, high effort) is the main reviewer and synthesizer; a
   second, independent reviewer runs blind through another lab's model:
-  GPT-5.6 Sol via the Codex CLI by default, GLM-5.2 via opencode as the
-  alternate, for decorrelated blind spots. Use this whenever the user asks to
-  "cross-review", wants a "second opinion" on a PR or design, says "review this
-  with codex" / "review this with GPT" / "review this with GLM", "run the
+  GPT-5.6 Sol via the Codex CLI by default, or GLM-5.2 / Kimi K3 via opencode
+  as alternates, for decorrelated blind spots. Use this whenever the user asks
+  to "cross-review", wants a "second opinion" on a PR or design, says "review
+  this with codex" / "with GPT" / "with GLM" / "with Kimi", "run the
   panel", or wants higher-confidence review of an architecture doc, RFC, or diff
   before merging or sign-off. Trigger even when they just paste a diff or design
   and ask "what did we miss?".
@@ -25,12 +25,18 @@ by having the two models argue it out. This one **reviews an artifact that
 already exists** (a diff or a design doc) and merges findings. "Should we do
 X?" is debate; "is this X any good?" is review.
 
-| | reviewer #1 | reviewer #2 (default) | reviewer #2 (alternate) |
-|---|---|---|---|
-| model | `claude-opus-5` | `gpt-5.6-sol` | `glm-5.2` |
-| effort | high | high (`CODEX_EFFORT`) | max (`ZEN_VARIANT`) |
-| runs via | Claude Code | Codex CLI | opencode + OpenCode Zen |
-| lab | Anthropic | OpenAI | Z.ai (US-hosted) |
+| | reviewer #1 | reviewer #2 (default) | reviewer #2 (alt 1) | reviewer #2 (alt 2) |
+|---|---|---|---|---|
+| `--backend` | n/a | `codex` | `glm` | `kimi` |
+| model | `claude-opus-5` | `gpt-5.6-sol` | `glm-5.2` | `kimi-k3` |
+| effort | high | high (`CODEX_EFFORT`) | max (`ZEN_VARIANT`) | max (`ZEN_VARIANT`) |
+| runs via | Claude Code | Codex CLI | opencode + OpenCode Zen | opencode + OpenCode Zen |
+| lab | Anthropic | OpenAI | Z.ai (US-hosted) | Moonshot AI (US-hosted) |
+| $/Mtok in-out | n/a | n/a | 1.4 / 4.4 | 3.0 / 15.0 |
+
+`glm` and `kimi` are one code path with different default models, so `ZEN_MODEL`
+overrides either and any other Zen model can be tried without touching the
+script.
 
 Reviewer #2 is pluggable *because only the CLI changes*: packet, rubric, schema,
 prompt, and synthesis are identical across backends. One judgment call worth
@@ -81,10 +87,14 @@ scripts/second_review.sh <packet> references/rubric.md \
 # alternate: GLM-5.2 via opencode, max effort
 scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json --backend glm
+
+# alternate: Kimi K3 via opencode, max effort
+scripts/second_review.sh <packet> references/rubric.md \
+  references/findings.schema.json /tmp/r2-findings.json --backend kimi
 ```
 
 Prereqs: `codex` on PATH and logged in (`codex login`), or `opencode` plus an
-OpenCode Zen key for `--backend glm`; and `python3` with `jsonschema`, without
+OpenCode Zen key for `--backend glm|kimi`; and `python3` with `jsonschema`, without
 which the run **fails closed** rather than accepting unchecked findings.
 
 Reviewer #2 runs blind, and its output is schema-validated (a finding missing
@@ -195,15 +205,21 @@ was checked, not skipped.
   (zero-retention). **Never** route internal code through Z.ai's own API. Z.ai is
   also on the US BIS Entity List; that backend assumes your org's compliance has
   approved MIT-licensed GLM weights via a US host for internal artifacts.
-- **Swapping in a third lab** (Gemini/Vertex, an Azure-hosted model) is a new
-  `case` arm in `second_review.sh`: prompt, rubric, schema, and synthesis are
-  already backend-agnostic.
+- **kimi backend: same posture, same caveat.** Kimi K3 = `opencode/kimi-k3`,
+  also a China-based lab (Moonshot AI) reached through the US-hosted,
+  zero-retention Zen tier. **Never** route internal code through Moonshot's own
+  API. Confirm your org's compliance position covers this lab specifically: it
+  is a separate decision from the GLM one, not covered by it.
+- **Swapping in another Zen model** is a one-line default in the `glm|kimi` arm
+  (or just `ZEN_MODEL=`). A different **CLI** (Gemini/Vertex, an Azure-hosted
+  model) is a new `case` arm: prompt, rubric, schema, and synthesis are already
+  backend-agnostic.
 
 ## Files
 
 - `scripts/gather_artifact.sh`: build the review packet (`--level full|minimal`, `--tests`).
-- `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm`, one blind, schema-validated pass).
+- `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm|kimi`, one blind, schema-validated pass).
 - `references/rubric.md`: severity/category source of truth + review lenses.
 - `references/findings.schema.json`: the per-reviewer findings contract.
-- `config/opencode.zen.json`: hardened opencode config (Zen, tools off, paid model), used by `--backend glm`.
+- `config/opencode.zen.json`: hardened opencode config (Zen, tools off, paid model), shared by `--backend glm` and `--backend kimi`.
 - `tests/`: `bash tests/test_*.sh`; no test spends a paid call (fake CLI shims).
