@@ -18,9 +18,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/../scripts/second_review.sh"
 RUBRIC="$HERE/../references/rubric.md"
 SCHEMA="$HERE/../references/findings.schema.json"
-pass=0; fail=0
+pass=0; fail=0; skip=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
+# A skipped assertion is NOT a pass: count it separately and print it, so a
+# missing dependency shows up as a hole in coverage instead of a green run.
+skipped() { skip=$((skip+1)); echo "SKIP: $1" >&2; }
+
+# GNU coreutils, absent from a stock macOS under either name.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 
 WORK="$(mktemp -d)"
 # The validation-failure cases deliberately leave their raw output in /tmp for
@@ -69,9 +75,19 @@ rc=0; "$SR" "$BUNDLE" "$RUBRIC" >/dev/null 2>&1 || rc=$?
 rc=0; "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend bogus >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "bad --backend should exit 2 (got $rc)"
 
-# 3: --backend with no value -> exit 2, and must not hang
-rc=0; timeout 10 "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 2 ] && ok || bad "trailing --backend should exit 2, not hang (got $rc)"
+# 3: --backend with no value -> exit 2, and must not hang.
+# `timeout` is GNU coreutils: macOS ships neither it nor `gtimeout` until you
+# `brew install coreutils`, so hardcoding it made this assertion exit 127 and
+# report a spurious failure on a stock Mac -- the platform this suite targets.
+# The bound is load-bearing here (the regression being guarded against is a HANG,
+# which would otherwise wedge the suite forever), so skip loudly rather than
+# quietly dropping the check when neither name is available.
+if [ -n "$TIMEOUT_BIN" ]; then
+  rc=0; "$TIMEOUT_BIN" 10 "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] && ok || bad "trailing --backend should exit 2, not hang (got $rc)"
+else
+  skipped "no timeout/gtimeout on PATH (brew install coreutils): skipped the no-hang assertion"
+fi
 
 # 4: bad effort per backend -> exit 2 (codex has medium/xhigh, opencode does not)
 rc=0; CODEX_EFFORT=bogus "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
@@ -177,34 +193,53 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   # and in the same breath answered "there's no artifact on stdin from my
   # perspective". The bytes arrive; the framing is what breaks. So the artifact
   # gets an explicit header, and the word stdin never appears in the prompt.
-  GSHIM="$WORK/opencode"; make_shim "$GSHIM" "$VALID"
-  rm -f "$OUT"
-  rc=0; OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend glm >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ] && ok || bad "glm backend should exit 0 (got $rc)"
-  grep -q "BUNDLE_SENTINEL" "$GSHIM.args" && ok || bad "bundle never reached opencode argv"
-  grep -q "You are an INDEPENDENT senior reviewer" "$GSHIM.args" && ok || bad "prompt should be an opencode argument"
-  grep -q "ARTIFACT TO REVIEW" "$GSHIM.args" && ok || bad "the artifact needs an explicit header, not a bare append"
-  grep -qi "stdin" "$GSHIM.args" && bad "the glm prompt must never mention stdin" || ok
-  grep -qx -- "max" "$GSHIM.args" && ok || bad "opencode variant should default to max"
+  # Every opencode-family backend behaves identically apart from its default
+  # model, so assert the whole contract for each name rather than trusting that
+  # `glm|kimi)` kept them on one path.
+  for be in glm kimi; do
+    case "$be" in
+      glm)  want_model="opencode/glm-5.2" ;;
+      kimi) want_model="opencode/kimi-k3" ;;
+    esac
+    GSHIM="$WORK/opencode-$be"; make_shim "$GSHIM" "$VALID"
+    rm -f "$OUT"
+    rc=0; OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend "$be" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] && ok || bad "$be backend should exit 0 (got $rc)"
+    grep -q "BUNDLE_SENTINEL" "$GSHIM.args" && ok || bad "$be: bundle never reached opencode argv"
+    grep -q "You are an INDEPENDENT senior reviewer" "$GSHIM.args" && ok || bad "$be: prompt should be an opencode argument"
+    grep -q "ARTIFACT TO REVIEW" "$GSHIM.args" && ok || bad "$be: the artifact needs an explicit header, not a bare append"
+    grep -qi "stdin" "$GSHIM.args" && bad "$be: the prompt must never mention stdin" || ok
+    grep -qx -- "max" "$GSHIM.args" && ok || bad "$be: opencode variant should default to max"
+    grep -qx -- "$want_model" "$GSHIM.args" && ok || bad "$be should default to $want_model"
+    # The prompt tells the model to stamp reviewer = the model basename, so a
+    # wrong default also mislabels every finding the backend produces.
+    grep -q "reviewer = \"${want_model##*/}\"" "$GSHIM.args" && ok || bad "$be: prompt should pin reviewer id to ${want_model##*/}"
 
-  # The packet travels in argv, and opencode merges any stdin it is given into
-  # the message WITHOUT a delimiter, so the call must pin stdin to /dev/null.
-  # Otherwise a piped invocation appends stray bytes to the artifact and the run
-  # returns schema-valid findings over a corrupted packet, exit 0. Feed the
-  # script a sentinel on stdin and assert the CLI saw none of it. (Removing the
-  # redirect does not merely fail this: the shim's `cat` then blocks on the
-  # inherited stdin and the whole suite hangs.)
-  rm -f "$OUT" "$GSHIM.stdin"
-  rc=0; printf 'STOWAWAY_SENTINEL\n' | OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test \
-    "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend glm >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ] && ok || bad "glm: piped invocation should still exit 0 (got $rc)"
-  grep -q "STOWAWAY_SENTINEL" "$GSHIM.stdin" && bad "glm: caller stdin leaked into the opencode call" || ok
+    # The packet travels in argv, and opencode merges any stdin it is given into
+    # the message WITHOUT a delimiter, so the call must pin stdin to /dev/null.
+    # Otherwise a piped invocation appends stray bytes to the artifact and the
+    # run returns schema-valid findings over a corrupted packet, exit 0. Feed
+    # the script a sentinel on stdin and assert the CLI saw none of it.
+    rm -f "$OUT" "$GSHIM.stdin"
+    rc=0; printf 'STOWAWAY_SENTINEL\n' | OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test \
+      "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend "$be" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] && ok || bad "$be: piped invocation should still exit 0 (got $rc)"
+    grep -q "STOWAWAY_SENTINEL" "$GSHIM.stdin" && bad "$be: caller stdin leaked into the opencode call" || ok
+
+    # ZEN_MODEL still wins over the backend's default (the documented escape
+    # hatch, and how a third Zen model gets tried without touching the script).
+    rm -f "$OUT"
+    rc=0; OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test ZEN_MODEL=opencode/deepseek-v4-flash \
+      "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend "$be" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] && ok || bad "$be: ZEN_MODEL override should exit 0 (got $rc)"
+    grep -qx -- "opencode/deepseek-v4-flash" "$GSHIM.args" && ok || bad "$be: ZEN_MODEL should override the default model"
+  done
 
   # An empty answer must fail HERE, loudly, naming the backend. opencode exits 0
   # with empty stdout on a large packet at max effort (seen in the wild), and
   # without this guard the run fell through to the JSON extractor and blamed the
   # model's formatting: "could not locate a findings JSON object".
-  for be in codex glm; do
+  for be in codex glm kimi; do
     ESHIM="$WORK/empty-$be"
     printf '#!/usr/bin/env bash\ncat > /dev/null\nexit 0\n' > "$ESHIM"; chmod +x "$ESHIM"
     rm -f "$OUT"; EERR="$WORK/eerr-$be.txt"
@@ -285,5 +320,20 @@ else
   echo "note: jsonschema not installed - schema-enforcement cases skipped (fail-closed path checked instead)" >&2
 fi
 
-echo "second_review: $pass passed, $fail failed"
+# Not `${skip:+...}`: "0" is a non-empty string, so that prints ", 0 skipped" on
+# every clean run.
+#
+# And not `[ .. ] && skipmsg=..` either. What kills that form HERE is `set -u`,
+# not `set -e`: when the test is false skipmsg is never assigned and the echo
+# below dies "unbound variable". Verified on bash 3.2.57.
+#
+# Do not generalize the `set -e` half. At THIS top level the failed test is
+# exempt as a non-final command in an AND-OR list, so the script continues. But
+# the list's status still becomes its enclosing command's status, and that
+# command is not exempt: as the last line of a function body, in a subshell, or
+# in a command substitution, the same idiom exits 1. This file defines ok(),
+# bad(), skipped() and make_shim(), so copying the pattern into one of them
+# would abort the suite mid-run.
+if [ "$skip" -gt 0 ]; then skipmsg=", $skip skipped"; else skipmsg=""; fi
+echo "second_review: $pass passed, $fail failed$skipmsg"
 [ "$fail" -eq 0 ]

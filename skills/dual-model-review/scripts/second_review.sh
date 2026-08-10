@@ -4,19 +4,25 @@
 # Evidence/failure_case rules) before accepting the output.
 #
 # Usage:
-#   second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm]
+#   second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm|kimi]
 #
 # Backends. Reviewer #2 is pluggable: the packet, rubric, schema, prompt, and
-# synthesis are identical either way; only the CLI underneath changes.
+# synthesis are identical whichever you pick; only the CLI underneath changes.
 #   codex  GPT-5.6 Sol via the Codex CLI            (default)
 #   glm    GLM-5.2 via opencode + OpenCode Zen      (alternate)
+#   kimi   Kimi K3 via opencode + OpenCode Zen      (alternate)
+#
+# glm and kimi are ONE code path that differs only in default model, so they
+# share the preflight, the argv message, and both guards. Pick on cost and
+# behavior: glm-5.2 is $1.4/$4.4 per Mtok, kimi-k3 is $3/$15 (~3.4x on output).
 #
 # Env:
 #   REVIEW2_BACKEND  backend used when --backend is omitted (default: codex)
 #   CODEX_MODEL      codex model id                    (default: gpt-5.6-sol)
 #   CODEX_EFFORT     model_reasoning_effort            (default: high)
 #   CODEX_BIN        codex executable                  (default: codex)
-#   ZEN_MODEL        opencode model id                 (default: opencode/glm-5.2)
+#   ZEN_MODEL        opencode model id, overrides the backend's default
+#                    (glm: opencode/glm-5.2, kimi: opencode/kimi-k3)
 #   ZEN_VARIANT      opencode reasoning-effort variant (default: max)
 #   OPENCODE_BIN     opencode executable               (default: opencode)
 #   OPENCODE_CONFIG  hardened opencode config          (default: <skill>/config/opencode.zen.json)
@@ -30,10 +36,15 @@
 #   be relied on to reject a typo that would quietly downgrade effort.
 # - For a high-stakes review, run this two or three times into different OUT_JSON
 #   files and union the findings by hand: one pass is a noisy detector.
+# - NO call timeout is built in, and a Zen backend can stall for tens of minutes.
+#   Bound it from outside when that matters: `timeout 900 second_review.sh ...`
+#   (GNU coreutils; on macOS that is `gtimeout`, and neither name exists until
+#   `brew install coreutils`). Exit 124 = stalled; $OUT is cleared before the
+#   call, so a timed-out run leaves no stale findings behind.
 set -euo pipefail
 
 usage() {
-  echo "usage: second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm]"
+  echo "usage: second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm|kimi]"
 }
 
 BACKEND="${REVIEW2_BACKEND:-codex}"
@@ -74,16 +85,26 @@ case "$BACKEND" in
       *) echo "bad CODEX_EFFORT: '$R2_EFFORT' (want low|medium|high|xhigh|max|ultra)" >&2; exit 2 ;;
     esac
     ;;
-  glm)
-    R2_MODEL="${ZEN_MODEL:-opencode/glm-5.2}"
+  glm|kimi)
+    # Same opencode path, different default model. ZEN_MODEL overrides either, so
+    # `ZEN_MODEL=opencode/deepseek-v4-flash --backend glm` still works, and a new
+    # Zen model is a one-line default rather than another arm.
+    case "$BACKEND" in
+      glm)  ZEN_DEFAULT_MODEL="opencode/glm-5.2" ;;
+      kimi) ZEN_DEFAULT_MODEL="opencode/kimi-k3" ;;
+    esac
+    R2_MODEL="${ZEN_MODEL:-$ZEN_DEFAULT_MODEL}"
     R2_EFFORT="${ZEN_VARIANT:-max}"
+    # Provider-level, not per-model: opencode's variant names are the same across
+    # Zen's reasoning models (both glm-5.2 and kimi-k3 are reasoning: true), and
+    # `opencode models` exposes no per-model variant list to narrow against.
     case "$R2_EFFORT" in
       minimal|low|high|max) ;;
       *) echo "bad ZEN_VARIANT: '$R2_EFFORT' (want minimal|low|high|max)" >&2; exit 2 ;;
     esac
     ;;
   *)
-    echo "bad --backend: '$BACKEND' (want codex|glm)" >&2; exit 2 ;;
+    echo "bad --backend: '$BACKEND' (want codex|glm|kimi)" >&2; exit 2 ;;
 esac
 
 # The reviewer id the model must stamp on its output: the bare model name, with
@@ -202,7 +223,7 @@ for m in cat.get("models") or []:
       fi
     fi
     ;;
-  glm)
+  glm|kimi)
     OPENCODE_BIN="${OPENCODE_BIN:-opencode}"
     command -v "$OPENCODE_BIN" >/dev/null || { echo "opencode not found on PATH: $OPENCODE_BIN" >&2; exit 127; }
     export OPENCODE_CONFIG="${OPENCODE_CONFIG:-$SKILL_DIR/config/opencode.zen.json}"
@@ -309,7 +330,7 @@ case "$BACKEND" in
     # Prefer the captured final message; fall back to stdout if -o wrote nothing.
     if [ -s "$OUTMSG" ]; then cat "$OUTMSG" > "$RAW"; fi
     ;;
-  glm)
+  glm|kimi)
     # ONE argv message: the prompt, then the artifact under an explicit header —
     # the same shape as the codex arm's single stdin stream, for the same reason.
     #
@@ -322,7 +343,6 @@ case "$BACKEND" in
     # the same breath answered "there's no artifact on stdin from my
     # perspective", then reviewed nothing. The bytes arrive; the framing breaks.
     # In argv the ordering and the header are ours, and the word never appears.
-    #
     # TRADE-OFF, deliberate: argv is world-readable (`ps auxww`, and on Linux
     # /proc/<pid>/cmdline) for the life of the call, so on a shared host the
     # packet is visible to other local users in a way the codex arm's stdin
@@ -332,7 +352,7 @@ case "$BACKEND" in
     # disabled) hands framing back to opencode, which is the same class of
     # unknown. Revisit `-f` if packets ever routinely exceed the cap below, but
     # re-verify the framing against a real reviewer model before switching.
-    GLM_MSG="$FULL_PROMPT
+    ZEN_MSG="$FULL_PROMPT
 
 ## ARTIFACT TO REVIEW
 
@@ -342,7 +362,7 @@ $(cat "$BUNDLE")"
     # Fail here instead, and say which lever to pull. Half of ARG_MAX is ample:
     # real packets run 40-80KB against a 1MB cap. Measured in BYTES (`wc -c`, not
     # `${#var}`, which counts characters and undercounts any non-ASCII diff).
-    GLM_BYTES="$(printf '%s' "$GLM_MSG" | wc -c | tr -d ' ')"
+    ZEN_BYTES="$(printf '%s' "$ZEN_MSG" | wc -c | tr -d ' ')"
     ARG_CAP=$(( $(getconf ARG_MAX 2>/dev/null || echo 262144) / 2 ))
     # ARG_MAX is not the only ceiling. Linux also caps any SINGLE argv string at
     # MAX_ARG_STRLEN = 32 * PAGE_SIZE (128KB on 4K pages), independent of
@@ -353,8 +373,8 @@ $(cat "$BUNDLE")"
     # ARG_MAX/2 cap it is being min'd with).
     PER_ARG_CAP=$(( 32 * $(getconf PAGE_SIZE 2>/dev/null || echo 4096) - 8192 ))
     [ "$PER_ARG_CAP" -lt "$ARG_CAP" ] && ARG_CAP="$PER_ARG_CAP"
-    if [ "$GLM_BYTES" -gt "$ARG_CAP" ]; then
-      echo "packet too large for the glm backend: $GLM_BYTES bytes > $ARG_CAP (argv limit)." >&2
+    if [ "$ZEN_BYTES" -gt "$ARG_CAP" ]; then
+      echo "packet too large for the $BACKEND backend: $ZEN_BYTES bytes > $ARG_CAP (argv limit)." >&2
       echo "Trim the bundle, or use --backend codex, which streams the packet on stdin and has no such cap." >&2
       exit 2
     fi
@@ -365,7 +385,7 @@ $(cat "$BUNDLE")"
     # prompt no longer mentions stdin, so the model cannot notice the
     # contamination either: the run returns schema-valid findings over a corrupt
     # artifact and exits 0. Same reason the codex preflight pins its stdin.
-    "$OPENCODE_BIN" run --variant "$R2_EFFORT" --model "$R2_MODEL" "$GLM_MSG" \
+    "$OPENCODE_BIN" run --variant "$R2_EFFORT" --model "$R2_MODEL" "$ZEN_MSG" \
       < /dev/null > "$RAW" || {
       echo "opencode run failed (its stderr is above)" >&2; exit 1;
     }
