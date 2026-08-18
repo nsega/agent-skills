@@ -43,8 +43,12 @@ Flow controls:
   penalized and stabilization work is boosted (static config, updated
   quarterly in prompt.md).
 - **Queue decay** — queued issues are re-scored weekly; two consecutive
-  sub-threshold scores drop the issue. (Not yet automated: run the
-  REEVAL pass manually until the weekly runner exists.)
+  sub-threshold scores drop the issue. The hourly runner triggers
+  `run-reeval.sh` once the `last_reeval` stamp is 6+ days old, so a
+  slept-through Monday self-heals on the next weekday run. The pass is
+  best-effort (a failure never costs the scout iteration) and retries
+  hourly until it succeeds. Run `run-reeval.sh` directly for an ad-hoc
+  pass; a successful manual pass counts toward the weekly cadence.
 
 ## Rubric governance
 
@@ -67,15 +71,17 @@ $OSS_LAB_STATE_DIR (default ~/.local/share/oss-lab)
 ├── env        # GITHUB_TOKEN, TODOIST_TOKEN, TODOIST_PROJECT_ID
 ├── seen.json
 ├── queue.json
-└── last_run
+├── last_run
+└── last_reeval
 ```
 
 In the reference setup, `OSS_LAB_STATE_DIR` points at a clone of the
 private `oss-lab-state` repo: after each iteration that changes
 `seen.json` or `queue.json`, the runner commits them
-(`scout: <date> <n> scored, <m> queued`) and pushes, best-effort. A
-failed push never fails the iteration. `env`, `last_run(.pending)`,
-and logs stay untracked there.
+(`scout: <date> <n> scored, <m> queued`, or
+`reeval: <date> <n> rescored, <m> dropped` after the weekly pass) and
+pushes, best-effort. A failed push never fails the iteration. `env`,
+`last_run(.pending)`, `last_reeval`, and logs stay untracked there.
 
 Install: `make install-oss-lab`. It symlinks the skill into the
 personal Claude identity, copies the plist with the repo path rewritten

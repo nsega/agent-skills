@@ -27,6 +27,17 @@ if [[ "$CONFIG_DIR" != "$HOME/.claude" ]]; then
   exit 1
 fi
 
+# --- Weekly queue re-evaluation (flow control #3) -----------------------
+# Stamp-gated rather than Monday-gated so a slept-through Monday self-heals
+# on the next hourly run. run-reeval.sh advances the stamp only after a
+# successful pass, so a failed pass retries next hour. Best-effort: a
+# reeval failure must never cost the hourly scout iteration.
+LAST_REEVAL="$(cat "$STATE_DIR/last_reeval" 2>/dev/null || true)"
+[[ "$LAST_REEVAL" =~ ^[0-9]+$ ]] || LAST_REEVAL=0
+if (( $(date +%s) - LAST_REEVAL >= 6 * 86400 )); then
+  "$SKILL_DIR/scripts/run-reeval.sh" || echo "warn: reeval pass failed, continuing" >&2
+fi
+
 # --- Guard R1: fetch first; if nothing new, never start Claude ----------
 NEW_ISSUES="$("$SKILL_DIR/scripts/fetch-issues.sh")"
 if [[ -z "$NEW_ISSUES" ]]; then
