@@ -29,12 +29,18 @@ UPSTREAM_SKILLS ?= mcp-builder skill-creator
 
 LINK := scripts/link.sh
 
-.PHONY: install uninstall status install-codex uninstall-codex status-codex new help
+# oss-lab launchd job (see install-oss-lab)
+OSS_LAB_PLIST_LABEL := dev.nsega.oss-scout
+OSS_LAB_PLIST_SRC   := $(REPO_SRC)/oss-lab/$(OSS_LAB_PLIST_LABEL).plist
+OSS_LAB_PLIST_DST   := $(HOME)/Library/LaunchAgents/$(OSS_LAB_PLIST_LABEL).plist
+
+.PHONY: install uninstall status install-codex uninstall-codex status-codex install-oss-lab new help
 
 help:
 	@echo "Targets:"
 	@echo "  install / uninstall / status            (targets: $(CLAUDE_SKILLS_DIRS))"
 	@echo "  install-codex / uninstall-codex / status-codex  (target: $(CODEX_SKILLS_DIR))"
+	@echo "  install-oss-lab                         symlink oss-lab + install launchd job"
 	@echo "  new name=<skill-name>                   scaffold a new skill"
 	@echo ""
 	@echo "Sources: $(REPO_SRC) (all)"
@@ -64,6 +70,35 @@ status:
 	  $(LINK) status    "$$d" "$(UPSTREAM_REPO)" $(UPSTREAM_SKILLS); \
 	  $(LINK) unmanaged "$$d" "$(REPO_SRC)" "$(UPSTREAM_REPO)"; \
 	done
+
+# --- oss-lab (opt-in; symlink the skill + install the hourly launchd job) ---
+# Personal identity only: run-scout.sh refuses to run unless
+# CLAUDE_CONFIG_DIR is the personal ~/.claude, so the work identity never
+# gets this skill. The plist is COPIED (launchd dislikes symlinked plists)
+# with the repo path rewritten to this checkout's location. If the copy
+# changed while the job is loaded, it is unloaded first so the new plist
+# takes effect; launchctl load -w runs only when the job is not loaded.
+install-oss-lab:
+	@echo "==> $(HOME)/.claude/skills"
+	@$(LINK) install "$(HOME)/.claude/skills" "$(REPO_SRC)" oss-lab
+	@mkdir -p "$(HOME)/Library/LaunchAgents"
+	@tmp=$$(mktemp); \
+	sed 's|~/dev/agent-skills|$(abspath .)|' "$(OSS_LAB_PLIST_SRC)" > "$$tmp"; \
+	if cmp -s "$$tmp" "$(OSS_LAB_PLIST_DST)"; then \
+	  rm -f "$$tmp"; echo "ok      $(OSS_LAB_PLIST_DST) (unchanged)"; \
+	else \
+	  if launchctl list "$(OSS_LAB_PLIST_LABEL)" >/dev/null 2>&1; then \
+	    launchctl unload "$(OSS_LAB_PLIST_DST)" 2>/dev/null || true; \
+	    echo "unloaded $(OSS_LAB_PLIST_LABEL) (plist changed)"; \
+	  fi; \
+	  mv "$$tmp" "$(OSS_LAB_PLIST_DST)"; \
+	  echo "copied  $(OSS_LAB_PLIST_DST)"; \
+	fi
+	@if launchctl list "$(OSS_LAB_PLIST_LABEL)" >/dev/null 2>&1; then \
+	  echo "loaded  $(OSS_LAB_PLIST_LABEL) (already loaded)"; \
+	else \
+	  launchctl load -w "$(OSS_LAB_PLIST_DST)" && echo "loaded  $(OSS_LAB_PLIST_LABEL)"; \
+	fi
 
 # --- Codex (opt-in; this repo's own skills only) ---
 install-codex:
