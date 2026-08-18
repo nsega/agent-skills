@@ -5,6 +5,7 @@ set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="${OSS_LAB_STATE_DIR:-$HOME/.local/share/oss-lab}"
+TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
 
 # Load secrets (GitHub PAT, Todoist token, project ID) — never in the repo.
 # allexport so plain VAR= lines reach child processes (gh in fetch-issues.sh).
@@ -48,13 +49,21 @@ if [[ -z "$NEW_ISSUES" ]]; then
 fi
 
 # --- Guard: WIP cap (flow control #2) -----------------------------------
-# Filter query first; if Todoist rejects the filter, fall back to counting
-# the project's open tasks. If Todoist is unreachable entirely, abort
-# rather than fail open to 0 (last_run has not advanced, nothing is lost).
-WIP_COUNT="$(curl -sf "https://api.todoist.com/rest/v2/tasks?project_id=$TODOIST_PROJECT_ID&filter=%40oss-lab%20%26%20!%40done" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" | jq 'length')" ||
-WIP_COUNT="$(curl -sf "https://api.todoist.com/rest/v2/tasks?project_id=$TODOIST_PROJECT_ID" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" | jq 'length')" || {
+# Todoist API v1 (REST v2 was retired and answers 410). Responses are
+# {results:[...], next_cursor}, and filters have their own endpoint.
+#
+# Filter query first; if Todoist rejects the filter, fall back to the
+# project's own tasks counting only oss-lab-labelled ones — the project
+# also holds unrelated tasks, so a bare project count would pin WIP above
+# the cap forever. If Todoist is unreachable entirely, abort rather than
+# fail open to 0 (last_run has not advanced, so nothing is lost).
+WIP_COUNT="$(curl -sf --get "$TODOIST_API/tasks/filter" \
+  --data-urlencode "query=@oss-lab & !@done" \
+  -H "Authorization: Bearer $TODOIST_TOKEN" | jq '.results | length')" ||
+WIP_COUNT="$(curl -sf --get "$TODOIST_API/tasks" \
+  --data-urlencode "project_id=$TODOIST_PROJECT_ID" --data-urlencode "limit=200" \
+  -H "Authorization: Bearer $TODOIST_TOKEN" |
+  jq '[.results[] | select(.labels | index("oss-lab"))] | length')" || {
   echo "abort: todoist unreachable, WIP count unknown (window not advanced)" >&2
   exit 1
 }
@@ -87,7 +96,7 @@ echo "$VALID_RESULTS" | while read -r item; do
       title="$(jq -r '"Contribute: \(.issue) (score \(.weighted_total))"' <<<"$item")"
       # Best-effort: a failed POST must not kill the loop and discard the
       # rest of the paid batch. Fall back to the queue so the score survives.
-      if ! curl -sf -X POST "https://api.todoist.com/rest/v2/tasks" \
+      if ! curl -sf -X POST "$TODOIST_API/tasks" \
         -H "Authorization: Bearer $TODOIST_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg c "$title" --arg d "$(jq -r '.rationale_consistency' <<<"$item")" \
