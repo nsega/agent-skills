@@ -15,20 +15,35 @@ description: >
 
 Every weekday hour (09:00–18:00), a launchd job runs one iteration:
 
-1. **Fetch (bash, zero tokens)** — `gh api` pulls new open issues from
+1. **Revalidate (bash, zero tokens):** every open task is re-checked
+   upstream, because routing is otherwise a one-way door. A task whose
+   issue has since been closed, assigned to someone else, or picked up
+   in a pull request is closed, freeing its WIP slot. Without this the
+   cap fills with work that is already taken and real candidates pile up
+   in the queue unreachable.
+2. **Fetch (bash, zero tokens):** `gh api` pulls new open issues from
    the target repos, filters out assigned / stale / excluded-label
-   issues with jq, and deduplicates against `seen.json`.
-2. **Guard** — if nothing survives, exit before Claude starts.
-3. **Score (Claude, the only paid step)** — surviving issues are scored
+   issues and any issue that already has a linked pull request, and
+   deduplicates against `seen.json`. Comment threads ride along so the
+   scorer can see a claim that left no assignee and no PR.
+3. **Guard:** if nothing survives, exit before Claude starts.
+4. **Score (Claude, the only paid step):** surviving issues are scored
    0–10 on four weighted axes (see Rubric). The scorer runs with
    `--tools ""`, so it holds no tools at all: issue bodies are attacker-
    controlled text, and its output is auto-POSTed to Todoist and pushed
    to the state repo, so a tool-less scorer has no way to act on an
    injected instruction (see Trust boundary).
-4. **Route (bash)** — high scores become tasks, mid scores go to a
-   re-evaluation queue, low scores are recorded and dropped.
-5. **Commit state** — `seen.json` and `last_run` advance so the next
+5. **Route (bash):** high scores become tasks, mid scores go to a
+   re-evaluation queue, low scores are recorded and dropped. The runner
+   enforces the WIP budget itself rather than trusting the model to,
+   spending it on the highest scores first.
+6. **Commit state:** `seen.json` and `last_run` advance so the next
    window resumes cleanly even after a rate-limit stop.
+
+The weekly re-evaluation closes the loop: a queued issue that now clears
+the threshold is promoted into a task (within the same WIP budget, and
+skipped if someone took it meanwhile), so the queue has an exit and not
+just an entrance.
 
 ## Etiquette by design
 
@@ -38,9 +53,14 @@ below are deliberate, not incidental:
 - **Read-only upstream.** The loop only reads public issue feeds. It
   never comments, never `/assign`s, and never opens PRs. Nothing here
   writes to the target repos.
-- **Respects existing claims.** Issues with an assignee are
-  hard-filtered before scoring; work someone else has claimed is never
-  surfaced.
+- **Respects existing claims.** Issues with an assignee, or with a
+  linked pull request, are hard-filtered before scoring, and a comment
+  thread showing someone else taking the work routes the issue to
+  `drop` whatever it scored. Claims are re-checked continuously, not
+  only at fetch time, so the loop stops pointing at work that was taken
+  after it was surfaced. In this project most claims arrive as a PR or
+  a comment rather than an assignment, so an assignee check alone would
+  have led to duplicated effort.
 - **No hoarding.** The WIP cap (3 active tasks) exists so the loop
   never queues up more claimed work than will actually be delivered.
 - **Depth over breadth.** The consistency axis anchors scoring to one
@@ -101,6 +121,18 @@ become a task or a `seen.json` entry. This matters because the scorer's
 output is acted on automatically: tasks are created and state is pushed
 without a human in the loop.
 
+## GitHub token
+
+`GITHUB_TOKEN` is optional: `gh` falls back to its own stored login when
+the variable is empty, and the loop only reads public data. If you do set
+one, note that a **fine-grained** PAT authenticates normally but returns
+no cross-referenced timeline events for repos it does not own, which
+would silently report every taken issue as free. Claim detection
+therefore goes through the search API (`linked:pr`), which answers
+correctly under both fine-grained and classic tokens. The result is
+cached per repo per run, so the revalidation pass and the fetch filter
+share one lookup.
+
 ## Configuration
 
 Secrets and state never live in this repo:
@@ -117,10 +149,11 @@ $OSS_LAB_STATE_DIR (default ~/.local/share/oss-lab)
 In the reference setup, `OSS_LAB_STATE_DIR` points at a clone of the
 private `oss-lab-state` repo: after each iteration that changes
 `seen.json` or `queue.json`, the runner commits them
-(`scout: <date> <n> scored, <m> queued`, or
-`reeval: <date> <n> rescored, <m> dropped` after the weekly pass) and
-pushes, best-effort. A failed push never fails the iteration. `env`,
-`last_run(.pending)`, `last_reeval`, and logs stay untracked there.
+(`scout: <date> <n> scored, <t> tasked, <m> queued`, or
+`reeval: <date> <n> rescored, <p> promoted, <d> dropped` after the
+weekly pass) and pushes, best-effort. A failed push never fails the
+iteration. `env`, `last_run(.pending)`, `last_reeval`, the `.cache/`
+directory, and logs stay untracked there.
 
 Install: `make install-oss-lab`. It symlinks the skill into the
 personal Claude identity, copies the plist with the repo path rewritten

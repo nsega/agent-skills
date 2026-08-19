@@ -71,11 +71,28 @@ One JSON object per issue:
 }
 ```
 
+## Claimed work
+
+Some issues carry a `recent_comments` array (author plus the tail of each
+comment). Issues that are assigned, or that already have a linked pull
+request, are filtered out before you see them, but a claim often leaves
+neither: contributors routinely comment "I can take this" or "working on
+it" without ever running `/assign`.
+
+If a comment shows another contributor claiming the issue or reporting
+progress on it, and nothing later releases it (they withdrew, or a
+maintainer reassigned it), route the issue `"drop"` and set
+`"claimed_by": "<their login>"`, whatever it scored. Taking work someone
+else has announced is the behavior this loop exists to avoid. A comment
+from the scout's own account is not someone else's claim, and a question,
+a bug report, or a maintainer triaging is not a claim.
+
 ## Routing rules
 
 - weighted_total >= 7.0 → "todoist"
 - 5.0–6.9 → "queue"
 - < 5.0 → "drop"
+- claimed by another contributor → "drop", regardless of score
 
 WIP cap: the runner passes the current count of active Todoist tasks as
 $WIP_COUNT. At most (3 - WIP_COUNT) issues may route to "todoist" in

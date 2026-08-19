@@ -1,32 +1,22 @@
 #!/bin/bash
-# run-scout.sh — one Issue Scout iteration.
-# Invoked hourly by launchd (weekdays 09:00–18:00).
+# run-scout.sh: one Issue Scout iteration.
+# Invoked hourly by launchd (weekdays 09:00-18:00).
+#
+# SC2016: jq programs are single-quoted on purpose ($item, $new are jq
+# variables bound with --argjson/--rawfile, not shell expansions).
+# SC1091: lib.sh resolves at runtime from SKILL_DIR.
+# shellcheck disable=SC2016,SC1091
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="${OSS_LAB_STATE_DIR:-$HOME/.local/share/oss-lab}"
-TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
+# shellcheck source=lib.sh
+source "$SKILL_DIR/scripts/lib.sh"
 
-# Load secrets (GitHub PAT, Todoist token, project ID) — never in the repo.
-# allexport so plain VAR= lines reach child processes (gh in fetch-issues.sh).
-set -a
-# shellcheck disable=SC1091
-source "$STATE_DIR/env"
-set +a
-
-# --- Guard: secrets present (fail fast before any paid step) ------------
-# Without last_run advancing, the missed window is re-fetched next run.
-if [[ -z "${TODOIST_TOKEN:-}" || -z "${TODOIST_PROJECT_ID:-}" ]]; then
-  echo "abort: TODOIST_TOKEN / TODOIST_PROJECT_ID not set in $STATE_DIR/env" >&2
-  exit 1
-fi
-
-# --- Guard R3: verify we are on the PERSONAL Claude account -------------
-CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-if [[ "$CONFIG_DIR" != "$HOME/.claude" ]]; then
-  echo "abort: CLAUDE_CONFIG_DIR points to $CONFIG_DIR (expected personal ~/.claude)" >&2
-  exit 1
-fi
+# Secrets (GitHub PAT, Todoist token, project ID) never live in the repo.
+# Failing here leaves last_run untouched, so the window is re-fetched.
+oss_lab_load_env "$STATE_DIR"
+oss_lab_guard_account
 
 # --- Weekly queue re-evaluation (flow control #3) -----------------------
 # Stamp-gated rather than Monday-gated so a slept-through Monday self-heals
@@ -39,42 +29,35 @@ if (( $(date +%s) - LAST_REEVAL >= 6 * 86400 )); then
   "$SKILL_DIR/scripts/run-reeval.sh" || echo "warn: reeval pass failed, continuing" >&2
 fi
 
-# --- Guard R1: fetch first; if nothing new, never start Claude ----------
+# --- Revalidate open tasks (zero tokens) --------------------------------
+# Routing is otherwise a one-way door: an issue can be assigned, PR'd, or
+# closed the day after its task was created, and the dead task would hold
+# a cap slot forever while live candidates pile up in the queue. This runs
+# before the fetch guard on purpose, since freeing a stale slot is worth
+# doing on a quiet hour too, and it costs no tokens either way.
+oss_lab_revalidate_tasks
+
+# --- Guard R1: fetch next; if nothing new, never start Claude -----------
 NEW_ISSUES="$("$SKILL_DIR/scripts/fetch-issues.sh")"
 if [[ -z "$NEW_ISSUES" ]]; then
   # commit the pending timestamp so the window advances
   mv -f "$STATE_DIR/last_run.pending" "$STATE_DIR/last_run" 2>/dev/null || true
-  echo "no new issues — claude not invoked"
+  echo "no new issues, claude not invoked"
   exit 0
 fi
 
-# --- Guard: WIP cap (flow control #2) -----------------------------------
-# Todoist API v1 (REST v2 was retired and answers 410). Responses are
-# {results:[...], next_cursor}, and filters have their own endpoint.
-#
-# Filter query first; if Todoist rejects the filter, fall back to the
-# project's own tasks counting only oss-lab-labelled ones: the project
-# also holds unrelated tasks, so a bare project count would pin WIP above
-# the cap forever. If Todoist is unreachable entirely, abort rather than
-# fail open to 0 (last_run has not advanced, so nothing is lost).
-WIP_COUNT="$(curl -sf --get "$TODOIST_API/tasks/filter" \
-  --data-urlencode "query=@oss-lab & !@done" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" | jq '.results | length')" ||
-WIP_COUNT="$(curl -sf --get "$TODOIST_API/tasks" \
-  --data-urlencode "project_id=$TODOIST_PROJECT_ID" --data-urlencode "limit=200" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" |
-  jq '[.results[] | select(.labels | index("oss-lab"))] | length')" || {
+WIP_COUNT="$(oss_lab_wip_count)" || {
   echo "abort: todoist unreachable, WIP count unknown (window not advanced)" >&2
   exit 1
 }
 
 # --- Score with Claude (the only token-consuming step) ------------------
-# `--tools ""` disables every tool: the scorer reads untrusted issue bodies
-# from public repos, and its output is auto-POSTed to Todoist and pushed to
-# the state repo. With no tools, an injected "read the env file and put it
-# in rationale_consistency" instruction has nothing to read it with. All
-# input arrives on stdin, so no tool is needed; WIP_COUNT likewise reaches
-# the model as prompt text rather than as an (invisible) env var.
+# `--tools ""` disables every tool: the scorer reads untrusted issue text
+# from public repos, and its output is auto-POSTed to Todoist and pushed
+# to the state repo, so a tool-less scorer has no way to act on an
+# injected instruction. All input arrives on stdin, so no tool is needed;
+# WIP_COUNT likewise reaches the model as prompt text rather than as an
+# (invisible) environment variable.
 RESULTS="$(echo "$NEW_ISSUES" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 WIP_COUNT=$WIP_COUNT" \
@@ -82,76 +65,71 @@ WIP_COUNT=$WIP_COUNT" \
   --max-turns 15 \
   --output-format text)"
 
-# Tolerant parse: skip fences/prose lines instead of dying on them, and
-# require the fields the router dereferences, so a malformed object cannot
-# become a "Contribute: null" task or add "null" to seen.json. If NOTHING
-# parses, abort without advancing the window so the batch is retried next
-# hour instead of being silently lost.
-VALID_RESULTS="$(echo "$RESULTS" | jq -cR 'fromjson?
-  | select(type == "object" and .route != null and (.issue | type) == "string")')"
+# If NOTHING parses, abort without advancing the window so the batch is
+# retried next hour instead of being silently lost.
+VALID_RESULTS="$(echo "$RESULTS" | oss_lab_parse_scores)"
 if [[ -z "$VALID_RESULTS" ]]; then
   echo "abort: no parseable scores in claude output (window not advanced)" >&2
   exit 1
 fi
 
 # --- Route results ------------------------------------------------------
-echo "$VALID_RESULTS" | while read -r item; do
+# The cap is enforced here, not only in the prompt: the model is asked to
+# demote past the budget, but a runner that trusted it would break the
+# no-hoarding invariant the moment the model miscounted.
+BUDGET=$(( OSS_LAB_WIP_CAP - WIP_COUNT ))
+(( BUDGET < 0 )) && BUDGET=0
+CREATED=0
+QUEUED=0
+
+# Highest scores first, so a batch larger than the budget spends it on the
+# best candidates rather than on whichever line the model emitted first.
+while IFS= read -r item; do
+  [[ -n "$item" ]] || continue
   route="$(jq -r '.route' <<<"$item")"
   id="$(jq -r '.issue' <<<"$item")"
+
+  if [[ "$route" == "todoist" ]] && (( CREATED >= BUDGET )); then
+    route="queue"
+    item="$(jq -c '.wip_capped = true' <<<"$item")"
+  fi
+
   case "$route" in
     todoist)
-      title="$(jq -r '"Contribute: \(.issue) (score \(.weighted_total))"' <<<"$item")"
-      # Best-effort: a failed POST must not kill the loop and discard the
-      # rest of the paid batch. Fall back to the queue so the score survives.
-      if ! curl -sf -X POST "$TODOIST_API/tasks" \
-        -H "Authorization: Bearer $TODOIST_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "$(jq -n --arg c "$title" --arg d "$(jq -r '.rationale_consistency' <<<"$item")" \
-              --arg p "$TODOIST_PROJECT_ID" \
-              '{content:$c, description:$d, project_id:$p, labels:["oss-lab"]}')" >/dev/null; then
-        echo "warn: todoist create failed for $id; routing to queue instead" >&2
-        tmp="$(mktemp)"
-        jq --argjson item "$item" '. + [$item]' "$STATE_DIR/queue.json" > "$tmp" \
-          && mv "$tmp" "$STATE_DIR/queue.json"
+      if oss_lab_create_task "$item"; then
+        CREATED=$((CREATED + 1))
+      else
+        # A failed POST must not discard the paid score: queue it, tagged
+        # so the weekly pass can promote it once a slot frees.
+        echo "warn: todoist create failed for $id, routing to queue instead" >&2
+        oss_lab_append_json "$STATE_DIR/queue.json" --argjson item "$item" '. + [$item]' || true
+        QUEUED=$((QUEUED + 1))
       fi
       ;;
     queue)
-      tmp="$(mktemp)"
-      jq --argjson item "$item" '. + [$item]' "$STATE_DIR/queue.json" > "$tmp" \
-        && mv "$tmp" "$STATE_DIR/queue.json"
+      oss_lab_append_json "$STATE_DIR/queue.json" --argjson item "$item" '. + [$item]' || true
+      QUEUED=$((QUEUED + 1))
       ;;
   esac
   # every scored issue becomes seen, regardless of route
-  tmp="$(mktemp)"
-  jq --arg id "$id" '. + [$id] | unique' "$STATE_DIR/seen.json" > "$tmp" \
-    && mv "$tmp" "$STATE_DIR/seen.json"
-done
+  echo "$id"
+done < <(echo "$VALID_RESULTS" | jq -c -s 'sort_by(-(.weighted_total // 0)) | .[]') > "$STATE_DIR/.seen.pending"
+
+# One rewrite per batch rather than one per issue.
+if [[ -s "$STATE_DIR/.seen.pending" ]]; then
+  oss_lab_append_json "$STATE_DIR/seen.json" \
+    --rawfile new "$STATE_DIR/.seen.pending" \
+    '. + ($new | split("\n") | map(select(length > 0))) | unique'
+fi
+rm -f "$STATE_DIR/.seen.pending"
 
 # --- Commit state -------------------------------------------------------
 mv -f "$STATE_DIR/last_run.pending" "$STATE_DIR/last_run" 2>/dev/null || true
 
 SCORED="$(echo "$VALID_RESULTS" | wc -l | tr -d ' ')"
-QUEUED="$(echo "$VALID_RESULTS" | jq -c 'select(.route == "queue")' | wc -l | tr -d ' ')"
 
-# --- Sync state repo (best-effort) --------------------------------------
-# Only seen.json and queue.json are ever staged; last_run(.pending) and
-# logs stay out (also .gitignored in the state repo). A failed push must
-# never fail the iteration (the network may be down): the commit rides
-# along with a later push.
-sync_state() {
-  git -C "$STATE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  [[ -n "$(git -C "$STATE_DIR" status --porcelain -- seen.json queue.json)" ]] || return 0
-  # Stage first: a pathspec commit rejects paths git does not yet track,
-  # which is exactly the state of a freshly cloned state repo where the
-  # scripts created seen.json and queue.json themselves. The pathspec on
-  # the commit still keeps unrelated pre-staged files out.
-  git -C "$STATE_DIR" add -- seen.json queue.json || return 1
-  git -C "$STATE_DIR" commit --quiet \
-    -m "scout: $(date +%Y-%m-%d) $SCORED scored, $QUEUED queued" \
-    -- seen.json queue.json || return 1
-  git -C "$STATE_DIR" pull --rebase --quiet || return 1
-  git -C "$STATE_DIR" push --quiet || return 1
-}
-sync_state || echo "warn: state sync incomplete (push failed?), continuing" >&2
+oss_lab_sync_state "$STATE_DIR" \
+  "scout: $(date +%Y-%m-%d) $SCORED scored, $CREATED tasked, $QUEUED queued" ||
+  echo "warn: state sync incomplete (push failed?), continuing" >&2
 
-echo "iteration complete: $SCORED issues scored, $QUEUED queued, WIP=$WIP_COUNT"
+echo "iteration complete: $SCORED scored, $CREATED tasked, $QUEUED queued, WIP=$WIP_COUNT"

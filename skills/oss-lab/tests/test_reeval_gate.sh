@@ -1,41 +1,23 @@
 #!/usr/bin/env bash
-# `X && ok || bad` is the house test idiom; ok never fails.
-# shellcheck disable=SC2015
-set -euo pipefail
 # Mocked end-to-end tests for the weekly reeval gate in run-scout.sh: fake
-# `claude` and `gh` on PATH, a throwaway state dir (not a git repo, so state
-# sync is a no-op), and a fetch that returns nothing so the scout takes its
-# "no new issues" early exit after the gate has run. No paid calls, no network.
+# `claude`, `gh`, and `curl` on PATH, a throwaway state dir (not a git repo,
+# so state sync is a no-op), and a fetch that returns nothing so the scout
+# takes its "no new issues" early exit after the gate has run. No paid
+# calls, no network.
+# shellcheck disable=SC2015,SC1091
+set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/helpers.sh"
 RS="$HERE/../scripts/run-scout.sh"
-pass=0; fail=0
-ok()  { pass=$((pass+1)); }
-bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
-
-MOCKBIN="$WORK/bin"; mkdir -p "$MOCKBIN"
-cat > "$MOCKBIN/claude" <<'EOF'
-#!/bin/bash
-printf '%s\n' "$@" > "$MOCK_LOG/claude_args"
-cat > "$MOCK_LOG/claude_stdin"
-cat "$MOCK_CLAUDE_OUT"
-EOF
-chmod +x "$MOCKBIN/claude"
-cat > "$MOCKBIN/gh" <<'EOF'
-#!/bin/bash
-exit 0
-EOF
-chmod +x "$MOCKBIN/gh"
+WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+MOCKBIN="$WORK/bin"; build_mockbin "$MOCKBIN"
 
 QA='{"issue":"kubernetes/kubernetes#111","weighted_total":5.6,"route":"queue"}'
 
 new_state() {  # $1: case name; sets STATE, MOCK_LOG, MOCK_CLAUDE_OUT
-  STATE="$WORK/$1/state"; MOCK_LOG="$WORK/$1/log"
-  mkdir -p "$STATE" "$MOCK_LOG"
-  printf 'TODOIST_TOKEN=x\nTODOIST_PROJECT_ID=y\n' > "$STATE/env"
-  echo '[]' > "$STATE/seen.json"
+  STATE="$WORK/$1/state"; MOCK_LOG="$WORK/$1/log"; mkdir -p "$MOCK_LOG"
+  build_state "$STATE"
   printf '[%s]\n' "$QA" > "$STATE/queue.json"
   MOCK_CLAUDE_OUT="$WORK/$1/claude_out"
   printf '%s\n' \
@@ -49,6 +31,8 @@ run_scout() {
       CLAUDE_CONFIG_DIR="$HOME/.claude" \
       MOCK_LOG="$MOCK_LOG" \
       MOCK_CLAUDE_OUT="$MOCK_CLAUDE_OUT" \
+      MOCK_WIP="${MOCK_WIP:-3}" \
+      MOCK_GH_LOGIN=nsega \
       "$RS"
 }
 
@@ -89,5 +73,20 @@ rc=0; err="$(run_scout 2>&1 >/dev/null)" || rc=$?
 echo "$err" | grep -q "reeval pass failed" && ok || bad "reeval failure: scout should warn"
 [ ! -e "$STATE/last_reeval" ] && ok || bad "reeval failure: stamp must not advance"
 
-echo "reeval_gate: $pass passed, $fail failed"
-[ "$fail" -eq 0 ]
+# 6: revalidation runs even on a quiet hour, i.e. before the fetch guard.
+# Freeing a slot held by work someone else took must not wait for the next
+# issue to appear.
+new_state g6
+date +%s > "$STATE/last_reeval"   # keep reeval out of the way
+echo '[{"id":"z1","content":"Contribute: k8s/k8s#9 (score 7.5)","labels":["oss-lab"]}]' > "$WORK/g6/tasks.json"
+echo '{"k8s/k8s#9": {"state":"closed","assignees":[]}}' > "$WORK/g6/issues.json"
+rc=0; out="$(env PATH="$MOCKBIN:$PATH" OSS_LAB_STATE_DIR="$STATE" \
+  CLAUDE_CONFIG_DIR="$HOME/.claude" MOCK_LOG="$MOCK_LOG" \
+  MOCK_CLAUDE_OUT="$MOCK_CLAUDE_OUT" MOCK_GH_LOGIN=nsega \
+  MOCK_TASKS_JSON="$WORK/g6/tasks.json" MOCK_ISSUES_JSON="$WORK/g6/issues.json" \
+  "$RS" 2>&1)" || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "quiet hour: scout should exit 0 (got $rc)"
+echo "$out" | grep -q "no new issues" && ok || bad "quiet hour: should still take the empty-fetch exit"
+grep -q "z1" "$MOCK_LOG/todoist_closed" 2>/dev/null && ok || bad "quiet hour: revalidation should still free the stale slot"
+
+summary reeval_gate
