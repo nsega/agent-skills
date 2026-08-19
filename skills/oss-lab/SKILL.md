@@ -26,6 +26,27 @@ Every weekday hour (09:00–18:00), a launchd job runs one iteration:
 5. **Commit state** — `seen.json` and `last_run` advance so the next
    window resumes cleanly even after a rate-limit stop.
 
+## Etiquette by design
+
+This tool automates *attention*, not *contribution*. The constraints
+below are deliberate, not incidental:
+
+- **Read-only upstream.** The loop only reads public issue feeds. It
+  never comments, never `/assign`s, and never opens PRs. Nothing here
+  writes to the target repos.
+- **Respects existing claims.** Issues with an assignee are
+  hard-filtered before scoring; work someone else has claimed is never
+  surfaced.
+- **No hoarding.** The WIP cap (3 active tasks) exists so the loop
+  never queues up more claimed work than will actually be delivered.
+- **Depth over breadth.** The consistency axis anchors scoring to one
+  SIG, one code area, and reviewers who already know the contributor:
+  sustained work in one corner of the project, not drive-by issue
+  farming across repos.
+- **A human does the work.** Routing an issue to the task manager is
+  where automation stops. Reading the issue, joining the discussion,
+  and writing the fix are manual and human-owned.
+
 ## Rubric
 
 | Axis | Weight | Measures |
