@@ -52,7 +52,10 @@ for repo in "${REPOS[@]}"; do
     | select(([.labels[].name] | map(IN($excl[])) | any) | not)
     | select(($seen[0] | index($id)) == null)
     | {
-        id: $id,
+        # "issue", not "id": the scorer echoes this key back as its output
+        # identifier (the output contract in prompt.md), and a mismatch
+        # here makes the router dereference a missing field.
+        issue: $id,
         title: .title,
         labels: [.labels[].name],
         comments: .comments,

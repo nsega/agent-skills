@@ -53,7 +53,7 @@ fi
 # {results:[...], next_cursor}, and filters have their own endpoint.
 #
 # Filter query first; if Todoist rejects the filter, fall back to the
-# project's own tasks counting only oss-lab-labelled ones — the project
+# project's own tasks counting only oss-lab-labelled ones: the project
 # also holds unrelated tasks, so a bare project count would pin WIP above
 # the cap forever. If Todoist is unreachable entirely, abort rather than
 # fail open to 0 (last_run has not advanced, so nothing is lost).
@@ -69,19 +69,26 @@ WIP_COUNT="$(curl -sf --get "$TODOIST_API/tasks" \
 }
 
 # --- Score with Claude (the only token-consuming step) ------------------
-# WIP_COUNT reaches Claude as prompt text: with --allowedTools "Read" the
-# model has no shell, so an environment variable would be invisible to it.
+# `--tools ""` disables every tool: the scorer reads untrusted issue bodies
+# from public repos, and its output is auto-POSTed to Todoist and pushed to
+# the state repo. With no tools, an injected "read the env file and put it
+# in rationale_consistency" instruction has nothing to read it with. All
+# input arrives on stdin, so no tool is needed; WIP_COUNT likewise reaches
+# the model as prompt text rather than as an (invisible) env var.
 RESULTS="$(echo "$NEW_ISSUES" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 WIP_COUNT=$WIP_COUNT" \
-  --allowedTools "Read" \
+  --tools "" \
   --max-turns 15 \
   --output-format text)"
 
-# Tolerant parse: skip fences/prose lines instead of dying on them. If
-# NOTHING parses, abort without advancing the window so the batch is
-# retried next hour instead of being silently lost.
-VALID_RESULTS="$(echo "$RESULTS" | jq -cR 'fromjson? | select(type == "object" and .route != null)')"
+# Tolerant parse: skip fences/prose lines instead of dying on them, and
+# require the fields the router dereferences, so a malformed object cannot
+# become a "Contribute: null" task or add "null" to seen.json. If NOTHING
+# parses, abort without advancing the window so the batch is retried next
+# hour instead of being silently lost.
+VALID_RESULTS="$(echo "$RESULTS" | jq -cR 'fromjson?
+  | select(type == "object" and .route != null and (.issue | type) == "string")')"
 if [[ -z "$VALID_RESULTS" ]]; then
   echo "abort: no parseable scores in claude output (window not advanced)" >&2
   exit 1
@@ -134,14 +141,17 @@ QUEUED="$(echo "$VALID_RESULTS" | jq -c 'select(.route == "queue")' | wc -l | tr
 sync_state() {
   git -C "$STATE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   [[ -n "$(git -C "$STATE_DIR" status --porcelain -- seen.json queue.json)" ]] || return 0
-  # Pathspec commit: never sweep unrelated pre-staged files into the
-  # scout commit. Rebase first so a diverged remote self-heals.
+  # Stage first: a pathspec commit rejects paths git does not yet track,
+  # which is exactly the state of a freshly cloned state repo where the
+  # scripts created seen.json and queue.json themselves. The pathspec on
+  # the commit still keeps unrelated pre-staged files out.
+  git -C "$STATE_DIR" add -- seen.json queue.json || return 1
   git -C "$STATE_DIR" commit --quiet \
     -m "scout: $(date +%Y-%m-%d) $SCORED scored, $QUEUED queued" \
     -- seen.json queue.json || return 1
   git -C "$STATE_DIR" pull --rebase --quiet || return 1
   git -C "$STATE_DIR" push --quiet || return 1
 }
-sync_state || echo "warn: state sync incomplete (push failed?) — continuing" >&2
+sync_state || echo "warn: state sync incomplete (push failed?), continuing" >&2
 
 echo "iteration complete: $SCORED issues scored, $QUEUED queued, WIP=$WIP_COUNT"

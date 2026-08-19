@@ -84,7 +84,13 @@ jq -e '.[0].issue == "kubernetes/kubernetes#111" and .[0].weighted_total == 6.1 
 grep -qE '^[0-9]+$' "$STATE/last_reeval" && ok || bad "happy path should advance the stamp"
 grep -q "REEVAL=1" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry REEVAL=1"
 grep -q "okr_alignment" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry the rubric"
-grep -qx -- "--allowedTools" "$MOCK_LOG/claude_args" && ok || bad "claude should run with --allowedTools"
+grep -qx -- "--tools" "$MOCK_LOG/claude_args" && ok || bad "claude should run with --tools"
+# The scorer must hold NO tools: it reads text that originated in untrusted
+# public issues, so any tool is an exfiltration path for the state repo env.
+[ -z "$(grep -A1 -x -- "--tools" "$MOCK_LOG/claude_args" | tail -1)" ] \
+  && ok || bad "--tools must be empty so every tool is disabled"
+grep -qx -- "--allowedTools" "$MOCK_LOG/claude_args" \
+  && bad "claude must not be granted tools via --allowedTools" || ok
 [ "$(wc -l < "$MOCK_LOG/claude_stdin" | tr -d ' ')" -eq 2 ] && ok || bad "claude stdin should carry both queue items as JSONL"
 grep -q "kubernetes/kubernetes#111" "$MOCK_LOG/claude_stdin" && ok || bad "claude stdin missing queue item A"
 [ "$(git -C "$STATE" log -1 --pretty=%s)" = "reeval: $(date +%Y-%m-%d) 2 rescored, 1 dropped" ] \

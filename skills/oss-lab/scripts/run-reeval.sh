@@ -27,20 +27,23 @@ if [[ "$(jq 'length' "$QUEUE_FILE")" -eq 0 ]]; then
 fi
 
 # --- Re-score with Claude (the only token-consuming step) ---------------
-# REEVAL=1 reaches Claude as prompt text for the same reason WIP_COUNT
-# does in run-scout.sh: with --allowedTools "Read" the model has no shell,
-# so an environment variable would be invisible to it.
+# `--tools ""` disables every tool, for the same reason as in run-scout.sh:
+# queued items carry text that originated in untrusted public issues, and
+# a tool-less scorer has nothing to exfiltrate secrets with. REEVAL=1
+# reaches the model as prompt text, since an env var would be invisible.
 RESULTS="$(jq -c '.[]' "$QUEUE_FILE" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 REEVAL=1" \
-  --allowedTools "Read" \
+  --tools "" \
   --max-turns 15 \
   --output-format text)"
 
-# Tolerant parse: skip fences/prose lines instead of dying on them. If
-# NOTHING parses, abort without advancing the stamp so the pass is retried
-# next hour instead of being silently skipped for a week.
-VALID_RESULTS="$(echo "$RESULTS" | jq -cR 'fromjson? | select(type == "object" and .route != null)')"
+# Tolerant parse: skip fences/prose lines instead of dying on them, and
+# require .issue, which the keyed merge below indexes by. If NOTHING
+# parses, abort without advancing the stamp so the pass is retried next
+# hour instead of being silently skipped for a week.
+VALID_RESULTS="$(echo "$RESULTS" | jq -cR 'fromjson?
+  | select(type == "object" and .route != null and (.issue | type) == "string")')"
 if [[ -z "$VALID_RESULTS" ]]; then
   echo "abort: no parseable scores in claude output (stamp not advanced)" >&2
   exit 1
@@ -68,6 +71,7 @@ DROPPED=$((ORIG_COUNT - NEW_COUNT))
 sync_state() {
   git -C "$STATE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   [[ -n "$(git -C "$STATE_DIR" status --porcelain -- seen.json queue.json)" ]] || return 0
+  git -C "$STATE_DIR" add -- seen.json queue.json || return 1
   git -C "$STATE_DIR" commit --quiet \
     -m "reeval: $(date +%Y-%m-%d) $RESCORED rescored, $DROPPED dropped" \
     -- seen.json queue.json || return 1
