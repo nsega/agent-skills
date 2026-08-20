@@ -47,6 +47,9 @@ oss_lab_github_login() {
 # Active oss-lab tasks as JSONL: {id, content, issue}. `issue` is parsed
 # back out of the task title, so a task the user renamed yields null and
 # is left alone by revalidation rather than being closed on a guess.
+# The optional bracket matches both title forms: the current markdown
+# link, "Contribute: [owner/repo#1](url)", and the plain
+# "Contribute: owner/repo#1" that earlier tasks still carry.
 oss_lab_active_tasks() {
   curl -sf --get "$TODOIST_API/tasks" \
     --data-urlencode "project_id=$TODOIST_PROJECT_ID" \
@@ -55,7 +58,14 @@ oss_lab_active_tasks() {
     jq -c '.results[]
            | select(.labels | index("oss-lab"))
            | {id, content,
-              issue: (.content | capture("Contribute: (?<i>[^ ]+#[0-9]+)").i? // null)}'
+              issue: (.content | capture("Contribute: \\[?(?<i>[^\\[\\] ]+#[0-9]+)").i? // null)}'
+}
+
+# The web URL for an "owner/repo#123" id. GitHub redirects /issues/<n> to
+# the pull request when the number is one, so this is right either way.
+oss_lab_issue_url() {
+  local id="$1"
+  echo "https://github.com/${id%%#*}/issues/${id##*#}"
 }
 
 # Number of active oss-lab tasks. Filter query first; if Todoist rejects
@@ -80,8 +90,12 @@ oss_lab_wip_count() {
 # Create one Todoist task from a scored item. Best-effort by contract:
 # the caller decides what a failure means for the batch.
 oss_lab_create_task() {
-  local item="$1" title body
-  title="$(jq -r '"Contribute: \(.issue) (score \(.weighted_total))"' <<<"$item")"
+  local item="$1" title body url
+  # Markdown link so the task opens the issue in one click. Todoist keeps
+  # the link text as the visible title, so the id still reads plainly.
+  url="$(oss_lab_issue_url "$(jq -r '.issue' <<<"$item")")"
+  title="$(jq -r --arg url "$url" \
+    '"Contribute: [\(.issue)](\($url)) (score \(.weighted_total))"' <<<"$item")"
   body="$(jq -r '.rationale_consistency // ""' <<<"$item")"
   curl -sf -X POST "$TODOIST_API/tasks" \
     -H "Authorization: Bearer $TODOIST_TOKEN" \

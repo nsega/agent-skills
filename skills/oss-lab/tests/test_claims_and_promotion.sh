@@ -74,6 +74,22 @@ MOCK_TASKS_JSON="$CASE/tasks.json" MOCK_ISSUES_JSON="$CASE/issues.json" \
   out="$(run_it "$RS" 2>&1)" || true
 grep -q "c1" "$MOCK_LOG/todoist_closed" 2>/dev/null && ok || bad "revalidate: closed issue should free its slot"
 
+# Titles written as a markdown link must still parse back to their issue,
+# and so must the plain titles that pre-link tasks still carry.
+case_dir revalidate_linktitle; build_state "$STATE"
+cat > "$CASE/tasks.json" <<'EOF'
+[{"id":"L1","content":"Contribute: [k8s/k8s#7](https://github.com/k8s/k8s/issues/7) (score 7.9)","labels":["oss-lab"]},
+ {"id":"L2","content":"Contribute: k8s/k8s#8 (score 7.2)","labels":["oss-lab"]}]
+EOF
+cat > "$CASE/issues.json" <<'EOF'
+{"k8s/k8s#7": {"state":"closed","assignees":[]},
+ "k8s/k8s#8": {"state":"closed","assignees":[]}}
+EOF
+MOCK_TASKS_JSON="$CASE/tasks.json" MOCK_ISSUES_JSON="$CASE/issues.json" \
+  run_it "$RS" >/dev/null 2>&1 || true
+grep -q "L1" "$MOCK_LOG/todoist_closed" 2>/dev/null && ok || bad "revalidate: markdown-link title should parse back to its issue"
+grep -q "L2" "$MOCK_LOG/todoist_closed" 2>/dev/null && ok || bad "revalidate: legacy plain title must still parse"
+
 # A task the human renamed no longer names an issue: never guess at it.
 case_dir revalidate_renamed; build_state "$STATE"
 echo '[{"id":"r1","content":"look at the scheduler thing","labels":["oss-lab"]}]' > "$CASE/tasks.json"
@@ -120,6 +136,8 @@ MOCK_CLAUDE_OUT="$CASE/out"; printf '%s\n' \
 MOCK_WIP=2 out="$(run_it "$RR" 2>&1)" || bad "promote: reeval should exit 0"
 posts="$(cat "$MOCK_LOG/todoist_posts" 2>/dev/null || true)"
 grep -q "k8s/k8s#21" <<<"$posts" && ok || bad "promote: highest scorer should become a task"
+grep -q 'Contribute: \[k8s/k8s#21\](https://github.com/k8s/k8s/issues/21) (score 7.6)' <<<"$posts" \
+  && ok || bad "promote: task title should link the issue"
 grep -q "k8s/k8s#20" <<<"$posts" && bad "promote: budget of 1 must not create 2 tasks" || ok
 jq -e '[.[].issue] == ["k8s/k8s#20"]' "$STATE/queue.json" >/dev/null \
   && ok || bad "promote: promoted issue should leave the queue, the other stay"
