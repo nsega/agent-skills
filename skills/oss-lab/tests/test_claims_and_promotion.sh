@@ -26,6 +26,7 @@ run_it() { # $1 script
       MOCK_TASKS_JSON="${MOCK_TASKS_JSON:-}" MOCK_ISSUES_JSON="${MOCK_ISSUES_JSON:-}" \
       MOCK_TIMELINE_JSON="${MOCK_TIMELINE_JSON:-}" MOCK_COMMENTS_JSON="${MOCK_COMMENTS_JSON:-}" \
       MOCK_FETCH="${MOCK_FETCH:-}" MOCK_GH_LOGIN=nsega \
+      OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-3}" \
       "$1"
 }
 
@@ -121,6 +122,20 @@ jq -e 'select(.issue == "kubernetes/kubernetes#10") | has("recent_comments") | n
 jq -e 'select(.issue == "kubernetes/kubernetes#10") | has("number") | not' <<<"$FETCH_OUT" >/dev/null \
   && ok || bad "fetch: internal plumbing fields should not reach the scorer"
 
+# A comments call that exits 0 but returns something other than an array
+# must not kill the window: --argjson would reject it and jq's usage error
+# would abort the whole fetch under set -e.
+case_dir fetch_badcomments; build_state "$STATE"
+echo '{"number":13,"title":"odd thread","pull_request":null,"assignees":[],"labels":[],"comments":5,"created_at":"x","html_url":"u","body":"b"}' > "$CASE/raw.jsonl"
+echo '{"kubernetes/kubernetes#13": {"message":"Not Found"}}' > "$CASE/comments.json"
+rc=0
+OUT_BAD="$(env PATH="$MOCKBIN:$PATH" OSS_LAB_STATE_DIR="$STATE" \
+  MOCK_FETCH="$CASE/raw.jsonl" MOCK_COMMENTS_JSON="$CASE/comments.json" \
+  MOCK_GH_LOGIN=nsega "$HERE/../scripts/fetch-issues.sh" 2>/dev/null)" || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "fetch_badcomments: non-array comments must not fail the fetch (rc=$rc)"
+jq -e 'select(.issue == "kubernetes/kubernetes#13") | .recent_comments == []' <<<"$OUT_BAD" >/dev/null \
+  && ok || bad "fetch_badcomments: should degrade to an empty comment list"
+
 # ---- 3. promotion out of the queue -------------------------------------
 # Two queued issues rescore above the bar, budget allows one.
 case_dir promote; build_state "$STATE" --git
@@ -133,7 +148,9 @@ MOCK_CLAUDE_OUT="$CASE/out"; printf '%s\n' \
   '{"issue":"k8s/k8s#20","weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
   '{"issue":"k8s/k8s#21","weighted_total":7.6,"rationale_consistency":"r","route":"todoist"}' \
   > "$MOCK_CLAUDE_OUT"
-MOCK_WIP=2 out="$(run_it "$RR" 2>&1)" || bad "promote: reeval should exit 0"
+# Cap pinned to 3 here (not the shipped default) so the budget is
+# exactly 1 and the test keeps meaning the same thing if the cap moves.
+OSS_LAB_WIP_CAP=3 MOCK_WIP=2 out="$(run_it "$RR" 2>&1)" || bad "promote: reeval should exit 0"
 posts="$(cat "$MOCK_LOG/todoist_posts" 2>/dev/null || true)"
 grep -q "k8s/k8s#21" <<<"$posts" && ok || bad "promote: highest scorer should become a task"
 grep -q 'Contribute: \[k8s/k8s#21\](https://github.com/k8s/k8s/issues/21) (score 7.6)' <<<"$posts" \
@@ -162,10 +179,30 @@ echo '[{"issue":"k8s/k8s#40","weighted_total":5.5,"route":"queue"}]' > "$STATE/q
 git -C "$STATE" commit --quiet -am seed
 MOCK_CLAUDE_OUT="$CASE/out"
 echo '{"issue":"k8s/k8s#40","weighted_total":9.0,"rationale_consistency":"r","route":"todoist"}' > "$MOCK_CLAUDE_OUT"
-MOCK_WIP=3 run_it "$RR" >/dev/null 2>&1 || true
+OSS_LAB_WIP_CAP=3 MOCK_WIP=3 run_it "$RR" >/dev/null 2>&1 || true
 [ ! -s "$MOCK_LOG/todoist_posts" ] && ok || bad "promote: a full cap should create nothing"
 jq -e 'length == 1 and .[0].wip_capped == true' "$STATE/queue.json" >/dev/null \
   && ok || bad "promote: capped item stays queued and flagged"
+
+# ---- 3b. the runner enforces the cap even if the model ignores it ------
+# The model is told to demote past the budget, but the runner must not
+# depend on that: here it returns three todoist routes with only one slot.
+case_dir scout_budget; build_state "$STATE"
+echo '{"number":30,"title":"t","pull_request":null,"assignees":[],"labels":[],"comments":0,"created_at":"x","html_url":"u","body":"b"}' > "$CASE/raw.jsonl"
+MOCK_CLAUDE_OUT="$CASE/out"; printf '%s\n' \
+  '{"issue":"k8s/k8s#41","weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"k8s/k8s#42","weighted_total":9.2,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"k8s/k8s#43","weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
+  > "$MOCK_CLAUDE_OUT"
+OSS_LAB_WIP_CAP=3 MOCK_WIP=2 MOCK_FETCH="$CASE/raw.jsonl" \
+  out="$(run_it "$RS" 2>&1)" || bad "scout_budget: should exit 0"
+posts="$(cat "$MOCK_LOG/todoist_posts" 2>/dev/null || true)"
+# Count tasks, not lines: the POST body is pretty-printed JSON.
+[ "$(grep -c "Contribute:" <<<"$posts")" -eq 1 ] && ok || bad "scout_budget: budget of 1 must create exactly 1 task"
+grep -q "k8s/k8s#42" <<<"$posts" && ok || bad "scout_budget: the slot should go to the highest score"
+jq -e 'length == 2 and all(.[]; .wip_capped == true)' "$STATE/queue.json" >/dev/null \
+  && ok || bad "scout_budget: the other two should be queued and flagged"
+grep -q "WIP_CAP=3" "$MOCK_LOG/claude_args" && ok || bad "scout_budget: prompt should carry the cap"
 
 # ---- 4. corrupt queue no longer reads as empty -------------------------
 case_dir corrupt; build_state "$STATE"

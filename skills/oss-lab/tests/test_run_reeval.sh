@@ -33,6 +33,7 @@ run_rr() {
       MOCK_CLAUDE_OUT="${MOCK_CLAUDE_OUT:-/dev/null}" \
       MOCK_WIP="${MOCK_WIP:-3}" \
       MOCK_GH_LOGIN=nsega \
+      OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-4}" \
       "$RR"
 }
 
@@ -61,6 +62,9 @@ grep -qE '^[0-9]+$' "$STATE/last_reeval" && ok || bad "happy path should advance
 grep -q "REEVAL=1" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry REEVAL=1"
 grep -q "okr_alignment" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry the rubric"
 grep -q "WIP_COUNT=3" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry WIP_COUNT"
+# 4 is neither the shipped default nor WIP_COUNT, so this only passes if
+# the runner really forwards the configured cap.
+grep -q "WIP_CAP=4" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry WIP_CAP"
 grep -qx -- "--tools" "$MOCK_LOG/claude_args" && ok || bad "claude should run with --tools"
 # The scorer must hold NO tools: it reads text that originated in untrusted
 # public issues, so any tool is an exfiltration path for the state repo env.

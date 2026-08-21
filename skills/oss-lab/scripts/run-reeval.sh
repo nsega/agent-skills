@@ -47,7 +47,8 @@ WIP_COUNT="$(oss_lab_wip_count)" || {
 RESULTS="$(jq -c '.[]' "$QUEUE_FILE" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 REEVAL=1
-WIP_COUNT=$WIP_COUNT" \
+WIP_COUNT=$WIP_COUNT
+WIP_CAP=$OSS_LAB_WIP_CAP" \
   --tools "" \
   --max-turns 15 \
   --output-format text)"

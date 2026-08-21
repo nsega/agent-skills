@@ -56,11 +56,12 @@ WIP_COUNT="$(oss_lab_wip_count)" || {
 # from public repos, and its output is auto-POSTed to Todoist and pushed
 # to the state repo, so a tool-less scorer has no way to act on an
 # injected instruction. All input arrives on stdin, so no tool is needed;
-# WIP_COUNT likewise reaches the model as prompt text rather than as an
-# (invisible) environment variable.
+# WIP_COUNT and WIP_CAP likewise reach the model as prompt text rather
+# than as (invisible) environment variables.
 RESULTS="$(echo "$NEW_ISSUES" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
-WIP_COUNT=$WIP_COUNT" \
+WIP_COUNT=$WIP_COUNT
+WIP_CAP=$OSS_LAB_WIP_CAP" \
   --tools "" \
   --max-turns 15 \
   --output-format text)"

@@ -7,8 +7,11 @@
 # 410): responses are {results: [...], next_cursor}.
 
 TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
-# Most active contributions to hold at once (flow control #2).
-OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-3}"
+# Most active contributions to hold at once (flow control #2). This is
+# the only place the cap is defined: the runners pass it to the scorer
+# as $WIP_CAP, so prompt.md never hardcodes a number that could drift
+# out of step with the budget the runner actually enforces.
+OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
 
 # --- account guard ------------------------------------------------------
 # The scout runs on the personal Claude account only.

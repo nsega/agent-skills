@@ -94,11 +94,12 @@ a bug report, or a maintainer triaging is not a claim.
 - < 5.0 → "drop"
 - claimed by another contributor → "drop", regardless of score
 
-WIP cap: the runner passes the current count of active Todoist tasks as
-$WIP_COUNT. At most (3 - WIP_COUNT) issues may route to "todoist" in
-this batch: pick the highest weighted_total first, and demote every
-other todoist-qualified issue to "queue" with "wip_capped": true. If
-WIP_COUNT >= 3, demote them all. Never exceed the cap.
+WIP cap: the runner passes the cap as $WIP_CAP and the current count of
+active Todoist tasks as $WIP_COUNT. At most (WIP_CAP - WIP_COUNT) issues
+may route to "todoist" in this batch: pick the highest weighted_total
+first, and demote every other todoist-qualified issue to "queue" with
+"wip_capped": true. If WIP_COUNT is at or above WIP_CAP, demote them
+all. Never exceed the cap.
 
 ## Queue re-evaluation mode
 

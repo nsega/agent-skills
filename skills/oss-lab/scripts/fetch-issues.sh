@@ -99,7 +99,12 @@ while IFS= read -r item; do
               --jq '[.[-3:][] | {author: .user.login,
                                  body: (.body // "" | gsub("\\s+"; " ") | .[0:240])}]' \
             2>/dev/null || echo '[]')"
-  jq -c --argjson rc "${recent:-[]}" 'del(.number, .repo) | .recent_comments = $rc' <<<"$item"
+  # Validate rather than trust: a nonzero exit is caught above, but a call
+  # that exits 0 while printing anything other than an array would reach
+  # --argjson as invalid JSON, and jq's usage error would kill the whole
+  # fetch under set -e. One odd comment thread must not cost the window.
+  jq -e 'type == "array"' <<<"$recent" >/dev/null 2>&1 || recent='[]'
+  jq -c --argjson rc "$recent" 'del(.number, .repo) | .recent_comments = $rc' <<<"$item"
 done
 
 echo "$FETCH_START" > "$LAST_RUN_FILE.pending"
