@@ -17,6 +17,7 @@ immediately — no copy step. The same `SKILL.md` format works for Codex.
 | `dual-model-review` | Two-model review of a PR or design doc (Claude Opus 5 plus a blind second lab: GPT-5.6 Sol via Codex by default, GLM-5.2 or Kimi K3 via OpenCode Zen as alternates), disagreements surfaced for the human | You want a second opinion or higher confidence before merge/sign-off: "cross-review this", "run the panel", "what did we miss?" |
 | `friction-log` | Maintain a personal friction log in an Obsidian vault | "log friction: X", "show friction log", weekly review, or graduating items ("shipped: X", "drop: X") |
 | `illustrate-with-html` | Explain/visualize anything as a single self-contained `.html` file | You want to *see* something rather than read it — a workflow, architecture, timeline, or report — even if you never say "diagram" |
+| `oss-lab` | Issue Scout loop for Kubernetes OSS contributions: a launchd job that hourly applies zero-token hard filters to new issues, scores the survivors against a weighted OKR rubric, and routes them to Todoist or a holding queue | You want contribution candidates surfaced in the background instead of triaging issue feeds by hand (opt-in, machine-local: `make install-oss-lab`) |
 | `pr-review` | Verification-based PR review: every finding backed by a concrete check, verdicts over candidates | You want a merge verdict with evidence on a PR or diff — the default for "review this PR" |
 | `pr-visual-review` | PR review with sequence/class/flow diagrams (only when structurally warranted) | You need the *structure* of a change: call flow, blast radius, class relationships |
 | `repo-deepwiki` | Generate a DeepWiki-style, citation-heavy architecture wiki for a repo | Onboarding to or documenting a codebase: "describe this repo", "architecture overview", "how is this project structured?" |
@@ -67,6 +68,19 @@ Codex is opt-in (this repo's own skills only, separate target):
 ```sh
 make install-codex / status-codex / uninstall-codex   # ~/.codex/skills
 ```
+
+`oss-lab` needs one extra step beyond the symlink, because it also installs
+a launchd job. It targets the personal identity only:
+
+```sh
+make install-oss-lab   # link into ~/.claude/skills + install/load the hourly job
+```
+
+It copies `dev.nsega.oss-scout.plist` into `~/Library/LaunchAgents/` (launchd
+dislikes symlinked plists) with the repo path rewritten to your checkout,
+reloads it only when the content changed, and loads it only when the job is
+not already loaded. State and secrets live outside this repo, under
+`$OSS_LAB_STATE_DIR`.
 
 Everything is overridable for testing or other setups:
 
