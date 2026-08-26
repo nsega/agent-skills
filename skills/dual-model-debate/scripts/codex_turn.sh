@@ -76,7 +76,8 @@ $PROTOCOL_TXT"
 
   D="${DMD_OUT_DIR:-/tmp}"; mkdir -p "$D"
   SCRATCH="$(mktemp -d "$D/dual-model-debate-scratch.XXXXXX")"
-  OUTMSG="$(mktemp "$D/dual-model-debate-turn.XXXXXX.txt")"
+  # Trailing Xs: BSD mktemp only randomizes a trailing template (see build_packet.sh).
+  OUTMSG="$(mktemp "$D/dual-model-debate-turn.txt.XXXXXX")"
   # EXIT alone is not enough: a shell killed by an untrapped SIGINT/SIGTERM
   # (Ctrl-C during the long paid turn) dies without running its EXIT trap, so the
   # signals are trapped into a normal exit, which then fires EXIT.

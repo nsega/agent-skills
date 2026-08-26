@@ -34,7 +34,9 @@ emit_fenced() {
 # Deliverables land in $DMD_OUT_DIR when set (created if missing); default /tmp.
 OUT_DIR="${DMD_OUT_DIR:-/tmp}"
 mkdir -p "$OUT_DIR" || { echo "cannot create output dir: $OUT_DIR" >&2; exit 2; }
-OUT="$(mktemp "$OUT_DIR/dual-model-debate-packet.XXXXXX.md")"
+# Trailing Xs: BSD mktemp only randomizes a trailing template, so an interior
+# .XXXXXX. would create a literal-X file once and EEXIST on every reuse.
+OUT="$(mktemp "$OUT_DIR/dual-model-debate-packet.md.XXXXXX")"
 {
   echo "# Debate packet"
   echo
