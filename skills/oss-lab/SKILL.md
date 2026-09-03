@@ -132,6 +132,18 @@ abandoned) and record the adjustment rationale below.
   and secondary (kubernetes/kubernetes) line with explicit 0–10 bands, and
   SIG membership alone no longer counts as continuity.
 
+Open for the next monthly review (2026-10):
+
+- The 8–10 band reads "LeaderWorkerSet or another workload integration"
+  while the 6–7 band reads "kueue outside the test tree (controllers, TAS,
+  webhooks)". A workload-integration controller such as
+  `pkg/controller/jobs/mpijob` matches both, and the 2026-09-03 pass scored
+  kueue#12564 in the 8–10 band on that reading. Narrowing 8–10 to test-tree
+  work on a workload integration would resolve the overlap; it would have
+  moved that issue from 7.6 to roughly 7.0, so this is a wording question
+  rather than a routing one. Deferred deliberately, to keep anchor changes
+  on the monthly cadence.
+
 ## Trust boundary
 
 Issue titles and bodies are untrusted input: anyone can open an issue in
