@@ -207,6 +207,50 @@ oss_lab_revalidate_tasks() {
   return 0
 }
 
+# Drop queued issues that upstream has already settled, rewriting the
+# queue file in place and printing one line per issue removed.
+#
+# The queue is otherwise write-only until a re-score promotes something:
+# an issue that closed, was assigned, or grew a linked PR after it was
+# queued stays there and is re-scored (paid) every week forever, because a
+# settled issue still scores mid-band and so never trips the two-strike
+# drop. Running this before the paid call makes the weekly pass rank only
+# work that is still there to take.
+#
+# "unknown" keeps the issue. An unreachable GitHub must not read as
+# "settled", or a single network blip empties the queue permanently.
+# Entries carrying no .issue are kept for the merge to decide on, which is
+# the one place that knows what a malformed entry means.
+oss_lab_revalidate_queue() {
+  local file="$1" id status ids live tmp
+  # Read the ids up front and bail if that fails. Callers invoke this in an
+  # `||` list, which suspends errexit for the whole body, so a read failure
+  # inside the loop would otherwise fall through to a rewrite with an empty
+  # keep-list: the one outcome this function must never produce.
+  ids="$(jq -r '.[] | .issue // empty' "$file")" || return 1
+
+  live="$(mktemp)"
+  while IFS= read -r id; do
+    [[ -n "$id" ]] || continue
+    status="$(oss_lab_issue_status "$id")"
+    case "$status" in
+      stale:*) echo "revalidate: dequeued $id (${status#stale:})" ;;
+      *)       echo "$id" >> "$live" ;;
+    esac
+  done <<<"$ids"
+
+  tmp="$(mktemp)"
+  if jq --rawfile kept "$live" '
+        ($kept | split("\n") | map(select(length > 0))) as $k
+        | map(select(.issue == null or (.issue as $i | $k | index($i))))' "$file" > "$tmp"; then
+    mv "$tmp" "$file"
+    rm -f "$live"
+  else
+    rm -f "$tmp" "$live"
+    return 1
+  fi
+}
+
 # --- model output -------------------------------------------------------
 # Tolerant parse of a scoring reply on stdin: skip fences and prose rather
 # than dying on them, and require the fields the callers dereference, so a

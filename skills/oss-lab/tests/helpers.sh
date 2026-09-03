@@ -25,6 +25,10 @@ build_mockbin() {
 #!/bin/bash
 printf '%s\n' "$@" > "$MOCK_LOG/claude_args"
 cat > "$MOCK_LOG/claude_stdin"
+# MOCK_RACE_ISSUES: swap in a new upstream state at the moment the paid
+# call happens, so a case can make an issue go stale BETWEEN the queue
+# revalidation and the promotion that follows it in the same pass.
+[ -n "${MOCK_RACE_ISSUES:-}" ] && cp "$MOCK_RACE_ISSUES" "$MOCK_ISSUES_JSON"
 cat "${MOCK_CLAUDE_OUT:-/dev/null}"
 EOF
 
@@ -36,6 +40,10 @@ EOF
   # MOCK_FETCH        : file of raw issue JSONL returned by the issues list
   cat > "$d/gh" <<'EOF'
 #!/bin/bash
+# MOCK_GH_DOWN: every call fails, i.e. GitHub unreachable. Distinct from a
+# repo that merely reports nothing: issue status must come back "unknown"
+# so callers keep the item instead of treating silence as settled.
+[ -n "${MOCK_GH_DOWN:-}" ] && exit 1
 args=("$@"); filter=""; raw=""
 for ((i=0; i<${#args[@]}; i++)); do
   [ "${args[$i]}" = "--jq" ] && filter="${args[$((i+1))]}"

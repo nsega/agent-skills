@@ -24,17 +24,43 @@ question-type issues score low. Work likely to land as a reviewable PR
 scores high.
 
 **consistency (weight 0.3)** — Continuity with the existing contribution
-line. High scores require overlap with the anchors below: same SIG, same
-code area, or same reviewers.
+line. Score against the anchors below, then against the bands; the bands
+are the calibration, not a suggestion.
 
-Anchors (update monthly, last updated: 2026-08):
-- SIG: sig-scheduling
-- Open PRs: kubernetes/kubernetes#132761, kubernetes/kubernetes#133906
-  (scheduler test refactors)
-- Code areas: pkg/scheduler/, test/integration/scheduler/,
-  scheduler framework test helpers
-- Familiar territory: Go test refactoring, table-driven tests,
-  flaky test remediation
+Anchors (update monthly, last updated: 2026-09):
+
+- **Primary line: kubernetes-sigs/kueue (active).** Merged kueue#13897
+  (LeaderWorkerSet e2e coverage), #14705 (LWS restart-policy flake), and
+  #14752 (cherry-pick to release-0.19). Code areas:
+  test/e2e/singlecluster/extended/, test/util/, the LeaderWorkerSet and
+  other workload integrations. Labels that overlap: area/testing,
+  area/integrations, kind/flake. Reviewers who already know this work:
+  tenzen-y, mimowo.
+- **Secondary line: kubernetes/kubernetes (parked).** sig-scheduling test
+  refactors in pkg/scheduler/framework/runtime/ and
+  pkg/scheduler/backend/queue/ (PRs #132761 and #133906). Both have been
+  open for over a year with no maintainer movement since 2026-07 and are
+  deliberately parked. Overlap here is real continuity, but weaker
+  evidence than an equivalent kueue match.
+- **Familiar territory, repo-independent.** Go table-driven tests,
+  e2e and integration test refactoring, flaky-test remediation.
+
+Bands:
+- **8–10**: kueue test/e2e or test/util work; LeaderWorkerSet or another
+  workload integration; anything one of the reviewers above would review.
+- **6–7**: kueue outside the test tree (controllers, TAS, webhooks); or
+  kubernetes/kubernetes sig-scheduling *test* work, including KEP
+  graduation tests and scheduler_perf benchmarks.
+- **4–5**: kubernetes/kubernetes sig-scheduling non-test work;
+  gateway-api-inference-extension conformance or InferencePool tests.
+- **0–3**: another SIG, another code area, or non-test work with no
+  anchor overlap.
+
+Being a sig-scheduling subproject is not by itself continuity. kueue,
+the kubernetes/kubernetes scheduler, and gateway-api-inference-extension
+all qualify, so that fact discriminates nothing. Score the code area and
+the reviewers, and do not deduct from a kueue issue for sitting outside
+pkg/scheduler/: the primary line is not in kubernetes/kubernetes.
 
 **impact (weight 0.2)** — Post-merge reach. Test infrastructure
 improvements, flaky test fixes, and issues with active comment threads

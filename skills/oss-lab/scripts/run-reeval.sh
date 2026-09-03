@@ -1,9 +1,10 @@
 #!/bin/bash
 # run-reeval.sh: one weekly queue re-evaluation pass (flow control #3).
-# Re-scores every queued issue with the same rubric, promotes anything that
-# now clears the threshold (as far as the WIP cap allows), and drops what
-# has fallen sub-threshold twice. Invoked by run-scout.sh once the
-# last_reeval stamp is 6+ days old, or manually for an ad-hoc pass.
+# Revalidates the queue against upstream for free, re-scores what is left
+# with the same rubric, promotes anything that now clears the threshold (as
+# far as the WIP cap allows), and drops what has fallen sub-threshold
+# twice. Invoked by run-scout.sh once the last_reeval stamp is 6+ days old,
+# or manually for an ad-hoc pass.
 #
 # SC2016: jq programs are single-quoted on purpose (jq variables, not
 # shell expansions). SC1091: lib.sh resolves at runtime from SKILL_DIR.
@@ -35,15 +36,40 @@ if [[ "$ORIG_COUNT" -eq 0 ]]; then
   exit 0
 fi
 
+# --- WIP count ----------------------------------------------------------
+# Read before anything is written, so every abort path leaves the state
+# exactly as it found it.
+WIP_COUNT="$(oss_lab_wip_count)" || {
+  echo "abort: todoist unreachable, WIP count unknown (stamp not advanced)" >&2
+  exit 1
+}
+
+# --- Guard R2: drop queued issues upstream has already settled ----------
+# Zero tokens, and it runs before the paid call so the pass only ranks work
+# that is still there to take. Without it, an issue that closed or was
+# taken after being queued is re-scored every week forever: a settled issue
+# still scores mid-band, so the two-strike drop never fires, and any
+# promotion slot it wins is spent on work nobody can pick up.
+oss_lab_revalidate_queue "$QUEUE_FILE" ||
+  echo "warn: queue revalidation failed, re-scoring the queue as-is" >&2
+LIVE_COUNT="$(jq 'length' "$QUEUE_FILE")"
+PRUNED=$(( ORIG_COUNT - LIVE_COUNT ))
+
+# Everything queued has been settled upstream: nothing left to rank.
+if [[ "$LIVE_COUNT" -eq 0 ]]; then
+  date +%s > "$STAMP_FILE"
+  oss_lab_sync_state "$STATE_DIR" \
+    "reeval: $(date +%Y-%m-%d) 0 rescored, 0 promoted, $PRUNED stale-pruned, 0 dropped" ||
+    echo "warn: state sync incomplete (push failed?), continuing" >&2
+  echo "queue empty after revalidation ($PRUNED stale pruned), claude not invoked"
+  exit 0
+fi
+
 # --- Re-score with Claude (the only token-consuming step) ---------------
 # `--tools ""` disables every tool, for the same reason as in run-scout.sh:
 # queued items carry text that originated in untrusted public issues, and
 # a tool-less scorer has nothing to exfiltrate secrets with. REEVAL=1 and
 # WIP_COUNT reach the model as prompt text, since an env var is invisible.
-WIP_COUNT="$(oss_lab_wip_count)" || {
-  echo "abort: todoist unreachable, WIP count unknown (stamp not advanced)" >&2
-  exit 1
-}
 RESULTS="$(jq -c '.[]' "$QUEUE_FILE" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 REEVAL=1
@@ -83,7 +109,9 @@ if (( BUDGET > 0 )); then
   while IFS= read -r item; do
     [[ -n "$item" ]] || continue
     id="$(jq -r '.issue' <<<"$item")"
-    # Do not hand back work someone else picked up while it sat queued.
+    # Guard R2 already dropped what was settled before the paid call; this
+    # re-check only has to cover an issue taken during the call itself,
+    # and it sits directly in front of the Todoist write.
     status="$(oss_lab_issue_status "$id")"
     if [[ "$status" == stale:* ]]; then
       echo "promote: skipping $id (${status#stale:})"
@@ -115,10 +143,12 @@ date +%s > "$STAMP_FILE"
 
 RESCORED="$(echo "$VALID_RESULTS" | wc -l | tr -d ' ')"
 NEW_COUNT="$(jq 'length' "$QUEUE_FILE")"
-DROPPED=$(( ORIG_COUNT - NEW_COUNT - PROMOTED ))
+# Measured against the post-prune count, so "dropped" keeps meaning the
+# two-strike rule and never absorbs the revalidation's removals.
+DROPPED=$(( LIVE_COUNT - NEW_COUNT - PROMOTED ))
 
 oss_lab_sync_state "$STATE_DIR" \
-  "reeval: $(date +%Y-%m-%d) $RESCORED rescored, $PROMOTED promoted, $DROPPED dropped" ||
+  "reeval: $(date +%Y-%m-%d) $RESCORED rescored, $PROMOTED promoted, $PRUNED stale-pruned, $DROPPED dropped" ||
   echo "warn: state sync incomplete (push failed?), continuing" >&2
 
-echo "reeval complete: $RESCORED rescored, $PROMOTED promoted, $DROPPED dropped, $NEW_COUNT still queued"
+echo "reeval complete: $RESCORED rescored, $PROMOTED promoted, $PRUNED stale-pruned, $DROPPED dropped, $NEW_COUNT still queued"

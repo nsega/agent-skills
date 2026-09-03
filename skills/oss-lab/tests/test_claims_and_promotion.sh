@@ -162,7 +162,10 @@ jq -e '.[0].wip_capped == true' "$STATE/queue.json" >/dev/null \
   && ok || bad "promote: the one the budget could not cover should be flagged"
 grep -q "promoted" <<<"$out" && ok || bad "promote: summary should report promotions"
 
-# A queued issue that someone else picked up meanwhile is never handed back.
+# A queued issue that someone else picked up meanwhile is never handed
+# back. The revalidation that runs before the paid call now catches it, so
+# rejecting it costs nothing; the promote-time check behind it only has to
+# cover an issue taken during the call itself (test_run_reeval.sh case 15).
 case_dir promote_taken; build_state "$STATE" --git
 echo '[{"issue":"k8s/k8s#30","weighted_total":5.5,"route":"queue"}]' > "$STATE/queue.json"
 git -C "$STATE" commit --quiet -am seed
@@ -171,7 +174,11 @@ echo '{"issue":"k8s/k8s#30","weighted_total":8.0,"rationale_consistency":"r","ro
 echo '{"k8s/k8s#30": {"state":"open","assignees":[{"login":"someone-else"}]}}' > "$CASE/issues.json"
 MOCK_WIP=0 MOCK_ISSUES_JSON="$CASE/issues.json" out="$(run_it "$RR" 2>&1)" || true
 [ ! -s "$MOCK_LOG/todoist_posts" ] && ok || bad "promote: must not task an issue someone else took"
-grep -q "skipping k8s/k8s#30" <<<"$out" && ok || bad "promote: should say why it skipped"
+grep -q "dequeued k8s/k8s#30 (assigned to someone-else)" <<<"$out" \
+  && ok || bad "promote: should say why the taken issue was dequeued"
+[ ! -e "$MOCK_LOG/claude_args" ] && ok || bad "promote: a taken issue should be rejected before the paid call"
+jq -e 'length == 0' "$STATE/queue.json" >/dev/null \
+  && ok || bad "promote: a taken issue should not stay queued for next week"
 
 # Full WIP means no promotion at all, and nothing leaves the queue.
 case_dir promote_full; build_state "$STATE" --git
