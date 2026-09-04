@@ -18,6 +18,24 @@ source "$SKILL_DIR/scripts/lib.sh"
 oss_lab_load_env "$STATE_DIR"
 oss_lab_guard_account
 
+# Resolve our GitHub login once. The memo inside oss_lab_github_login dies
+# with the command substitution every caller invokes it from, so without
+# this each issue status pays an extra `gh api user` round-trip: a handful
+# per hour for the task check, but one per entry once the queue prune runs.
+# Exported so the run-reeval.sh child inherits it instead of re-resolving.
+export OSS_LAB_GITHUB_LOGIN="${OSS_LAB_GITHUB_LOGIN:-$(oss_lab_github_login)}"
+
+# --- Revalidate open tasks (zero tokens) --------------------------------
+# Routing is otherwise a one-way door: an issue can be assigned, PR'd, or
+# closed the day after its task was created, and the dead task would hold
+# a cap slot forever while live candidates pile up in the queue. This runs
+# before the fetch guard on purpose, since freeing a stale slot is worth
+# doing on a quiet hour too, and it costs no tokens either way. It also
+# runs before the weekly pass below, which sizes its promotion budget from
+# the WIP count: a dead task still holding a slot at that moment shrinks
+# the budget for a whole week, because the stamp advances either way.
+oss_lab_revalidate_tasks
+
 # --- Weekly queue re-evaluation (flow control #3) -----------------------
 # Stamp-gated rather than Monday-gated so a slept-through Monday self-heals
 # on the next hourly run. run-reeval.sh advances the stamp only after a
@@ -28,14 +46,6 @@ LAST_REEVAL="$(cat "$STATE_DIR/last_reeval" 2>/dev/null || true)"
 if (( $(date +%s) - LAST_REEVAL >= 6 * 86400 )); then
   "$SKILL_DIR/scripts/run-reeval.sh" || echo "warn: reeval pass failed, continuing" >&2
 fi
-
-# --- Revalidate open tasks (zero tokens) --------------------------------
-# Routing is otherwise a one-way door: an issue can be assigned, PR'd, or
-# closed the day after its task was created, and the dead task would hold
-# a cap slot forever while live candidates pile up in the queue. This runs
-# before the fetch guard on purpose, since freeing a stale slot is worth
-# doing on a quiet hour too, and it costs no tokens either way.
-oss_lab_revalidate_tasks
 
 # --- Guard R1: fetch next; if nothing new, never start Claude -----------
 NEW_ISSUES="$("$SKILL_DIR/scripts/fetch-issues.sh")"

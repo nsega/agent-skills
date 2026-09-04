@@ -21,6 +21,11 @@ source "$SKILL_DIR/scripts/lib.sh"
 oss_lab_load_env "$STATE_DIR"
 oss_lab_guard_account
 
+# Inherited from run-scout.sh when it invokes this; resolved here for an
+# ad-hoc pass. See the note there: without it every issue status pays an
+# extra `gh api user`, once per queued entry during the prune below.
+export OSS_LAB_GITHUB_LOGIN="${OSS_LAB_GITHUB_LOGIN:-$(oss_lab_github_login)}"
+
 # --- Guard R1: an empty queue never starts Claude -----------------------
 mkdir -p "$STATE_DIR"
 [[ -f "$QUEUE_FILE" ]] || echo '[]' > "$QUEUE_FILE"
@@ -91,6 +96,11 @@ fi
 # Keyed merge over the ORIGINAL queue: an issue Claude skipped stays queued
 # untouched (rescored next week) rather than being silently lost, an issue
 # routed "drop" is removed, and a hallucinated issue never enters.
+#
+# An entry with no .issue is also removed here: it can be neither re-scored
+# nor promoted, so there is nothing to keep it for. Guard R2 leaves it
+# alone (it proves nothing about it), which means the count below reports
+# it under "dropped" rather than "stale-pruned".
 MERGED="$(mktemp)"
 echo "$VALID_RESULTS" | jq -s --slurpfile orig "$QUEUE_FILE" '
   (map(select(.issue != null)) | map({key: .issue, value: .}) | from_entries) as $rescored
@@ -110,8 +120,11 @@ if (( BUDGET > 0 )); then
     [[ -n "$item" ]] || continue
     id="$(jq -r '.issue' <<<"$item")"
     # Guard R2 already dropped what was settled before the paid call; this
-    # re-check only has to cover an issue taken during the call itself,
-    # and it sits directly in front of the Todoist write.
+    # re-check sits directly in front of the Todoist write and catches a
+    # close or an assignment that landed during it. It does NOT catch a
+    # linked PR opened during the call: oss_lab_linked_prs serves a 50
+    # minute per-repo cache that Guard R2 populated minutes ago, so that
+    # dimension is only as fresh as the prune was.
     status="$(oss_lab_issue_status "$id")"
     if [[ "$status" == stale:* ]]; then
       echo "promote: skipping $id (${status#stale:})"

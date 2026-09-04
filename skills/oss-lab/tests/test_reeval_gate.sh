@@ -89,4 +89,28 @@ rc=0; out="$(env PATH="$MOCKBIN:$PATH" OSS_LAB_STATE_DIR="$STATE" \
 echo "$out" | grep -q "no new issues" && ok || bad "quiet hour: should still take the empty-fetch exit"
 grep -q "z1" "$MOCK_LOG/todoist_closed" 2>/dev/null && ok || bad "quiet hour: revalidation should still free the stale slot"
 
+# 7: task revalidation runs BEFORE the weekly pass, so the promotion budget
+# is computed from live work. The reeval reads the WIP count to size its
+# budget; if a dead task still occupies a cap slot at that moment the budget
+# is short (or zero) for a whole week, since the stamp advances either way.
+# This is the same "revalidate before you decide" rule the queue prune
+# follows, one layer up.
+new_state g7
+rm -f "$STATE/last_reeval"        # no stamp: the weekly pass is due
+echo '[{"id":"d1","content":"Contribute: k8s/k8s#4 (score 7.5)","labels":["oss-lab"]}]' > "$WORK/g7/tasks.json"
+echo '{"k8s/k8s#4": {"state":"closed","assignees":[]}}' > "$WORK/g7/issues.json"
+rc=0; env PATH="$MOCKBIN:$PATH" OSS_LAB_STATE_DIR="$STATE" \
+  CLAUDE_CONFIG_DIR="$HOME/.claude" MOCK_LOG="$MOCK_LOG" \
+  MOCK_CLAUDE_OUT="$MOCK_CLAUDE_OUT" MOCK_GH_LOGIN=nsega MOCK_WIP=3 \
+  MOCK_TASKS_JSON="$WORK/g7/tasks.json" MOCK_ISSUES_JSON="$WORK/g7/issues.json" \
+  "$RS" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "ordering: scout should exit 0 (got $rc)"
+grep -q "d1" "$MOCK_LOG/todoist_closed" 2>/dev/null \
+  && ok || bad "ordering: the dead task should be closed"
+[ -e "$MOCK_LOG/claude_args" ] && ok || bad "ordering: the weekly pass should still run"
+# The sequence log is appended by the mocks in call order.
+[ "$(grep -n -m1 close "$MOCK_LOG/sequence" | cut -d: -f1)" -lt \
+  "$(grep -n -m1 claude "$MOCK_LOG/sequence" | cut -d: -f1)" ] \
+  && ok || bad "ordering: the task must be freed BEFORE the paid pass sizes its budget (sequence: $(tr '\n' ' ' < "$MOCK_LOG/sequence"))"
+
 summary reeval_gate

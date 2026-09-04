@@ -217,38 +217,45 @@ oss_lab_revalidate_tasks() {
 # drop. Running this before the paid call makes the weekly pass rank only
 # work that is still there to take.
 #
-# "unknown" keeps the issue. An unreachable GitHub must not read as
-# "settled", or a single network blip empties the queue permanently.
-# Entries carrying no .issue are kept for the merge to decide on, which is
-# the one place that knows what a malformed entry means.
+# The one invariant: this removes only entries it has POSITIVELY proven
+# settled. It collects the settled ids and subtracts them, rather than
+# collecting survivors and keeping those, so every way of failing to reach
+# a verdict leaves the entry queued. That covers an unreachable GitHub
+# ("unknown"), an id it cannot parse, and a read that fails outright.
+#
+# Only well-formed "owner/repo#123" ids are probed. Queue entries come from
+# the scorer, which reads untrusted public issue text, so an id may be
+# empty, carry an embedded newline, or be absent entirely; none of those is
+# guessed at. Ids are deduplicated first, since nothing stops the same
+# issue being queued twice and the probe costs a GitHub round-trip.
 oss_lab_revalidate_queue() {
-  local file="$1" id status ids live tmp
-  # Read the ids up front and bail if that fails. Callers invoke this in an
-  # `||` list, which suspends errexit for the whole body, so a read failure
-  # inside the loop would otherwise fall through to a rewrite with an empty
-  # keep-list: the one outcome this function must never produce.
-  ids="$(jq -r '.[] | .issue // empty' "$file")" || return 1
+  local file="$1" id status ids stale='[]'
+  ids="$(jq -r '[ .[] | .issue? // empty
+                  | select(type == "string")
+                  | select(test("^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+#[0-9]+$")) ]
+                | unique | .[]' "$file")" || return 1
 
-  live="$(mktemp)"
   while IFS= read -r id; do
     [[ -n "$id" ]] || continue
     status="$(oss_lab_issue_status "$id")"
     case "$status" in
-      stale:*) echo "revalidate: dequeued $id (${status#stale:})" ;;
-      *)       echo "$id" >> "$live" ;;
+      stale:*)
+        echo "revalidate: dequeued $id (${status#stale:})"
+        stale="$(jq -c --arg i "$id" '. + [$i]' <<<"$stale")"
+        ;;
     esac
   done <<<"$ids"
 
-  tmp="$(mktemp)"
-  if jq --rawfile kept "$live" '
-        ($kept | split("\n") | map(select(length > 0))) as $k
-        | map(select(.issue == null or (.issue as $i | $k | index($i))))' "$file" > "$tmp"; then
-    mv "$tmp" "$file"
-    rm -f "$live"
-  else
-    rm -f "$tmp" "$live"
-    return 1
-  fi
+  # append_json owns the temp-file dance and ends its success branch in the
+  # mv, so a failed rewrite reaches the caller instead of being reported as
+  # a clean pass over a queue that was never pruned.
+  # SC2016: $settled and $i are jq bindings, not shell expansions. The
+  # runners carry this as a file-wide directive; here it is one call, so
+  # the exemption is scoped to it. shellcheck knows `jq` takes a program
+  # but cannot see through the wrapper.
+  # shellcheck disable=SC2016
+  oss_lab_append_json "$file" --argjson settled "$stale" \
+    'map(select(.issue as $i | ($settled | index($i)) == null))'
 }
 
 # --- model output -------------------------------------------------------

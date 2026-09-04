@@ -278,4 +278,106 @@ rc=0; out="$(env MOCK_ISSUES_JSON="$WORK/t15/issues.json" MOCK_RACE_ISSUES="$WOR
 echo "$out" | grep -q "skipping kubernetes/kubernetes#111" \
   && ok || bad "promote race: should say why it skipped"
 
+# ---- unit: oss_lab_revalidate_queue ------------------------------------
+# The cases above drive the function through the runner, which can only
+# reach it with well-formed input. These call it directly, because the
+# inputs that matter here (a malformed id, a failing rewrite) come from the
+# scorer reading untrusted public issue text and from the filesystem, and
+# neither is reachable through run-reeval.sh.
+#
+# The invariant under test: this function may only ever remove an entry it
+# has POSITIVELY proven settled. Anything it cannot parse or cannot reach
+# stays queued.
+
+unit_env() {  # prints a preamble that sources lib.sh with a stubbed status
+  cat <<'PRE'
+source "$LIB"
+oss_lab_issue_status() { echo "${STUB_STATUS:-live}"; }
+PRE
+}
+
+# 16: an id carrying an embedded newline is never probed and never removed
+U="$WORK/unit"; mkdir -p "$U"
+printf '%s\n' '[{"issue":"a/b#1\nc/d#2","n":1},{"issue":"a/b#5","n":2}]' > "$U/nl.json"
+out="$(LIB="$HERE/../scripts/lib.sh" bash -c "$(unit_env)"'
+  oss_lab_revalidate_queue "'"$U/nl.json"'"' 2>&1)"
+jq -e '[.[].issue] | length == 2' "$U/nl.json" >/dev/null \
+  && ok || bad "unit: an id with a newline must not be dropped (got $(jq -c '[.[].issue]' "$U/nl.json"))"
+[ -z "$out" ] && ok || bad "unit: a malformed id must not be logged as dequeued (got: $out)"
+
+# 17: an empty id is left alone too
+echo '[{"issue":"","n":1},{"issue":"a/b#5","n":2}]' > "$U/empty.json"
+LIB="$HERE/../scripts/lib.sh" bash -c "$(unit_env)"'
+  oss_lab_revalidate_queue "'"$U/empty.json"'"' >/dev/null 2>&1
+jq -e '[.[].issue] | length == 2' "$U/empty.json" >/dev/null \
+  && ok || bad "unit: an empty id must not be dropped"
+
+# 18: an entry with no .issue at all survives the prune
+echo '[{"weighted_total":5.0,"route":"queue"},{"issue":"a/b#5"}]' > "$U/noissue.json"
+LIB="$HERE/../scripts/lib.sh" bash -c "$(unit_env)"'
+  oss_lab_revalidate_queue "'"$U/noissue.json"'"' >/dev/null 2>&1
+jq -e 'length == 2' "$U/noissue.json" >/dev/null \
+  && ok || bad "unit: an entry with no .issue must survive the prune"
+
+# 19: a well-formed id that IS settled is still removed, and logged
+echo '[{"issue":"a/b#1"},{"issue":"a/b#5"}]' > "$U/stale.json"
+out="$(LIB="$HERE/../scripts/lib.sh" STUB_STATUS="stale:closed" bash -c "$(unit_env)"'
+  oss_lab_revalidate_queue "'"$U/stale.json"'"' 2>&1)"
+jq -e 'length == 0' "$U/stale.json" >/dev/null \
+  && ok || bad "unit: proven-settled entries should still be removed"
+[ "$(grep -c 'revalidate: dequeued' <<<"$out")" -eq 2 ] \
+  && ok || bad "unit: every removal should be logged"
+
+# 20: a failing rewrite must return nonzero, or the caller reports a clean
+# pass over a queue it never actually pruned
+echo '[{"issue":"a/b#1"}]' > "$U/mv.json"
+rc=0
+LIB="$HERE/../scripts/lib.sh" STUB_STATUS="stale:closed" bash -c "$(unit_env)"'
+  mv() { return 1; }
+  oss_lab_revalidate_queue "'"$U/mv.json"'"' >/dev/null 2>&1 || rc=$?
+[ "$rc" -ne 0 ] && ok || bad "unit: a failed rewrite must return nonzero (got $rc)"
+
+# 21: each distinct id is probed once, however many entries carry it
+echo '[{"issue":"a/b#1"},{"issue":"a/b#1"},{"issue":"a/b#9"}]' > "$U/dupes.json"
+LIB="$HERE/../scripts/lib.sh" PROBES="$U/probes" bash -c '
+  source "$LIB"
+  oss_lab_issue_status() { echo "$1" >> "$PROBES"; echo live; }
+  oss_lab_revalidate_queue "'"$U/dupes.json"'"' >/dev/null 2>&1
+[ "$(wc -l < "$U/probes" | tr -d " ")" -eq 2 ] \
+  && ok || bad "unit: duplicate ids should be probed once (got $(wc -l < "$U/probes") probes)"
+
+# 22: a malformed entry is removed by the MERGE, not the prune, and the
+# summary counts it as dropped. Pinned because the two removals are counted
+# separately and an operator reads the difference.
+new_state t22
+MOCK_CLAUDE_OUT="$WORK/t22/claude_out"
+printf '[%s,%s]\n' "$QA" '{"weighted_total":5.0,"route":"queue","note":"no issue key"}' \
+  > "$STATE/queue.json"
+git -C "$STATE" commit --quiet -am seed22
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  > "$MOCK_CLAUDE_OUT"
+rc=0; out="$(run_rr 2>&1)" || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "malformed entry: should exit 0 (got $rc)"
+echo "$out" | grep -q "0 stale-pruned, 1 dropped" \
+  && ok || bad "malformed entry: the prune should not claim it (got: $(echo "$out" | tail -1))"
+jq -e '[.[].issue] == ["kubernetes/kubernetes#111"]' "$STATE/queue.json" >/dev/null \
+  && ok || bad "malformed entry: the merge should remove it, leaving the live one"
+
+# 23: the GitHub login is resolved once per run, not once per queued entry.
+# oss_lab_github_login memoizes into a variable that dies with the command
+# substitution its only caller uses, so the runner has to hold the value.
+new_state t23
+MOCK_CLAUDE_OUT="$WORK/t23/claude_out"
+printf '[%s,%s,%s]\n' "$QA" "$QB" \
+  '{"issue":"kubernetes-sigs/kueue#333","weighted_total":5.0,"route":"queue"}' \
+  > "$STATE/queue.json"
+git -C "$STATE" commit --quiet -am seed23
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  > "$MOCK_CLAUDE_OUT"
+run_rr >/dev/null 2>&1 || true
+[ "$(wc -l < "$MOCK_LOG/gh_user_calls" 2>/dev/null | tr -d ' ')" -eq 1 ] \
+  && ok || bad "login memo: 3 queued entries should cost 1 'gh api user', not one each (got $(wc -l < "$MOCK_LOG/gh_user_calls" 2>/dev/null | tr -d ' '))"
+
 summary run_reeval

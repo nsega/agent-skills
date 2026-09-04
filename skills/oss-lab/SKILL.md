@@ -93,7 +93,7 @@ Flow controls:
 - **Release-cycle correction** — around code freeze, feature work is
   penalized and stabilization work is boosted (static config, updated
   quarterly in prompt.md).
-- **Queue decay** — the weekly pass first revalidates every queued issue
+- **Queue decay:** the weekly pass first revalidates every queued issue
   upstream (zero tokens, `oss_lab_revalidate_queue`) and drops the ones
   that closed, were assigned, or grew a linked PR; only the survivors are
   re-scored, and two consecutive sub-threshold scores drop an issue.
@@ -111,10 +111,10 @@ Flow controls:
 ## Rubric governance
 
 The consistency anchors (contribution lines, code areas, reviewers,
-scoring bands) and the release phase live as static blocks in `prompt.md` and are reviewed monthly and
-quarterly respectively. Weight changes require a calibration note:
-compare routed tasks against actual outcomes (started / merged /
-abandoned) and record the adjustment rationale below.
+scoring bands) and the release phase live as static blocks in `prompt.md`
+and are reviewed monthly and quarterly respectively. Weight changes
+require a calibration note: compare routed tasks against actual outcomes
+(started / merged / abandoned) and record the adjustment rationale below.
 
 ### Calibration log
 
