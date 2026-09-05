@@ -12,6 +12,13 @@ TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
 # as $WIP_CAP, so prompt.md never hardcodes a number that could drift
 # out of step with the budget the runner actually enforces.
 OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
+# Routing thresholds (flow control #3). The scorer applies them to route a
+# new issue; the weekly pass applies them itself, from the score, to decide
+# promotion and decay, so they are defined here and nowhere else in code.
+# prompt.md states the same numbers in prose for the model, and a test pins
+# that the two agree.
+OSS_LAB_PROMOTE_AT="${OSS_LAB_PROMOTE_AT:-7.0}"
+OSS_LAB_DROP_BELOW="${OSS_LAB_DROP_BELOW:-5.0}"
 
 # --- account guard ------------------------------------------------------
 # The scout runs on the personal Claude account only.

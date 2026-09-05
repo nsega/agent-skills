@@ -63,7 +63,7 @@ jq -e 'length == 1' "$STATE/queue.json" >/dev/null && ok || bad "dropped issue s
 jq -e '.[0].issue == "kubernetes/kubernetes#111" and .[0].weighted_total == 6.1 and .[0].reeval_count == 1' \
   "$STATE/queue.json" >/dev/null && ok || bad "survivor should carry the rescored fields"
 grep -qE '^[0-9]+$' "$STATE/last_reeval" && ok || bad "happy path should advance the stamp"
-grep -q "REEVAL=1" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry REEVAL=1"
+grep -q "REEVAL=1" "$MOCK_LOG/claude_args" && bad "claude prompt must not carry REEVAL=1: one scoring contract, the runner owns the flow" || ok
 grep -q "okr_alignment" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry the rubric"
 grep -q "WIP_COUNT=3" "$MOCK_LOG/claude_args" && ok || bad "claude prompt should carry WIP_COUNT"
 # 4 is neither the shipped default nor WIP_COUNT, so this only passes if
@@ -413,15 +413,15 @@ jq -e '.title == "scheduler_perf flakes on arm64" and (.body | startswith("Fails
   && ok || bad "evidence: stdin should carry the current title and body (got: ${line:0:120})"
 jq -e '.labels == ["kind/flake","sig/scheduling"]' <<<"$line" >/dev/null \
   && ok || bad "evidence: stdin should carry the current labels"
-jq -e '.reeval_count == 0 and .previous_total == 5.6' <<<"$line" >/dev/null \
-  && ok || bad "evidence: stdin should carry reeval_count and previous_total from the prior pass"
+jq -e '(has("reeval_count") or has("previous_total")) | not' <<<"$line" >/dev/null \
+  && ok || bad "evidence: nothing from the prior pass may reach the scorer, the runner keeps the count and the decay"
 jq -e '(has("rationale_consistency") or has("scores") or has("route")) | not' <<<"$line" >/dev/null \
   && ok || bad "evidence: the prior rationale, axis scores and route must not anchor the re-score"
 jq -e '(has("number") or has("repo")) | not' <<<"$line" >/dev/null \
   && ok || bad "evidence: internal plumbing fields should not reach the scorer"
 line2="$(grep 'kubernetes-sigs/kueue#222' "$MOCK_LOG/claude_stdin" 2>/dev/null || true)"
-jq -e '.reeval_count == 1 and .previous_total == 4.4' <<<"$line2" >/dev/null \
-  && ok || bad "evidence: a once-struck issue should carry its count and its sub-threshold total"
+jq -e '(has("reeval_count") or has("previous_total")) | not' <<<"$line2" >/dev/null \
+  && ok || bad "evidence: a once-struck issue looks exactly like a new one to the scorer"
 
 # 25: a commented issue carries the tail of its thread, so a soft claim that
 # arrived while it sat queued is visible to the re-score, as it is to the
@@ -456,5 +456,115 @@ jq -e '.[] | select(.issue == "kubernetes-sigs/kueue#222") | .weighted_total == 
   "$STATE/queue.json" >/dev/null && ok || bad "unfetched: the issue should stay queued with its prior fields"
 echo "$out" | grep -q "kubernetes-sigs/kueue#222" \
   && ok || bad "unfetched: should say which issue was left for next week"
+
+# ---- the runner owns the decay ---------------------------------------
+# The model scores an issue; whether it stays, drops or is promoted is the
+# runner's call, from the score and the queue's own record. The same rule
+# already governs the WIP cap: a runner that trusted the model to count
+# would break the invariant the moment the model miscounted. Here the model
+# used to read previous_total and reeval_count and route "drop" itself.
+
+# 27: sub-threshold twice -> dropped, with the two scores in the log
+new_state t27
+MOCK_CLAUDE_OUT="$WORK/t27/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.2,"route":"drop"}' \
+  > "$MOCK_CLAUDE_OUT"
+rc=0; out="$(run_rr 2>&1)" || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "decay: should exit 0 (got $rc)"
+jq -e '[.[].issue] == ["kubernetes/kubernetes#111"]' "$STATE/queue.json" >/dev/null \
+  && ok || bad "decay: a second sub-threshold score should drop the issue"
+echo "$out" | grep -q "dropping kubernetes-sigs/kueue#222 (sub-threshold twice: 4.4 then 4.2)" \
+  && ok || bad "decay: the drop should be logged with both scores (got: $(echo "$out" | grep dropping || echo none))"
+
+# 28: sub-threshold ONCE -> kept with the new score. The model routes it
+# "drop" because 4.2 is under the bar; the runner knows this is the first
+# strike and keeps it. This is the behaviour the model used to own.
+new_state t28
+MOCK_CLAUDE_OUT="$WORK/t28/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":4.2,"route":"drop"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  > "$MOCK_CLAUDE_OUT"
+rc=0; out="$(run_rr 2>&1)" || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "first strike: should exit 0 (got $rc)"
+jq -e '.[] | select(.issue == "kubernetes/kubernetes#111") | .weighted_total == 4.2 and .reeval_count == 1 and .route == "queue"' \
+  "$STATE/queue.json" >/dev/null \
+  && ok || bad "first strike: a first sub-threshold score keeps the issue, recorded, for one more look"
+echo "$out" | grep -q "dropping kubernetes/kubernetes#111" \
+  && bad "first strike: must not be logged as a drop" || ok
+# 29 folded in: 4.4 -> 5.5 recovers, count still advances
+jq -e '.[] | select(.issue == "kubernetes-sigs/kueue#222") | .weighted_total == 5.5 and .reeval_count == 2' \
+  "$STATE/queue.json" >/dev/null \
+  && ok || bad "recovery: a score back over the bar resets nothing but is recorded with its count"
+
+# 30: a claim drops the issue whatever it scored, and never promotes it
+new_state t30
+MOCK_CLAUDE_OUT="$WORK/t30/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":8.0,"rationale_consistency":"r","route":"drop","claimed_by":"someone-else"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  > "$MOCK_CLAUDE_OUT"
+rc=0; out="$(MOCK_WIP=0 run_rr 2>&1)" || rc=$?
+[ ! -s "$MOCK_LOG/todoist_posts" ] && ok || bad "claim: an 8.0 that someone claimed must not become a task"
+jq -e '[.[].issue] == ["kubernetes-sigs/kueue#222"]' "$STATE/queue.json" >/dev/null \
+  && ok || bad "claim: the claimed issue should leave the queue"
+echo "$out" | grep -q "dropping kubernetes/kubernetes#111 (claimed by someone-else)" \
+  && ok || bad "claim: the log should name who claimed it"
+
+# 31: a "drop" the model did not explain is read as a claim. Under the bar
+# the runner decides; over it the only reason left is a claim, and the loop
+# would rather lose a candidate than take announced work.
+new_state t31
+MOCK_CLAUDE_OUT="$WORK/t31/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.0,"route":"drop"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  > "$MOCK_CLAUDE_OUT"
+out="$(run_rr 2>&1)" || true
+jq -e '[.[].issue] == ["kubernetes-sigs/kueue#222"]' "$STATE/queue.json" >/dev/null \
+  && ok || bad "unexplained drop: an over-threshold drop is treated as a claim and removed"
+echo "$out" | grep -q "dropping kubernetes/kubernetes#111 (dropped by the scorer at 6.0" \
+  && ok || bad "unexplained drop: should be logged as such"
+
+# 32: promotion goes by score, not by the model's route. The model demotes
+# past the cap on its own count and writes route "queue" + wip_capped; the
+# runner used to promote only route "todoist", so a 7.1 the model had
+# capped could never be promoted directly, only re-rolled next week.
+new_state t32
+MOCK_CLAUDE_OUT="$WORK/t32/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":7.5,"rationale_consistency":"r","route":"queue","wip_capped":true}' \
+  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  > "$MOCK_CLAUDE_OUT"
+rc=0; out="$(MOCK_WIP=0 run_rr 2>&1)" || rc=$?
+grep -q "kubernetes/kubernetes#111" "$MOCK_LOG/todoist_posts" 2>/dev/null \
+  && ok || bad "score-based promotion: a 7.5 the model marked wip_capped must still be promoted when a slot is free"
+jq -e '[.[].issue] == ["kubernetes-sigs/kueue#222"]' "$STATE/queue.json" >/dev/null \
+  && ok || bad "score-based promotion: the promoted issue should leave the queue"
+
+# 33: the runner's count wins over whatever the model emits
+new_state t33
+MOCK_CLAUDE_OUT="$WORK/t33/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":99}' \
+  > "$MOCK_CLAUDE_OUT"
+run_rr >/dev/null 2>&1 || true
+jq -e '.[] | select(.issue == "kubernetes/kubernetes#111") | .reeval_count == 1' "$STATE/queue.json" >/dev/null \
+  && ok || bad "runner count: reeval_count is prior+1 from the queue, never the model's number"
+
+# 34: the thresholds the runner enforces are the ones the prompt states.
+# Same drift guard as the WIP cap: one place defines the number, and the
+# text the model reads must agree with it.
+PROMOTE_AT="$(bash -c 'source "'"$HERE"'/../scripts/lib.sh"; echo "$OSS_LAB_PROMOTE_AT"')"
+DROP_BELOW="$(bash -c 'source "'"$HERE"'/../scripts/lib.sh"; echo "$OSS_LAB_DROP_BELOW"')"
+[ -n "$PROMOTE_AT" ] && [ -n "$DROP_BELOW" ] && ok || bad "thresholds: lib.sh should define OSS_LAB_PROMOTE_AT and OSS_LAB_DROP_BELOW"
+grep -qF "weighted_total >= $PROMOTE_AT" "$HERE/../prompt.md" \
+  && ok || bad "thresholds: prompt.md routing rule should state the promote threshold lib.sh enforces ($PROMOTE_AT)"
+grep -qF "< $DROP_BELOW" "$HERE/../prompt.md" \
+  && ok || bad "thresholds: prompt.md routing rule should state the drop threshold lib.sh enforces ($DROP_BELOW)"
+grep -q "Queue re-evaluation mode" "$HERE/../prompt.md" \
+  && bad "one contract: prompt.md must not carry a re-evaluation mode any more" || ok
 
 summary run_reeval

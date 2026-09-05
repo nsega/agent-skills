@@ -98,15 +98,24 @@ Flow controls:
 - **Queue decay:** the weekly pass first revalidates every queued issue
   upstream (zero tokens, `oss_lab_revalidate_queue`) and drops the ones
   that closed, were assigned, or grew a linked PR; only the survivors are
-  re-scored, and two consecutive sub-threshold scores drop an issue. The
-  re-score reads the copy revalidation fetched, shaped exactly as
-  `fetch-issues.sh` shapes a new issue and with the prior rationale and
-  axis scores withheld, so a queued issue is graded on the same evidence
-  the first time and every week after. queue.json itself still holds only
-  the scoring object. An issue whose fetch failed is left out of the paid
-  call and stays queued untouched for next week; if none could be fetched
-  the pass aborts without advancing the stamp, since re-grading last
-  week's numbers is the blind pass this exists to avoid.
+  re-scored. The re-score reads the copy revalidation fetched, shaped
+  exactly as `fetch-issues.sh` shapes a new issue and with nothing from the
+  prior pass attached, so the model sees a queued issue exactly as it sees
+  a new one and there is one scoring contract, not two. What happens to
+  the score is the runner's decision, by the same principle as the WIP
+  cap: a claim drops the issue whatever it scored; a score at or above the
+  promote threshold is a promotion candidate regardless of the route the
+  model wrote (so a 7.1 the model capped last week takes the next free
+  slot instead of waiting to be re-rolled); two consecutive sub-threshold
+  scores drop it; anything else stays with its new score and
+  `reeval_count` advanced from the queue's own record. The thresholds are
+  `OSS_LAB_PROMOTE_AT` and `OSS_LAB_DROP_BELOW` in `scripts/lib.sh`,
+  beside the cap, and a test pins that `prompt.md` states the same
+  numbers. queue.json itself still holds only the scoring object. An issue
+  whose fetch failed is left out of the paid call and stays queued
+  untouched for next week; if none could be fetched the pass aborts
+  without advancing the stamp, since re-grading last week's numbers is the
+  blind pass this exists to avoid.
   Revalidating first is what makes the decay work at all: a settled issue
   still scores mid-band, so it never trips the two-strike rule, and it
   would otherwise be paid for every week while holding a promotion slot
