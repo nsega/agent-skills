@@ -70,19 +70,65 @@ if [[ "$LIVE_COUNT" -eq 0 ]]; then
   exit 0
 fi
 
+# --- Assemble the evidence (zero tokens) --------------------------------
+# queue.json holds only the scoring object. Fed back as-is, the model would
+# re-grade its own one-sentence rationale with no title, body, labels or
+# comments, and scores would move on sampling noise rather than on anything
+# that changed upstream. Guard R2 has just fetched every surviving issue to
+# check its state, and kept the copy: that is the evidence, shaped exactly
+# as fetch-issues.sh shapes a new issue, so the model grades the same input
+# the first time and every time after. Only issues with comments cost one
+# more call, as they did at the first score.
+#
+# The prior rationale and axis scores are deliberately NOT passed. They
+# would anchor the model to its own past reasoning, which is the opposite
+# of re-evaluating on new evidence. Only what the decay rule needs goes
+# along: reeval_count and previous_total.
+#
+# An issue with no fresh copy (its fetch failed, so Guard R2 called it
+# "unknown") is left out. The merge below keeps an unscored issue untouched,
+# so it is simply retried next week.
+# Only the shaped lines are appended to the file; the progress line for a
+# skipped issue goes to the log like every other one, and must not end up
+# as a line of scorer input.
+EVIDENCE="$(mktemp)"
+while IFS= read -r item; do
+  [[ -n "$item" ]] || continue
+  id="$(jq -r '.issue // empty' <<<"$item")"
+  [[ -n "$id" ]] || continue
+  cache="$(oss_lab_issue_cache "$id")"
+  if [[ ! -f "$cache" ]] || [[ -n "$(find "$cache" -mmin +50 2>/dev/null)" ]]; then
+    echo "reeval: no fresh upstream copy of $id, leaving it queued for next week"
+    continue
+  fi
+  jq -c . "$cache" | oss_lab_shape_issue "${id%%#*}" | oss_lab_attach_comments |
+    jq -c --argjson prior "$item" \
+      '. + {reeval_count: ($prior.reeval_count // 0), previous_total: $prior.weighted_total}' \
+    >> "$EVIDENCE"
+done < <(jq -c '.[]' "$QUEUE_FILE")
+
+# Nothing fetched means nothing to score on: re-grading last week's numbers
+# is exactly the blind pass this step exists to avoid. Retry next hour.
+if [[ ! -s "$EVIDENCE" ]]; then
+  rm -f "$EVIDENCE"
+  echo "abort: no fresh upstream copy of any queued issue, nothing to score (stamp not advanced)" >&2
+  exit 1
+fi
+
 # --- Re-score with Claude (the only token-consuming step) ---------------
 # `--tools ""` disables every tool, for the same reason as in run-scout.sh:
 # queued items carry text that originated in untrusted public issues, and
 # a tool-less scorer has nothing to exfiltrate secrets with. REEVAL=1 and
 # WIP_COUNT reach the model as prompt text, since an env var is invisible.
-RESULTS="$(jq -c '.[]' "$QUEUE_FILE" | claude -p "$(cat "$SKILL_DIR/prompt.md")
+RESULTS="$(claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 REEVAL=1
 WIP_COUNT=$WIP_COUNT
 WIP_CAP=$OSS_LAB_WIP_CAP" \
   --tools "" \
   --max-turns 15 \
-  --output-format text)"
+  --output-format text < "$EVIDENCE")"
+rm -f "$EVIDENCE"
 
 # If NOTHING parses, abort without advancing the stamp so the pass is
 # retried next hour instead of being silently skipped for a week.

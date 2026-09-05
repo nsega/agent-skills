@@ -43,9 +43,11 @@ Every weekday hour (09:00–18:00), a launchd job runs one iteration:
 
 The weekly re-evaluation closes the loop from both ends. It first
 revalidates the whole queue upstream for free and drops what has been
-settled, then re-scores only what survives; a queued issue that now clears
-the threshold is promoted into a task (within the same WIP budget), so the
-queue has an exit and not just an entrance.
+settled, then re-scores only what survives, from the upstream copy that
+revalidation just fetched: the paid step reads each issue as it stands
+today (title, labels, body, recent comments), never its own prior score. A
+queued issue that now clears the threshold is promoted into a task (within
+the same WIP budget), so the queue has an exit and not just an entrance.
 
 ## Etiquette by design
 
@@ -96,7 +98,15 @@ Flow controls:
 - **Queue decay:** the weekly pass first revalidates every queued issue
   upstream (zero tokens, `oss_lab_revalidate_queue`) and drops the ones
   that closed, were assigned, or grew a linked PR; only the survivors are
-  re-scored, and two consecutive sub-threshold scores drop an issue.
+  re-scored, and two consecutive sub-threshold scores drop an issue. The
+  re-score reads the copy revalidation fetched, shaped exactly as
+  `fetch-issues.sh` shapes a new issue and with the prior rationale and
+  axis scores withheld, so a queued issue is graded on the same evidence
+  the first time and every week after. queue.json itself still holds only
+  the scoring object. An issue whose fetch failed is left out of the paid
+  call and stays queued untouched for next week; if none could be fetched
+  the pass aborts without advancing the stamp, since re-grading last
+  week's numbers is the blind pass this exists to avoid.
   Revalidating first is what makes the decay work at all: a settled issue
   still scores mid-band, so it never trips the two-strike rule, and it
   would otherwise be paid for every week while holding a promotion slot
