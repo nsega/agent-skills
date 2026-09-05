@@ -129,7 +129,15 @@ all. Never exceed the cap.
 
 ## Queue re-evaluation mode
 
-When invoked with REEVAL=1, input is the existing queue. Re-score with
-the same rubric. Add "reeval_count" (increment from input). If an issue
-scores < 5.0 twice consecutively (reeval_count >= 2 and both below
-threshold), route it to "drop".
+When invoked with REEVAL=1, each input line is a queued issue as it stands
+upstream today: the same title, labels, body, and `recent_comments` a new
+issue carries, plus two fields from its last pass, `reeval_count` and
+`previous_total`. Its earlier rationale and axis scores are withheld on
+purpose. Score it fresh against the rubric on what is in front of you;
+`previous_total` exists for the decay rule below, not as an anchor. A new
+claim in `recent_comments` routes it `"drop"` exactly as it would a new
+issue.
+
+Emit `reeval_count` as the input value plus one. If `previous_total` is
+below 5.0 and the new weighted_total is too (two consecutive sub-threshold
+scores), route it `"drop"`.

@@ -112,6 +112,20 @@ oss_lab_close_task() {
     -H "Authorization: Bearer $TODOIST_TOKEN" >/dev/null
 }
 
+# --- per-run cache ------------------------------------------------------
+# Lives outside the tracked state (sync commits by pathspec, and the state
+# repo ignores .cache/). Holds the linked-PR search per repo and the raw
+# copy of every issue whose status was checked this run, so the weekly pass
+# can score from the issue as it stands today without a second fetch.
+oss_lab_cache_dir() {
+  echo "${OSS_LAB_CACHE_DIR:-${OSS_LAB_STATE_DIR:-$HOME/.local/share/oss-lab}/.cache}"
+}
+
+# Path of the cached upstream copy of an "owner/repo#123" issue.
+oss_lab_issue_cache() {
+  echo "$(oss_lab_cache_dir)/issue-${1//[\/#]/_}.json"
+}
+
 # --- linked pull requests ----------------------------------------------
 # Issue numbers in a repo that already have a linked PR: someone is mid-
 # implementation, so the issue is taken even with no assignee (the k8s norm
@@ -127,7 +141,7 @@ oss_lab_close_task() {
 # the fetch filter share one computation instead of paying for it twice.
 # Cache files live outside the tracked state (sync commits by pathspec).
 oss_lab_linked_prs() {
-  local repo="$1" cache_dir="${OSS_LAB_CACHE_DIR:-${OSS_LAB_STATE_DIR:-$HOME/.local/share/oss-lab}/.cache}"
+  local repo="$1" cache_dir; cache_dir="$(oss_lab_cache_dir)"
   local cache="$cache_dir/linked-${repo//\//_}.json"
   mkdir -p "$cache_dir"
   # Fresh enough for one hourly iteration.
@@ -162,6 +176,11 @@ oss_lab_issue_status() {
   repo="${id%%#*}"; num="${id##*#}"
   me="$(oss_lab_github_login)"
   json="$(gh api "repos/$repo/issues/$num" </dev/null 2>/dev/null)" || { echo "unknown"; return 0; }
+  # Keep the copy. The weekly pass scores from it, so the paid step reads
+  # the issue as it stands today at no extra fetch. Best-effort: a cache
+  # that cannot be written costs that issue its re-score, not the verdict.
+  { mkdir -p "$(oss_lab_cache_dir)" &&
+    printf '%s' "$json" > "$(oss_lab_issue_cache "$id")"; } 2>/dev/null || true
 
   state="$(jq -r '.state // "open"' <<<"$json")"
   [[ "$state" == "closed" ]] && { echo "stale:closed"; return 0; }
@@ -256,6 +275,59 @@ oss_lab_revalidate_queue() {
   # shellcheck disable=SC2016
   oss_lab_append_json "$file" --argjson settled "$stale" \
     'map(select(.issue as $i | ($settled | index($i)) == null))'
+}
+
+# --- scorer input -------------------------------------------------------
+# Shape raw GitHub issue objects (a stream on stdin) into what the scorer
+# reads: the fields the rubric grades and nothing else, body capped so one
+# essay cannot crowd a batch. Keeps .number and .repo for
+# oss_lab_attach_comments, which strips them. Shared by the first score
+# (fetch-issues.sh) and the weekly re-score (run-reeval.sh) so the model
+# grades the same input either way.
+oss_lab_shape_issue() {
+  local repo="$1"
+  jq -c --arg repo "$repo" '{
+    # "issue", not "id": the scorer echoes this key back as its output
+    # identifier (the output contract in prompt.md), and a mismatch here
+    # makes the router dereference a missing field.
+    issue: "\($repo)#\(.number)",
+    number: .number,
+    repo: $repo,
+    title: (.title // ""),
+    labels: [(.labels // [])[].name],
+    comments: (.comments // 0),
+    created_at: .created_at,
+    url: .html_url,
+    body: (.body // "" | .[0:1500])
+  }'
+}
+
+# Attach the tail of the comment thread to each shaped issue (JSONL on
+# stdin) that has one, so the scorer can see a soft claim ("I can take
+# this") that leaves no assignee and no PR. Only issues with comments cost
+# an extra call. Strips the .number/.repo plumbing on the way out.
+oss_lab_attach_comments() {
+  local item n repo num recent
+  while IFS= read -r item; do
+    [[ -n "$item" ]] || continue
+    n="$(jq -r '.comments' <<<"$item")"
+    if [[ "$n" == "0" ]]; then
+      jq -c 'del(.number, .repo)' <<<"$item"
+      continue
+    fi
+    repo="$(jq -r '.repo' <<<"$item")"
+    num="$(jq -r '.number' <<<"$item")"
+    recent="$(gh api "repos/$repo/issues/$num/comments" \
+                --jq '[.[-3:][] | {author: .user.login,
+                                   body: (.body // "" | gsub("\\s+"; " ") | .[0:240])}]' \
+              2>/dev/null || echo '[]')"
+    # Validate rather than trust: a nonzero exit is caught above, but a call
+    # that exits 0 while printing anything other than an array would reach
+    # --argjson as invalid JSON, and jq's usage error would kill the whole
+    # batch under set -e. One odd comment thread must not cost the window.
+    jq -e 'type == "array"' <<<"$recent" >/dev/null 2>&1 || recent='[]'
+    jq -c --argjson rc "$recent" 'del(.number, .repo) | .recent_comments = $rc' <<<"$item"
+  done
 }
 
 # --- model output -------------------------------------------------------

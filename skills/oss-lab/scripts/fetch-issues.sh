@@ -67,44 +67,11 @@ for repo in "${REPOS[@]}"; do
     | select((.assignees // []) == [])
     | select(([.labels[].name] | map(IN($excl[])) | any) | not)
     | select(($claimed | index($num)) == null)
-    | select(($seen[0] | index($id)) == null)
-    | {
-        # "issue", not "id": the scorer echoes this key back as its output
-        # identifier (the output contract in prompt.md), and a mismatch
-        # here makes the router dereference a missing field.
-        issue: $id,
-        number: .number,
-        repo: $repo,
-        title: .title,
-        labels: [.labels[].name],
-        comments: .comments,
-        created_at: .created_at,
-        url: .html_url,
-        body: (.body // "" | .[0:1500])
-      }'
+    | select(($seen[0] | index($id)) == null)' |
+  # Same shape the weekly re-score feeds the model, so a queued issue is
+  # graded on the same input the first time and every time after.
+  oss_lab_shape_issue "$repo"
 done |
-# Attach the tail of the comment thread for issues that have one, so the
-# scorer can see a soft claim ("I can take this") that leaves no assignee
-# and no PR. Only issues with comments cost an extra call.
-while IFS= read -r item; do
-  [[ -n "$item" ]] || continue
-  n="$(jq -r '.comments' <<<"$item")"
-  if [[ "$n" == "0" ]]; then
-    jq -c 'del(.number, .repo)' <<<"$item"
-    continue
-  fi
-  repo="$(jq -r '.repo' <<<"$item")"
-  num="$(jq -r '.number' <<<"$item")"
-  recent="$(gh api "repos/$repo/issues/$num/comments" \
-              --jq '[.[-3:][] | {author: .user.login,
-                                 body: (.body // "" | gsub("\\s+"; " ") | .[0:240])}]' \
-            2>/dev/null || echo '[]')"
-  # Validate rather than trust: a nonzero exit is caught above, but a call
-  # that exits 0 while printing anything other than an array would reach
-  # --argjson as invalid JSON, and jq's usage error would kill the whole
-  # fetch under set -e. One odd comment thread must not cost the window.
-  jq -e 'type == "array"' <<<"$recent" >/dev/null 2>&1 || recent='[]'
-  jq -c --argjson rc "$recent" 'del(.number, .repo) | .recent_comments = $rc' <<<"$item"
-done
+oss_lab_attach_comments
 
 echo "$FETCH_START" > "$LAST_RUN_FILE.pending"

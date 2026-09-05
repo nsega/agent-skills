@@ -79,7 +79,12 @@ case "$all" in
   *"repos/"*"/issues/"*)
     key="$(sed -E 's#.*repos/([^ ]+)/issues/([0-9]+).*#\1#' <<<"$all")"
     num="$(sed -E 's#.*repos/[^ ]+/issues/([0-9]+).*#\1#' <<<"$all")"
-    raw="$(lookup "${MOCK_ISSUES_JSON:-}" "$key#$num" '{"state":"open","assignees":[]}')" ;;
+    raw="$(lookup "${MOCK_ISSUES_JSON:-}" "$key#$num" '{"state":"open","assignees":[]}')"
+    # A fixture value of "unreachable" fails this one fetch, the way a 5xx
+    # or a network blip would, without taking the whole API down.
+    [ "$raw" = '"unreachable"' ] && exit 1
+    # The real API always returns .number; fixtures may leave it out.
+    raw="$(jq -c --argjson n "$num" '.number //= $n' <<<"$raw")" ;;
   *"repos/"*"/issues"*)   # the issues LIST endpoint
     if [ -n "${MOCK_FETCH:-}" ] && [ -f "$MOCK_FETCH" ]; then
       raw="$(jq -s -c '.' "$MOCK_FETCH")"

@@ -34,6 +34,7 @@ run_rr() {
       MOCK_WIP="${MOCK_WIP:-3}" \
       MOCK_GH_LOGIN=nsega \
       MOCK_ISSUES_JSON="${MOCK_ISSUES_JSON:-}" \
+      MOCK_COMMENTS_JSON="${MOCK_COMMENTS_JSON:-}" \
       MOCK_LINKED="${MOCK_LINKED:-}" \
       MOCK_GH_DOWN="${MOCK_GH_DOWN:-}" \
       OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-4}" \
@@ -212,20 +213,23 @@ jq -e '[.[].issue] == ["kubernetes-sigs/kueue#222"]' "$STATE/queue.json" >/dev/n
 echo "$out" | grep -q "dequeued kubernetes/kubernetes#111 (has a linked PR)" \
   && ok || bad "prune linked: should log the reason"
 
-# 12: GitHub unreachable -> nothing is pruned. An "unknown" status must
-# never be read as settled, or one network blip empties the queue.
+# 12: GitHub unreachable -> nothing is pruned, and nothing is re-scored.
+# "unknown" must never read as settled, or one network blip empties the
+# queue; and with no upstream copy of any issue the paid call would only be
+# re-grading last week's score, so the pass aborts without advancing the
+# stamp and retries next hour like every other abort.
 new_state t12
 MOCK_CLAUDE_OUT="$WORK/t12/claude_out"
 printf '%s\n' \
   '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue","reeval_count":2}' \
   > "$MOCK_CLAUDE_OUT"
-rc=0; MOCK_GH_DOWN=1 run_rr >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 0 ] && ok || bad "prune unknown: should exit 0 (got $rc)"
+rc=0; err="$(MOCK_GH_DOWN=1 run_rr 2>&1 >/dev/null)" || rc=$?
+[ "$rc" -eq 1 ] && ok || bad "gh down: should abort with exit 1 (got $rc)"
 jq -e 'length == 2' "$STATE/queue.json" >/dev/null \
-  && ok || bad "prune unknown: an unreachable GitHub must not empty the queue"
-[ "$(wc -l < "$MOCK_LOG/claude_stdin" | tr -d ' ')" -eq 2 ] \
-  && ok || bad "prune unknown: both issues should still be re-scored"
+  && ok || bad "gh down: an unreachable GitHub must not empty the queue"
+[ ! -e "$MOCK_LOG/claude_args" ] && ok || bad "gh down: with no upstream evidence the paid call must not run"
+[ ! -e "$STATE/last_reeval" ] && ok || bad "gh down: stamp must not advance"
+echo "$err" | grep -q "stamp not advanced" && ok || bad "gh down: should explain the abort"
 
 # 13: pruning the whole queue skips the paid call entirely
 new_state t13
@@ -379,5 +383,78 @@ printf '%s\n' \
 run_rr >/dev/null 2>&1 || true
 [ "$(wc -l < "$MOCK_LOG/gh_user_calls" 2>/dev/null | tr -d ' ')" -eq 1 ] \
   && ok || bad "login memo: 3 queued entries should cost 1 'gh api user', not one each (got $(wc -l < "$MOCK_LOG/gh_user_calls" 2>/dev/null | tr -d ' '))"
+
+# ---- the paid pass scores current upstream evidence -------------------
+# queue.json holds only the scoring object. Before this, the weekly pass fed
+# that object back to the model, which then re-graded its own one-sentence
+# rationale with no title, body, labels or comments: scores drifted on
+# sampling noise, not on anything that had changed. Guard R2 already fetches
+# every queued issue to check its state; these cases pin that the fetched
+# copy now reaches the paid call.
+
+ISSUE_111='{"state":"open","assignees":[],
+  "title":"scheduler_perf flakes on arm64",
+  "body":"Fails roughly 1 in 20 runs since the metrics refactor.",
+  "labels":[{"name":"kind/flake"},{"name":"sig/scheduling"}],
+  "comments":0,"html_url":"https://github.com/kubernetes/kubernetes/issues/111",
+  "created_at":"2026-08-01T00:00:00Z"}'
+
+# 24: stdin carries the issue as it stands upstream, not the prior score
+new_state t24
+MOCK_CLAUDE_OUT="$WORK/t24/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  > "$MOCK_CLAUDE_OUT"
+printf '{"kubernetes/kubernetes#111": %s}\n' "$ISSUE_111" > "$WORK/t24/issues.json"
+rc=0; MOCK_ISSUES_JSON="$WORK/t24/issues.json" run_rr >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "evidence: should exit 0 (got $rc)"
+line="$(grep 'kubernetes/kubernetes#111' "$MOCK_LOG/claude_stdin" 2>/dev/null || true)"
+jq -e '.title == "scheduler_perf flakes on arm64" and (.body | startswith("Fails roughly"))' <<<"$line" >/dev/null \
+  && ok || bad "evidence: stdin should carry the current title and body (got: ${line:0:120})"
+jq -e '.labels == ["kind/flake","sig/scheduling"]' <<<"$line" >/dev/null \
+  && ok || bad "evidence: stdin should carry the current labels"
+jq -e '.reeval_count == 0 and .previous_total == 5.6' <<<"$line" >/dev/null \
+  && ok || bad "evidence: stdin should carry reeval_count and previous_total from the prior pass"
+jq -e '(has("rationale_consistency") or has("scores") or has("route")) | not' <<<"$line" >/dev/null \
+  && ok || bad "evidence: the prior rationale, axis scores and route must not anchor the re-score"
+jq -e '(has("number") or has("repo")) | not' <<<"$line" >/dev/null \
+  && ok || bad "evidence: internal plumbing fields should not reach the scorer"
+line2="$(grep 'kubernetes-sigs/kueue#222' "$MOCK_LOG/claude_stdin" 2>/dev/null || true)"
+jq -e '.reeval_count == 1 and .previous_total == 4.4' <<<"$line2" >/dev/null \
+  && ok || bad "evidence: a once-struck issue should carry its count and its sub-threshold total"
+
+# 25: a commented issue carries the tail of its thread, so a soft claim that
+# arrived while it sat queued is visible to the re-score, as it is to the
+# first score
+new_state t25
+MOCK_CLAUDE_OUT="$WORK/t25/claude_out"; echo '{}' > "$MOCK_CLAUDE_OUT"
+printf '{"kubernetes/kubernetes#111": %s}\n' "$(jq -c '.comments = 2' <<<"$ISSUE_111")" > "$WORK/t25/issues.json"
+echo '{"kubernetes/kubernetes#111": [{"user":{"login":"abdel"},"body":"I can take this one."}]}' > "$WORK/t25/comments.json"
+MOCK_ISSUES_JSON="$WORK/t25/issues.json" MOCK_COMMENTS_JSON="$WORK/t25/comments.json" run_rr >/dev/null 2>&1 || true
+line="$(grep 'kubernetes/kubernetes#111' "$MOCK_LOG/claude_stdin" 2>/dev/null || true)"
+jq -e '.recent_comments[0].author == "abdel"' <<<"$line" >/dev/null \
+  && ok || bad "evidence: a commented issue should carry recent_comments"
+line2="$(grep 'kubernetes-sigs/kueue#222' "$MOCK_LOG/claude_stdin" 2>/dev/null || true)"
+jq -e 'has("recent_comments") | not' <<<"$line2" >/dev/null \
+  && ok || bad "evidence: a comment-free issue should not pay for the comments call"
+
+# 26: an issue whose upstream copy could not be fetched is left out of the
+# paid call and stays queued untouched, to be retried next week
+new_state t26
+MOCK_CLAUDE_OUT="$WORK/t26/claude_out"
+printf '%s\n' \
+  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  > "$MOCK_CLAUDE_OUT"
+echo '{"kubernetes-sigs/kueue#222": "unreachable"}' > "$WORK/t26/issues.json"
+rc=0; out="$(MOCK_ISSUES_JSON="$WORK/t26/issues.json" run_rr 2>&1)" || rc=$?
+[ "$rc" -eq 0 ] && ok || bad "unfetched: one unreachable issue must not fail the pass (got $rc)"
+[ "$(wc -l < "$MOCK_LOG/claude_stdin" | tr -d ' ')" -eq 1 ] \
+  && ok || bad "unfetched: only the fetched issue should reach the paid call"
+grep -q "kueue#222" "$MOCK_LOG/claude_stdin" \
+  && bad "unfetched: an issue with no upstream copy must not be re-scored blind" || ok
+jq -e '.[] | select(.issue == "kubernetes-sigs/kueue#222") | .weighted_total == 4.4 and .reeval_count == 1' \
+  "$STATE/queue.json" >/dev/null && ok || bad "unfetched: the issue should stay queued with its prior fields"
+echo "$out" | grep -q "kubernetes-sigs/kueue#222" \
+  && ok || bad "unfetched: should say which issue was left for next week"
 
 summary run_reeval
