@@ -41,7 +41,9 @@ new_state g1
 rc=0; out="$(run_scout 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "no stamp: scout should exit 0 (got $rc)"
 echo "$out" | grep -q "no new issues" && ok || bad "no stamp: scout should still take the empty-fetch exit"
-grep -q "REEVAL=1" "$MOCK_LOG/claude_args" 2>/dev/null && ok || bad "no stamp: reeval should invoke claude with REEVAL=1"
+# The scout exits before its own paid call when the fetch is empty, so any
+# claude invocation here is the weekly pass.
+[ -e "$MOCK_LOG/claude_args" ] && ok || bad "no stamp: reeval should invoke claude"
 grep -qE '^[0-9]+$' "$STATE/last_reeval" && ok || bad "no stamp: reeval should write the stamp"
 
 # 2: fresh stamp -> reeval skipped

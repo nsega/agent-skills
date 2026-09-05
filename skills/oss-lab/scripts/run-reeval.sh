@@ -80,10 +80,10 @@ fi
 # the first time and every time after. Only issues with comments cost one
 # more call, as they did at the first score.
 #
-# The prior rationale and axis scores are deliberately NOT passed. They
-# would anchor the model to its own past reasoning, which is the opposite
-# of re-evaluating on new evidence. Only what the decay rule needs goes
-# along: reeval_count and previous_total.
+# Nothing from the prior pass rides along: not the rationale or axis scores,
+# which would anchor the model to its own past reasoning, and not the count
+# or the previous total either, because the decay is decided below by the
+# runner. The model sees a queued issue exactly as it sees a new one.
 #
 # An issue with no fresh copy (its fetch failed, so Guard R2 called it
 # "unknown") is left out. The merge below keeps an unscored issue untouched,
@@ -101,10 +101,7 @@ while IFS= read -r item; do
     echo "reeval: no fresh upstream copy of $id, leaving it queued for next week"
     continue
   fi
-  jq -c . "$cache" | oss_lab_shape_issue "${id%%#*}" | oss_lab_attach_comments |
-    jq -c --argjson prior "$item" \
-      '. + {reeval_count: ($prior.reeval_count // 0), previous_total: $prior.weighted_total}' \
-    >> "$EVIDENCE"
+  jq -c . "$cache" | oss_lab_shape_issue "${id%%#*}" | oss_lab_attach_comments >> "$EVIDENCE"
 done < <(jq -c '.[]' "$QUEUE_FILE")
 
 # Nothing fetched means nothing to score on: re-grading last week's numbers
@@ -118,11 +115,12 @@ fi
 # --- Re-score with Claude (the only token-consuming step) ---------------
 # `--tools ""` disables every tool, for the same reason as in run-scout.sh:
 # queued items carry text that originated in untrusted public issues, and
-# a tool-less scorer has nothing to exfiltrate secrets with. REEVAL=1 and
-# WIP_COUNT reach the model as prompt text, since an env var is invisible.
+# a tool-less scorer has nothing to exfiltrate secrets with. WIP_COUNT and
+# WIP_CAP reach the model as prompt text, since an env var is invisible.
+# There is no re-evaluation flag: the model scores an issue the same way
+# every time, and what happens to that score is the runner's decision.
 RESULTS="$(claude -p "$(cat "$SKILL_DIR/prompt.md")
 
-REEVAL=1
 WIP_COUNT=$WIP_COUNT
 WIP_CAP=$OSS_LAB_WIP_CAP" \
   --tools "" \
@@ -138,25 +136,69 @@ if [[ -z "$VALID_RESULTS" ]]; then
   exit 1
 fi
 
-# --- Rewrite the queue --------------------------------------------------
-# Keyed merge over the ORIGINAL queue: an issue Claude skipped stays queued
-# untouched (rescored next week) rather than being silently lost, an issue
-# routed "drop" is removed, and a hallucinated issue never enters.
+# --- Decide each score (the runner's call, not the model's) -------------
+# Keyed join over the ORIGINAL queue. The model only scored; from here on
+# the same rule that governs the WIP cap applies: a runner that trusted the
+# model to count or to apply the thresholds would break the invariant the
+# moment it miscounted. In order:
+#   1. a claim drops the issue whatever it scored. `claimed_by` is the
+#      signal; a "drop" with no claimed_by on a score over the bar can only
+#      be a claim too (the threshold is the only other reason to drop), and
+#      the loop would rather lose a candidate than take announced work.
+#   2. under the bar twice in a row drops it (the decay rule).
+#   3. otherwise it stays with its new score, route "queue", and
+#      reeval_count advanced from the queue's own record.
+# An issue the model skipped stays untouched (rescored next week) rather
+# than being silently lost, and a hallucinated issue never enters.
 #
-# An entry with no .issue is also removed here: it can be neither re-scored
-# nor promoted, so there is nothing to keep it for. Guard R2 leaves it
-# alone (it proves nothing about it), which means the count below reports
-# it under "dropped" rather than "stale-pruned".
-MERGED="$(mktemp)"
-echo "$VALID_RESULTS" | jq -s --slurpfile orig "$QUEUE_FILE" '
+# An entry with no .issue is removed here: it can be neither re-scored nor
+# promoted, so there is nothing to keep it for. Guard R2 leaves it alone (it
+# proves nothing about it), which means the count below reports it under
+# "dropped" rather than "stale-pruned".
+DECISION="$(mktemp)"
+echo "$VALID_RESULTS" | jq -s --slurpfile orig "$QUEUE_FILE" \
+    --argjson drop_below "$OSS_LAB_DROP_BELOW" '
   (map(select(.issue != null)) | map({key: .issue, value: .}) | from_entries) as $rescored
-  | [ $orig[0][] | select(.issue != null) | $rescored[.issue] // . ]
-  | map(select(.route != "drop"))' > "$MERGED"
+  | [ $orig[0][] | select(.issue != null)
+      | . as $prior
+      | $rescored[.issue] as $new
+      | if $new == null then {keep: $prior}
+        else
+          ($new.weighted_total // 0) as $wt
+          | if $new.claimed_by != null then
+              {drop: {issue: .issue, why: "claimed by \($new.claimed_by)"}}
+            elif $new.route == "drop" and $wt >= $drop_below then
+              {drop: {issue: .issue,
+                      why: "dropped by the scorer at \($wt) with no claimed_by, treated as a claim"}}
+            elif $wt < $drop_below and ($prior.weighted_total // $drop_below) < $drop_below then
+              {drop: {issue: .issue,
+                      why: "sub-threshold twice: \($prior.weighted_total) then \($wt)"}}
+            else
+              {keep: ($new
+                      | del(.wip_capped, .claimed_by)
+                      | .route = "queue"
+                      | .reeval_count = (($prior.reeval_count // 0) + 1))}
+            end
+        end ]
+  | {kept:    [.[] | .keep // empty],
+     dropped: [.[] | .drop // empty],
+     scored:  ($rescored | keys)}' > "$DECISION"
+
+jq -r '.dropped[] | "reeval: dropping \(.issue) (\(.why))"' "$DECISION"
+MERGED="$(mktemp)"
+jq '.kept' "$DECISION" > "$MERGED"
+SCORED="$(jq -c '.scored' "$DECISION")"
+rm -f "$DECISION"
 
 # --- Promote what now clears the bar ------------------------------------
 # Without this the queue has an entrance but no exit: an issue that rescored
-# above the threshold would be written back as route "todoist" and re-scored
-# (paid) every week forever without ever becoming a task.
+# above the threshold would be re-scored (paid) every week forever without
+# ever becoming a task. Candidates are picked by SCORE, not by the route the
+# model wrote: the model demotes past the cap on its own count and writes
+# route "queue", so selecting on route left a capped 7.1 unpromotable until
+# it happened to be re-rolled as "todoist". Only issues scored this pass
+# qualify; one the model skipped, or whose fetch failed, keeps a score the
+# pass did not confirm and waits.
 BUDGET=$(( OSS_LAB_WIP_CAP - WIP_COUNT ))
 (( BUDGET < 0 )) && BUDGET=0
 PROMOTED_IDS="$(mktemp)"
@@ -183,18 +225,19 @@ if (( BUDGET > 0 )); then
     else
       echo "warn: todoist create failed for $id, leaving it queued" >&2
     fi
-  done < <(jq -c --argjson n "$BUDGET" \
-             '[.[] | select(.route == "todoist")] | sort_by(-(.weighted_total // 0)) | .[0:$n] | .[]' \
-             "$MERGED")
+  done < <(jq -c --argjson n "$BUDGET" --argjson at "$OSS_LAB_PROMOTE_AT" --argjson scored "$SCORED" '
+             [ .[] | select((.weighted_total // 0) >= $at)
+                   | select(.issue as $i | ($scored | index($i)) != null) ]
+             | sort_by(-(.weighted_total // 0)) | .[0:$n] | .[]' "$MERGED")
 fi
 
-# Promoted issues leave the queue; anything still routed "todoist" that the
-# budget could not cover stays, flagged, for the next pass.
+# Promoted issues leave the queue; anything over the bar that the budget
+# could not cover stays, flagged, for the next pass.
 tmp="$(mktemp)"
-jq --rawfile promoted "$PROMOTED_IDS" '
+jq --rawfile promoted "$PROMOTED_IDS" --argjson at "$OSS_LAB_PROMOTE_AT" '
   ($promoted | split("\n") | map(select(length > 0))) as $done
   | map(select(.issue as $i | ($done | index($i)) == null))
-  | map(if .route == "todoist" then .wip_capped = true else . end)' "$MERGED" > "$tmp" \
+  | map(if (.weighted_total // 0) >= $at then .wip_capped = true else . end)' "$MERGED" > "$tmp" \
   && mv "$tmp" "$QUEUE_FILE"
 rm -f "$MERGED" "$PROMOTED_IDS"
 
