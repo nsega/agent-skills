@@ -20,7 +20,8 @@ Every weekday hour (09:00–18:00), a launchd job runs one iteration:
    issue has since been closed, assigned to someone else, or picked up
    in a pull request is closed, freeing its WIP slot. Without this the
    cap fills with work that is already taken and real candidates pile up
-   in the queue unreachable.
+   in the queue unreachable. The weekly pass applies the same check to
+   the queue itself (see Queue decay).
 2. **Fetch (bash, zero tokens):** `gh api` pulls new open issues from
    the target repos, filters out assigned / stale / excluded-label
    issues and any issue that already has a linked pull request, and
@@ -40,10 +41,11 @@ Every weekday hour (09:00–18:00), a launchd job runs one iteration:
 6. **Commit state:** `seen.json` and `last_run` advance so the next
    window resumes cleanly even after a rate-limit stop.
 
-The weekly re-evaluation closes the loop: a queued issue that now clears
-the threshold is promoted into a task (within the same WIP budget, and
-skipped if someone took it meanwhile), so the queue has an exit and not
-just an entrance.
+The weekly re-evaluation closes the loop from both ends. It first
+revalidates the whole queue upstream for free and drops what has been
+settled, then re-scores only what survives; a queued issue that now clears
+the threshold is promoted into a task (within the same WIP budget), so the
+queue has an exit and not just an entrance.
 
 ## Etiquette by design
 
@@ -63,10 +65,11 @@ below are deliberate, not incidental:
   have led to duplicated effort.
 - **No hoarding.** The WIP cap (5 active tasks) exists so the loop
   never queues up more claimed work than will actually be delivered.
-- **Depth over breadth.** The consistency axis anchors scoring to one
-  SIG, one code area, and reviewers who already know the contributor:
-  sustained work in one corner of the project, not drive-by issue
-  farming across repos.
+- **Depth over breadth.** The consistency axis anchors scoring to the
+  code areas and reviewers where contributions have actually landed,
+  ranked as an active primary line and a weaker secondary one: sustained
+  work in one corner of the project, not drive-by issue farming across
+  repos.
 - **A human does the work.** Routing an issue to the task manager is
   where automation stops. Reading the issue, joining the discussion,
   and writing the fix are manual and human-owned.
@@ -76,7 +79,7 @@ below are deliberate, not incidental:
 | Axis | Weight | Measures |
 |---|---|---|
 | okr_alignment | 0.3 | Mergeable code/test contribution to a target repo |
-| consistency | 0.3 | Continuity with existing contribution line (same SIG, code area, reviewers) |
+| consistency | 0.3 | Continuity with existing contribution line (code area and reviewers, primary line first) |
 | impact | 0.2 | Post-merge reach; test infra and flaky-test fixes rank high |
 | feasibility | 0.2 | Scoped effort and expected review round-trips |
 
@@ -90,8 +93,15 @@ Flow controls:
 - **Release-cycle correction** — around code freeze, feature work is
   penalized and stabilization work is boosted (static config, updated
   quarterly in prompt.md).
-- **Queue decay** — queued issues are re-scored weekly; two consecutive
-  sub-threshold scores drop the issue. The hourly runner triggers
+- **Queue decay:** the weekly pass first revalidates every queued issue
+  upstream (zero tokens, `oss_lab_revalidate_queue`) and drops the ones
+  that closed, were assigned, or grew a linked PR; only the survivors are
+  re-scored, and two consecutive sub-threshold scores drop an issue.
+  Revalidating first is what makes the decay work at all: a settled issue
+  still scores mid-band, so it never trips the two-strike rule, and it
+  would otherwise be paid for every week while holding a promotion slot
+  nobody can use. A status of `unknown` keeps the issue, so an unreachable
+  GitHub cannot empty the queue. The hourly runner triggers
   `run-reeval.sh` once the `last_reeval` stamp is 6+ days old, so a
   slept-through Monday self-heals on the next weekday run. The pass is
   best-effort (a failure never costs the scout iteration) and retries
@@ -100,15 +110,51 @@ Flow controls:
 
 ## Rubric governance
 
-The consistency anchors (SIG, open PRs, code areas) and the release
-phase live as static blocks in `prompt.md` and are reviewed monthly and
-quarterly respectively. Weight changes require a calibration note:
-compare routed tasks against actual outcomes (started / merged /
-abandoned) and record the adjustment rationale below.
+The consistency anchors (contribution lines, code areas, reviewers,
+scoring bands) and the release phase live as static blocks in `prompt.md`
+and are reviewed monthly and quarterly respectively. Weight changes
+require a calibration note: compare routed tasks against actual outcomes
+(started / merged / abandoned) and record the adjustment rationale below.
 
 ### Calibration log
 
 - 2026-08: initial weights (0.3 / 0.3 / 0.2 / 0.2), thresholds 7.0 / 5.0.
+- 2026-09: consistency anchors rebalanced; weights and thresholds
+  unchanged. The anchors named only kubernetes/kubernetes#132761 and
+  #133906 and their `pkg/scheduler/` paths, so the scorer was deducting
+  from kueue issues for not being in kubernetes/kubernetes: recorded
+  rationales read "TAS/LWS topology assignment code is far from the
+  pkg/scheduler/ ... areas" (consistency 4) while a kubernetes/kubernetes
+  design-work issue scored 8 on code area alone. Every merged upstream
+  contribution is in kueue (#13897, #14705, #14752, all LeaderWorkerSet
+  e2e), both anchor PRs have been open over a year with no movement since
+  2026-07, and the O4 plan parks them. Anchors are now a primary (kueue)
+  and secondary (kubernetes/kubernetes) line with explicit 0–10 bands, and
+  SIG membership alone no longer counts as continuity.
+
+Open for the next monthly review (2026-10):
+
+- The 8–10 band reads "LeaderWorkerSet or another workload integration"
+  while the 6–7 band reads "kueue outside the test tree (controllers, TAS,
+  webhooks)". A workload-integration controller such as
+  `pkg/controller/jobs/mpijob` matches both, and the 2026-09-03 pass scored
+  kueue#12564 in the 8–10 band on that reading. Narrowing 8–10 to test-tree
+  work on a workload integration would resolve the overlap; it would have
+  moved that issue from 7.6 to roughly 7.0, so this is a wording question
+  rather than a routing one. Deferred deliberately, to keep anchor changes
+  on the monthly cadence.
+- The 8–10 band's clause "anything one of the reviewers above would
+  review" swallows the 6–7 band whole: tenzen-y and mimowo review kueue
+  controllers, TAS and webhooks too, so every kueue issue satisfies an
+  8–10 clause and consistency stops discriminating within kueue. This
+  already fired in the 2026-09-03 pass, whose kueue#12564 rationale cites
+  the clause by name. It is the wider form of the overlap above and wants
+  the same decision.
+- The "Familiar territory, repo-independent" anchor matches no band. Every
+  band is keyed to a repo or code area, and 0–3 requires "no anchor
+  overlap", so a Go table-driven test refactor outside the two named lines
+  has an anchor it is told to score against and nowhere to place it.
+  Either give that anchor a band or drop the bullet.
 
 ## Trust boundary
 
@@ -153,8 +199,8 @@ In the reference setup, `OSS_LAB_STATE_DIR` points at a clone of the
 private `oss-lab-state` repo: after each iteration that changes
 `seen.json` or `queue.json`, the runner commits them
 (`scout: <date> <n> scored, <t> tasked, <m> queued`, or
-`reeval: <date> <n> rescored, <p> promoted, <d> dropped` after the
-weekly pass) and pushes, best-effort. A failed push never fails the
+`reeval: <date> <n> rescored, <p> promoted, <s> stale-pruned, <d> dropped`
+after the weekly pass) and pushes, best-effort. A failed push never fails the
 iteration. `env`, `last_run(.pending)`, `last_reeval`, the `.cache/`
 directory, and logs stay untracked there.
 

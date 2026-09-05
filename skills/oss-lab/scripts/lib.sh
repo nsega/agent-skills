@@ -207,6 +207,57 @@ oss_lab_revalidate_tasks() {
   return 0
 }
 
+# Drop queued issues that upstream has already settled, rewriting the
+# queue file in place and printing one line per issue removed.
+#
+# The queue is otherwise write-only until a re-score promotes something:
+# an issue that closed, was assigned, or grew a linked PR after it was
+# queued stays there and is re-scored (paid) every week forever, because a
+# settled issue still scores mid-band and so never trips the two-strike
+# drop. Running this before the paid call makes the weekly pass rank only
+# work that is still there to take.
+#
+# The one invariant: this removes only entries it has POSITIVELY proven
+# settled. It collects the settled ids and subtracts them, rather than
+# collecting survivors and keeping those, so every way of failing to reach
+# a verdict leaves the entry queued. That covers an unreachable GitHub
+# ("unknown"), an id it cannot parse, and a read that fails outright.
+#
+# Only well-formed "owner/repo#123" ids are probed. Queue entries come from
+# the scorer, which reads untrusted public issue text, so an id may be
+# empty, carry an embedded newline, or be absent entirely; none of those is
+# guessed at. Ids are deduplicated first, since nothing stops the same
+# issue being queued twice and the probe costs a GitHub round-trip.
+oss_lab_revalidate_queue() {
+  local file="$1" id status ids stale='[]'
+  ids="$(jq -r '[ .[] | .issue? // empty
+                  | select(type == "string")
+                  | select(test("^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+#[0-9]+$")) ]
+                | unique | .[]' "$file")" || return 1
+
+  while IFS= read -r id; do
+    [[ -n "$id" ]] || continue
+    status="$(oss_lab_issue_status "$id")"
+    case "$status" in
+      stale:*)
+        echo "revalidate: dequeued $id (${status#stale:})"
+        stale="$(jq -c --arg i "$id" '. + [$i]' <<<"$stale")"
+        ;;
+    esac
+  done <<<"$ids"
+
+  # append_json owns the temp-file dance and ends its success branch in the
+  # mv, so a failed rewrite reaches the caller instead of being reported as
+  # a clean pass over a queue that was never pruned.
+  # SC2016: $settled and $i are jq bindings, not shell expansions. The
+  # runners carry this as a file-wide directive; here it is one call, so
+  # the exemption is scoped to it. shellcheck knows `jq` takes a program
+  # but cannot see through the wrapper.
+  # shellcheck disable=SC2016
+  oss_lab_append_json "$file" --argjson settled "$stale" \
+    'map(select(.issue as $i | ($settled | index($i)) == null))'
+}
+
 # --- model output -------------------------------------------------------
 # Tolerant parse of a scoring reply on stdin: skip fences and prose rather
 # than dying on them, and require the fields the callers dereference, so a
