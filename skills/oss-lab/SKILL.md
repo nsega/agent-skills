@@ -143,6 +143,18 @@ Open for the next monthly review (2026-10):
   moved that issue from 7.6 to roughly 7.0, so this is a wording question
   rather than a routing one. Deferred deliberately, to keep anchor changes
   on the monthly cadence.
+- The 8–10 band's clause "anything one of the reviewers above would
+  review" swallows the 6–7 band whole: tenzen-y and mimowo review kueue
+  controllers, TAS and webhooks too, so every kueue issue satisfies an
+  8–10 clause and consistency stops discriminating within kueue. This
+  already fired in the 2026-09-03 pass, whose kueue#12564 rationale cites
+  the clause by name. It is the wider form of the overlap above and wants
+  the same decision.
+- The "Familiar territory, repo-independent" anchor matches no band. Every
+  band is keyed to a repo or code area, and 0–3 requires "no anchor
+  overlap", so a Go table-driven test refactor outside the two named lines
+  has an anchor it is told to score against and nowhere to place it.
+  Either give that anchor a band or drop the bullet.
 
 ## Trust boundary
 
