@@ -4,7 +4,7 @@ description: >-
   Run a two-model review of a pull request or a system-design document.
   Claude Code (Opus 5, high effort) is the main reviewer and synthesizer; a
   second, independent reviewer runs blind through another lab's model:
-  GPT-5.6 Sol via the Codex CLI by default, or GLM-5.2 / Kimi K3 via opencode
+  GPT-6 Astra via the Codex CLI by default, or GLM-5.2 / Kimi K3 via opencode
   as alternates, for decorrelated blind spots. Use this whenever the user asks
   to "cross-review", wants a "second opinion" on a PR or design, says "review
   this with codex" / "with GPT" / "with GLM" / "with Kimi", "run the
@@ -28,8 +28,8 @@ X?" is debate; "is this X any good?" is review.
 | | reviewer #1 | reviewer #2 (default) | reviewer #2 (alt 1) | reviewer #2 (alt 2) |
 |---|---|---|---|---|
 | `--backend` | n/a | `codex` | `glm` | `kimi` |
-| model | `claude-opus-5` | `gpt-5.6-sol` | `glm-5.2` | `kimi-k3` |
-| effort | high | high (`CODEX_EFFORT`) | max (`ZEN_VARIANT`) | max (`ZEN_VARIANT`) |
+| model | `claude-opus-5` | `gpt-6-astra` | `glm-5.2` | `kimi-k3` |
+| effort | high | medium (`CODEX_EFFORT`) | max (`ZEN_VARIANT`) | max (`ZEN_VARIANT`) |
 | runs via | Claude Code | Codex CLI | opencode + OpenCode Zen | opencode + OpenCode Zen |
 | lab | Anthropic | OpenAI | Z.ai (US-hosted) | Moonshot AI (US-hosted) |
 | $/Mtok in-out | n/a | n/a | 1.4 / 4.4 | 3.0 / 15.0 |
@@ -88,7 +88,7 @@ saw the authoring intent.)
 Then run reviewer #2:
 
 ```bash
-# default: GPT-5.6 Sol via codex, high effort
+# default: GPT-6 Astra via codex, medium effort
 scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json
 
@@ -125,7 +125,7 @@ the merged report still records which lab said what.
 
 Override per run with `CODEX_MODEL` / `CODEX_EFFORT`
 (`low|medium|high|xhigh|max|ultra`; `max`/`ultra` need a model that supports
-them, e.g. `gpt-5.6-sol`) or `ZEN_MODEL` / `ZEN_VARIANT` (`minimal|low|high|max`);
+them, e.g. `gpt-6-astra`) or `ZEN_MODEL` / `ZEN_VARIANT` (`minimal|low|high|max`);
 a bad value exits 2 before anything is spent, since neither CLI reliably rejects
 one itself.
 
@@ -171,7 +171,7 @@ regressed anything); do not re-send the whole artifact.
 ```markdown
 # Dual-model review: <target>
 
-**Reviewers:** Claude Opus 5, high effort (author-aware) · <reviewer #2 model, e.g. GPT-5.6 Sol via Codex>
+**Reviewers:** Claude Opus 5, high effort (author-aware) · <reviewer #2 model, e.g. GPT-6 Astra via Codex>
 **Verdict:** <approve | approve_with_nits | request_changes | block>
 
 ## ⚠️ Escalated to human (disagreements that matter)

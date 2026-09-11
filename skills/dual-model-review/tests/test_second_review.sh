@@ -96,7 +96,7 @@ rc=0; ZEN_VARIANT=medium "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend gl
 [ "$rc" -eq 2 ] && ok || bad "ZEN_VARIANT=medium is not an opencode variant, should exit 2 (got $rc)"
 
 # 4b: the codex allowlist must match the real catalog (`codex debug models`):
-# no model accepts "minimal" (the API 400s on it), and gpt-5.6-sol does accept
+# no model accepts "minimal" (the API 400s on it), and gpt-6-astra does accept
 # "max". Getting either end wrong is a silent downgrade or a bogus rejection.
 rc=0; CODEX_EFFORT=minimal "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok || bad "CODEX_EFFORT=minimal is not a codex effort, should exit 2 (got $rc)"
@@ -119,7 +119,7 @@ rc=0; CODEX_BIN="$WORK/no-such-codex" "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT"
 
 VALID="$WORK/valid.json"
 cat > "$VALID" <<'JSON'
-{"reviewer":"gpt-5.6-sol","summary":"one finding.","overall":"request_changes",
+{"reviewer":"gpt-6-astra","summary":"one finding.","overall":"request_changes",
  "findings":[{"id":"R2-001","severity":"high","category":"correctness",
    "location":"a.py:10","issue":"off by one","evidence":"for i in range(n-1)",
    "failure_case":"last row is skipped","suggestion":"use range(n)",
@@ -129,7 +129,7 @@ JSON
 # A critical finding with no evidence/failure_case: the contract says reject.
 BADFIND="$WORK/badfind.json"
 cat > "$BADFIND" <<'JSON'
-{"reviewer":"gpt-5.6-sol","summary":"ungrounded.","overall":"block",
+{"reviewer":"gpt-6-astra","summary":"ungrounded.","overall":"block",
  "findings":[{"id":"R2-001","severity":"critical","category":"security",
    "location":"a.py:10","issue":"unsafe","suggestion":"fix it",
    "confidence":"low","recommendation":"must_fix"}]}
@@ -165,8 +165,8 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   grep -q "You are an INDEPENDENT senior reviewer" "$SHIM.stdin" && ok || bad "prompt never reached codex stdin"
   grep -qx -- "-" "$SHIM.args" && ok || bad "codex must get the '-' stdin placeholder"
   grep -qx -- "read-only" "$SHIM.args" && ok || bad "codex must run --sandbox read-only"
-  grep -qx -- "model_reasoning_effort=high" "$SHIM.args" && ok || bad "codex effort should default to high"
-  grep -qx -- "gpt-5.6-sol" "$SHIM.args" && ok || bad "codex model should default to gpt-5.6-sol"
+  grep -qx -- "model_reasoning_effort=medium" "$SHIM.args" && ok || bad "codex effort should default to medium"
+  grep -qx -- "gpt-6-astra" "$SHIM.args" && ok || bad "codex model should default to gpt-6-astra"
   # Blindness + reproducibility flags, matching dual-model-debate's codex_turn.sh.
   grep -qx -- "--ignore-user-config" "$SHIM.args" && ok || bad "codex must run --ignore-user-config"
   grep -qx -- "--ephemeral" "$SHIM.args" && ok || bad "codex must run --ephemeral"
@@ -272,7 +272,7 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
 cat > /dev/null
 echo "Here is the schema I was asked to satisfy:"
 cat "$SCHEMA"
-echo '{"reviewer":"gpt-5.6-sol","summary":"Clean.","overall":"approve","findings":[]}'
+echo '{"reviewer":"gpt-6-astra","summary":"Clean.","overall":"approve","findings":[]}'
 EOF
   chmod +x "$DECOY"
   rm -f "$OUT"
@@ -281,7 +281,7 @@ EOF
   [ -f "$OUT" ] && grep -q '"approve"' "$OUT" && ok || bad "the real approve document should be the one written"
 
   # An empty findings array is a valid result and must survive extraction.
-  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["findings"]==[] and d["reviewer"]=="gpt-5.6-sol" else 1)' "$OUT" 2>/dev/null \
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["findings"]==[] and d["reviewer"]=="gpt-6-astra" else 1)' "$OUT" 2>/dev/null \
     && ok || bad "the extracted document should be the reviewer's approve result, not a schema fragment"
 
   # Interrupt cleanup is asserted structurally, not by signalling a live run.
