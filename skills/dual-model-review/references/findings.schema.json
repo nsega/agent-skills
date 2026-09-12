@@ -8,7 +8,7 @@
   "properties": {
     "reviewer": {
       "type": "string",
-      "description": "The model that produced these findings, e.g. 'claude-opus-5', 'gpt-5.6-sol', or 'glm-5.2'. Records which lab said what after the merge."
+      "description": "The model that produced these findings, e.g. 'claude-opus-5', 'gpt-6-astra', or 'glm-5.2'. Records which lab said what after the merge."
     },
     "summary": {
       "type": "string",

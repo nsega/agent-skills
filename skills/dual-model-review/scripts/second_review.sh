@@ -8,7 +8,7 @@
 #
 # Backends. Reviewer #2 is pluggable: the packet, rubric, schema, prompt, and
 # synthesis are identical whichever you pick; only the CLI underneath changes.
-#   codex  GPT-5.6 Sol via the Codex CLI            (default)
+#   codex  GPT-6 Astra via the Codex CLI           (default)
 #   glm    GLM-5.2 via opencode + OpenCode Zen      (alternate)
 #   kimi   Kimi K3 via opencode + OpenCode Zen      (alternate)
 #
@@ -18,8 +18,8 @@
 #
 # Env:
 #   REVIEW2_BACKEND  backend used when --backend is omitted (default: codex)
-#   CODEX_MODEL      codex model id                    (default: gpt-5.6-sol)
-#   CODEX_EFFORT     model_reasoning_effort            (default: high)
+#   CODEX_MODEL      codex model id                    (default: gpt-6-astra)
+#   CODEX_EFFORT     model_reasoning_effort            (default: medium)
 #   CODEX_BIN        codex executable                  (default: codex)
 #   ZEN_MODEL        opencode model id, overrides the backend's default
 #                    (glm: opencode/glm-5.2, kimi: opencode/kimi-k3)
@@ -73,10 +73,10 @@ done
 # typo in either costs an exit code rather than a paid call.
 case "$BACKEND" in
   codex)
-    R2_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
-    R2_EFFORT="${CODEX_EFFORT:-high}"
+    R2_MODEL="${CODEX_MODEL:-gpt-6-astra}"
+    R2_EFFORT="${CODEX_EFFORT:-medium}"
     # The union across the catalog (`codex debug models`): every model supports
-    # low|medium|high|xhigh, several add max, and sol/terra add ultra. NO model
+    # low|medium|high|xhigh, several add max, and astra/sol/terra add ultra. NO model
     # accepts "minimal" (the API rejects it with HTTP 400 after the run has
     # started). This catches typos; the codex preflight below then narrows it to
     # what THIS model actually supports.
@@ -191,7 +191,7 @@ case "$BACKEND" in
     fi
 
     # Narrow the static union to what THIS model supports. The effort set is
-    # per-model (gpt-5.5 tops out at xhigh, only sol/terra reach ultra), so a
+    # per-model (gpt-5.5 tops out at xhigh, only astra/sol/terra reach ultra), so a
     # valid-looking pair like CODEX_MODEL=gpt-5.5 CODEX_EFFORT=max would
     # otherwise pass the gate and 400 mid-run, which is exactly the paid failure
     # this validation exists to prevent. `codex debug models` is a local catalog
