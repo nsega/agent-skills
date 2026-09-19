@@ -119,20 +119,32 @@ fi
 # WIP_CAP reach the model as prompt text, since an env var is invisible.
 # There is no re-evaluation flag: the model scores an issue the same way
 # every time, and what happens to that score is the runner's decision.
+# Exit code taken explicitly, for the same reason as in run-scout.sh: the
+# substitution captures stdout, so a failing `claude` that explains itself
+# there is invisible. run-scout.sh only ever sees this script's exit code,
+# so a silent abort here surfaces as a bare "reeval pass failed" and the
+# real reason is lost twice over.
+CLAUDE_RC=0
 RESULTS="$(claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 WIP_COUNT=$WIP_COUNT
 WIP_CAP=$OSS_LAB_WIP_CAP" \
   --tools "" \
   --max-turns 15 \
-  --output-format text < "$EVIDENCE")"
+  --output-format text < "$EVIDENCE")" || CLAUDE_RC=$?
 rm -f "$EVIDENCE"
+if (( CLAUDE_RC != 0 )); then
+  echo "abort: claude exited $CLAUDE_RC (stamp not advanced)" >&2
+  oss_lab_log_excerpt claude "$RESULTS"
+  exit 1
+fi
 
 # If NOTHING parses, abort without advancing the stamp so the pass is
 # retried next hour instead of being silently skipped for a week.
 VALID_RESULTS="$(echo "$RESULTS" | oss_lab_parse_scores)"
 if [[ -z "$VALID_RESULTS" ]]; then
   echo "abort: no parseable scores in claude output (stamp not advanced)" >&2
+  oss_lab_log_excerpt claude "$RESULTS"
   exit 1
 fi
 

@@ -20,6 +20,26 @@ OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
 OSS_LAB_PROMOTE_AT="${OSS_LAB_PROMOTE_AT:-7.0}"
 OSS_LAB_DROP_BELOW="${OSS_LAB_DROP_BELOW:-5.0}"
 
+# --- diagnostics --------------------------------------------------------
+# Print a bounded excerpt of a captured stream to stderr. Every paid call
+# in this skill is wrapped in a command substitution, which swallows the
+# child's stdout: a `claude` that fails and explains itself there leaves
+# no trace in the log at all. That is how an expired credential cost five
+# silent days in September 2026. The bound keeps a runaway response from
+# filling the log file.
+oss_lab_log_excerpt() {
+  local what="$1" text="$2" max="${3:-500}"
+  if [[ -z "$text" ]]; then
+    echo "  $what produced no output" >&2
+    return 0
+  fi
+  echo "  $what output (first $max chars): ${text:0:$max}" >&2
+  if (( ${#text} > max )); then
+    echo "  ... (${#text} chars total)" >&2
+  fi
+  return 0
+}
+
 # --- account guard ------------------------------------------------------
 # The scout runs on the personal Claude account only.
 oss_lab_guard_account() {

@@ -44,7 +44,10 @@ oss_lab_revalidate_tasks
 LAST_REEVAL="$(cat "$STATE_DIR/last_reeval" 2>/dev/null || true)"
 [[ "$LAST_REEVAL" =~ ^[0-9]+$ ]] || LAST_REEVAL=0
 if (( $(date +%s) - LAST_REEVAL >= 6 * 86400 )); then
-  "$SKILL_DIR/scripts/run-reeval.sh" || echo "warn: reeval pass failed, continuing" >&2
+  REEVAL_RC=0
+  "$SKILL_DIR/scripts/run-reeval.sh" || REEVAL_RC=$?
+  (( REEVAL_RC == 0 )) ||
+    echo "warn: reeval pass failed (exit $REEVAL_RC), continuing" >&2
 fi
 
 # --- Guard R1: fetch next; if nothing new, never start Claude -----------
@@ -68,19 +71,32 @@ WIP_COUNT="$(oss_lab_wip_count)" || {
 # injected instruction. All input arrives on stdin, so no tool is needed;
 # WIP_COUNT and WIP_CAP likewise reach the model as prompt text rather
 # than as (invisible) environment variables.
+# The exit code is taken explicitly rather than left to errexit. This is a
+# command substitution, so it captures stdout: a `claude` that fails and
+# explains itself there would abort the run with an empty log and a bare
+# exit 1, which is precisely how an expired credential went unnoticed for
+# five days. Failing loudly here is the difference between a dead pipeline
+# that announces itself and one that looks idle.
+CLAUDE_RC=0
 RESULTS="$(echo "$NEW_ISSUES" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 WIP_COUNT=$WIP_COUNT
 WIP_CAP=$OSS_LAB_WIP_CAP" \
   --tools "" \
   --max-turns 15 \
-  --output-format text)"
+  --output-format text)" || CLAUDE_RC=$?
+if (( CLAUDE_RC != 0 )); then
+  echo "abort: claude exited $CLAUDE_RC (window not advanced)" >&2
+  oss_lab_log_excerpt claude "$RESULTS"
+  exit 1
+fi
 
 # If NOTHING parses, abort without advancing the window so the batch is
 # retried next hour instead of being silently lost.
 VALID_RESULTS="$(echo "$RESULTS" | oss_lab_parse_scores)"
 if [[ -z "$VALID_RESULTS" ]]; then
   echo "abort: no parseable scores in claude output (window not advanced)" >&2
+  oss_lab_log_excerpt claude "$RESULTS"
   exit 1
 fi
 
