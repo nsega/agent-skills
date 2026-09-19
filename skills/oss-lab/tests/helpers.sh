@@ -33,6 +33,10 @@ cat > "$MOCK_LOG/claude_stdin"
 # revalidation and the promotion that follows it in the same pass.
 [ -n "${MOCK_RACE_ISSUES:-}" ] && cp "$MOCK_RACE_ISSUES" "$MOCK_ISSUES_JSON"
 cat "${MOCK_CLAUDE_OUT:-/dev/null}"
+# MOCK_CLAUDE_RC: exit nonzero after emitting MOCK_CLAUDE_OUT, so a case can
+# reproduce the real failure shape (an expired credential explains itself on
+# stdout, which the caller's command substitution then captures and hides).
+exit "${MOCK_CLAUDE_RC:-0}"
 EOF
 
   # MOCK_GH_LOGIN     : our login (default nsega)
