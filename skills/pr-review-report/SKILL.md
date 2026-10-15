@@ -53,18 +53,18 @@ For each issue in `closingIssuesReferences`, read it with `gh issue view`.
 
 ## 2. Write the review brief
 
-Read only what you need to decide how this PR should be reviewed:
+Read only these inputs, so the full diff stays in the reviewer's context:
 
-- `git diff --stat <baseRefOid>...<headRefOid>`
-- the PR description and linked issues
-- the hunks of the 3 largest changed files that are not generated or lockfiles
+1. `git diff --numstat <baseRefOid>...<headRefOid>`
+2. the PR description and linked issues
+3. `git diff <baseRefOid>...<headRefOid> -- <path>` for the 3 files with the
+   most changed lines, skipping tests, lockfiles, and generated files
 
-Do not read the full diff here. The point of the subagent is to keep the main
-context small.
-
-If `additions + deletions` exceeds about 1,500 lines, delegate this step to a
-lightweight subagent (Sonnet is enough) that reads the diff and returns only the
-brief below, then continue with its output.
+If the numstat shows more than about 1,500 changed lines outside lockfiles,
+skip input 3. Launch an Explore subagent with `model: sonnet` instead. Give it
+the PR number, both SHAs, any extra focus from the user, and the field
+definitions from CHANGE_TYPE to SEVERITY_NOTES below, and ask it to return only
+those fields. Wait for its result, then continue to step 3.
 
 Write the brief with these fields:
 
@@ -72,9 +72,10 @@ Write the brief with these fields:
   lines. Record claims as claims. Do not adopt the author's framing as fact.
 - **CHANGE_TYPE**: one or more of feat, fix, refactor, removal, deps, infra,
   docs, test.
-- **HYPOTHESES**: 3 to 5 concrete things to verify, each tied to a file. Good:
-  "`retry.ts`: the new retry loop re-sends a non-idempotent POST". Bad:
-  "check error handling".
+- **HYPOTHESES**: 3 to 5 concrete things to verify, each tied to a path. Build
+  them from the diff. When the PR description claims a behavior, turn that
+  claim into a hypothesis. Good: "`retry.ts`: the new retry loop re-sends a
+  non-idempotent POST". Bad: "check error handling".
 - **REQUIRED_CHECKS**: checks that must run for this change type. For example:
   - removal or deps: the stale-config sweep, code-usage verification, and
     lockfile hygiene sections of `pr-review`
@@ -84,9 +85,12 @@ Write the brief with these fields:
     propagation
   - any change: `gh pr checks <PR>` status
 - **DEPRIORITIZE**: generated files, vendored code, mechanical lockfile churn,
-  or anything else that only needs a light pass.
-- **SEVERITY_NOTES**: how to calibrate for this PR. For example, a Blocker
-  threshold is lower on a production request path than in an internal script.
+  mechanical renames, or "None".
+- **SEVERITY_NOTES**: facts for judging impact. Does the changed code run on a
+  production path or only in internal tooling? Do other services share it? Who
+  sees a failure (users, on-call alerting, developers)? Describe the situation
+  only. Leave severity levels to the reviewer, because main has seen only part
+  of the diff.
 
 Put any extra focus from the user at the top of HYPOTHESES.
 
