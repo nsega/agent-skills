@@ -91,9 +91,22 @@ if (( CLAUDE_RC != 0 )); then
   exit 1
 fi
 
-# If NOTHING parses, abort without advancing the window so the batch is
-# retried next hour instead of being silently lost.
-VALID_RESULTS="$(echo "$RESULTS" | oss_lab_parse_scores)"
+# Hold the reply to the output contract (oss_lab_parse_scores) and to this
+# batch: an issue the scorer was not given is a hallucination, or an id
+# planted in an issue body for it to echo, and is never acted on. Whatever is
+# set aside is named in the log rather than dropped silently.
+BATCH_IDS="$(echo "$NEW_ISSUES" | jq -cs 'map(.issue)')"
+VALID_RESULTS="$(echo "$RESULTS" | oss_lab_parse_scores \
+  | jq -c --argjson batch "$BATCH_IDS" 'select(.issue as $i | $batch | index($i) != null)')"
+IGNORED="$(echo "$RESULTS" | jq -cR 'fromjson? | select(type == "object")' \
+  | jq -rs --argjson valid "$(echo "$VALID_RESULTS" | jq -cs '.')" \
+      '. - $valid | map(.issue // "(no issue)" | tostring) | join(", ")')"
+if [[ -n "$IGNORED" ]]; then
+  echo "warn: ignoring scored objects that break the output contract or are not in this batch: $IGNORED" >&2
+fi
+
+# If NOTHING usable comes back, abort without advancing the window so the
+# batch is retried next hour instead of being silently lost.
 if [[ -z "$VALID_RESULTS" ]]; then
   echo "abort: no parseable scores in claude output (window not advanced)" >&2
   oss_lab_log_excerpt claude "$RESULTS"

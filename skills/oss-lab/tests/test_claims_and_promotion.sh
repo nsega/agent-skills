@@ -194,19 +194,22 @@ jq -e 'length == 1 and .[0].wip_capped == true' "$STATE/queue.json" >/dev/null \
 # ---- 3b. the runner enforces the cap even if the model ignores it ------
 # The model is told to demote past the budget, but the runner must not
 # depend on that: here it returns three todoist routes with only one slot.
+# The scored ids must be in the fetched batch: the runner ignores any other.
 case_dir scout_budget; build_state "$STATE"
-echo '{"number":30,"title":"t","pull_request":null,"assignees":[],"labels":[],"comments":0,"created_at":"x","html_url":"u","body":"b"}' > "$CASE/raw.jsonl"
+for n in 41 42 43; do
+  echo '{"number":'"$n"',"title":"t","pull_request":null,"assignees":[],"labels":[],"comments":0,"created_at":"x","html_url":"u","body":"b"}'
+done > "$CASE/raw.jsonl"
 MOCK_CLAUDE_OUT="$CASE/out"; printf '%s\n' \
-  '{"issue":"k8s/k8s#41","weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
-  '{"issue":"k8s/k8s#42","weighted_total":9.2,"rationale_consistency":"r","route":"todoist"}' \
-  '{"issue":"k8s/k8s#43","weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes/kubernetes#41","weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes/kubernetes#42","weighted_total":9.2,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes/kubernetes#43","weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
   > "$MOCK_CLAUDE_OUT"
 OSS_LAB_WIP_CAP=3 MOCK_WIP=2 MOCK_FETCH="$CASE/raw.jsonl" \
   out="$(run_it "$RS" 2>&1)" || bad "scout_budget: should exit 0"
 posts="$(cat "$MOCK_LOG/todoist_posts" 2>/dev/null || true)"
 # Count tasks, not lines: the POST body is pretty-printed JSON.
 [ "$(grep -c "Contribute:" <<<"$posts")" -eq 1 ] && ok || bad "scout_budget: budget of 1 must create exactly 1 task"
-grep -q "k8s/k8s#42" <<<"$posts" && ok || bad "scout_budget: the slot should go to the highest score"
+grep -q "kubernetes/kubernetes#42" <<<"$posts" && ok || bad "scout_budget: the slot should go to the highest score"
 jq -e 'length == 2 and all(.[]; .wip_capped == true)' "$STATE/queue.json" >/dev/null \
   && ok || bad "scout_budget: the other two should be queued and flagged"
 grep -q "WIP_CAP=3" "$MOCK_LOG/claude_args" && ok || bad "scout_budget: prompt should carry the cap"
