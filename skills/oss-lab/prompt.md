@@ -99,11 +99,12 @@ One JSON object per issue:
 
 ## Claimed work
 
-Some issues carry a `recent_comments` array (author plus the tail of each
-comment). Issues that are assigned, or that already have a linked pull
-request, are filtered out before you see them, but a claim often leaves
-neither: contributors routinely comment "I can take this" or "working on
-it" without ever running `/assign`.
+Some issues carry a `recent_comments` array: the newest three comments,
+each with its author and body. A body over 240 characters keeps its start
+and end with " … " between them. Issues that are assigned, or that
+already have a linked pull request, are filtered out before you see them,
+but a claim often leaves neither: contributors routinely comment "I can
+take this" or "working on it" without ever running `/assign`.
 
 If a comment shows another contributor claiming the issue or reporting
 progress on it, and nothing later releases it (they withdrew, or a

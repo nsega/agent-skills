@@ -12,11 +12,9 @@ TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
 # as $WIP_CAP, so prompt.md never hardcodes a number that could drift
 # out of step with the budget the runner actually enforces.
 OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
-# Routing thresholds (flow control #3). The scorer applies them to route a
-# new issue; the weekly pass applies them itself, from the score, to decide
-# promotion and decay, so they are defined here and nowhere else in code.
-# prompt.md states the same numbers in prose for the model, and a test pins
-# that the two agree.
+# Routing thresholds (flow control #3). Both runners route by score with
+# these, hourly and weekly. prompt.md repeats them for the model, and a test
+# keeps the two in step.
 OSS_LAB_PROMOTE_AT="${OSS_LAB_PROMOTE_AT:-7.0}"
 OSS_LAB_DROP_BELOW="${OSS_LAB_DROP_BELOW:-5.0}"
 
@@ -329,12 +327,11 @@ oss_lab_shape_issue() {
   }'
 }
 
-# Attach the tail of the comment thread to each shaped issue (JSONL on
-# stdin) that has one, so the scorer can see a soft claim ("I can take
-# this") that leaves no assignee and no PR. Only issues with comments cost
-# an extra call. Strips the .number/.repo plumbing on the way out.
+# Add each issue's newest three comments, so the scorer can spot a soft
+# claim ("I can take this"). Page 1 holds the OLDEST comments, so read the
+# last page instead. Long bodies keep their start and end.
 oss_lab_attach_comments() {
-  local item n repo num recent
+  local item n repo num recent last on_last
   while IFS= read -r item; do
     [[ -n "$item" ]] || continue
     n="$(jq -r '.comments' <<<"$item")"
@@ -344,10 +341,18 @@ oss_lab_attach_comments() {
     fi
     repo="$(jq -r '.repo' <<<"$item")"
     num="$(jq -r '.number' <<<"$item")"
-    recent="$(gh api "repos/$repo/issues/$num/comments" \
-                --jq '[.[-3:][] | {author: .user.login,
-                                   body: (.body // "" | gsub("\\s+"; " ") | .[0:240])}]' \
-              2>/dev/null || echo '[]')"
+    last=$(( (n + 99) / 100 ))
+    on_last=$(( n - (last - 1) * 100 ))
+    recent="$( {
+        if (( on_last < 3 && last > 1 )); then
+          gh api "repos/$repo/issues/$num/comments?per_page=100&page=$((last - 1))"
+        fi
+        gh api "repos/$repo/issues/$num/comments?per_page=100&page=$last"
+      } 2>/dev/null \
+      | jq -cs 'add | .[-3:] | map({author: .user.login,
+                                    body: (.body // "" | gsub("\\s+"; " ")
+                                           | if length > 240 then .[0:120] + " … " + .[-120:] else . end)})' \
+          2>/dev/null || echo '[]')"
     # Validate rather than trust: a nonzero exit is caught above, but a call
     # that exits 0 while printing anything other than an array would reach
     # --argjson as invalid JSON, and jq's usage error would kill the whole
@@ -372,6 +377,22 @@ oss_lab_parse_scores() {
              and (.issue | type) == "string"
              and (.route | IN("todoist", "queue", "drop"))
              and (.weighted_total | type) == "number")'
+}
+
+# Route one scored issue the way the weekly pass does. Prints "route<TAB>why".
+#   - claimed: drop
+#   - scorer said "drop" on a passing score: drop (only a claim explains it)
+#   - otherwise by score: todoist at 7.0+, queue at 5.0+, else drop (defaults)
+# The caller applies the WIP cap.
+oss_lab_route_scored() {
+  jq -r --argjson at "$OSS_LAB_PROMOTE_AT" --argjson below "$OSS_LAB_DROP_BELOW" '
+    if .claimed_by != null then ["drop", "claimed by \(.claimed_by)"]
+    elif .route == "drop" and .weighted_total >= $below then
+      ["drop", "dropped by the scorer at \(.weighted_total) with no claimed_by, treated as a claim"]
+    elif .weighted_total >= $at then ["todoist", ""]
+    elif .weighted_total >= $below then ["queue", ""]
+    else ["drop", ""]
+    end | @tsv'
 }
 
 # --- state files --------------------------------------------------------
