@@ -12,12 +12,9 @@ TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
 # as $WIP_CAP, so prompt.md never hardcodes a number that could drift
 # out of step with the budget the runner actually enforces.
 OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
-# Routing thresholds (flow control #3). Both runners apply them themselves,
-# from the score: the hourly pass to route a new issue (oss_lab_route_scored)
-# and the weekly pass to decide promotion and decay, so they are defined here
-# and nowhere else in code.
-# prompt.md states the same numbers in prose for the model, and a test pins
-# that the two agree.
+# Routing thresholds (flow control #3). Both runners route by score with
+# these, hourly and weekly. prompt.md repeats them for the model, and a test
+# keeps the two in step.
 OSS_LAB_PROMOTE_AT="${OSS_LAB_PROMOTE_AT:-7.0}"
 OSS_LAB_DROP_BELOW="${OSS_LAB_DROP_BELOW:-5.0}"
 
@@ -330,15 +327,9 @@ oss_lab_shape_issue() {
   }'
 }
 
-# Attach the newest three comments to each shaped issue (JSONL on stdin)
-# that has any, so the scorer can see a soft claim ("I can take this") that
-# leaves no assignee and no PR. The endpoint returns oldest first, 30 per
-# page by default, so the first page alone would show comments 28-30 of a
-# long thread: fetch the last page of 100 instead, plus the page before when
-# the last one holds fewer than three. A body over 240 characters keeps its
-# first and last 120, so a claim at either end of a long comment survives.
-# Only issues with comments cost an extra call (two past a page boundary).
-# Strips the .number/.repo plumbing on the way out.
+# Add each issue's newest three comments, so the scorer can spot a soft
+# claim ("I can take this"). Page 1 holds the OLDEST comments, so read the
+# last page instead. Long bodies keep their start and end.
 oss_lab_attach_comments() {
   local item n repo num recent last on_last
   while IFS= read -r item; do
@@ -388,16 +379,11 @@ oss_lab_parse_scores() {
              and (.weighted_total | type) == "number")'
 }
 
-# The runner's route for one scored object on stdin (hourly pass), printed as
-# "<route><TAB><why>", where <why> is set only when the issue is dropped as
-# claimed. The model scores; the runner routes, by the same rules the weekly
-# pass applies (run-reeval.sh, "Decide each score"):
-#   1. a claim drops the issue whatever it scored;
-#   2. a "drop" with no claimed_by on a score at or above the drop bar can
-#      only be a claim too (the threshold is the only other reason to drop),
-#      and the loop would rather lose a candidate than take announced work;
-#   3. otherwise weighted_total decides against OSS_LAB_PROMOTE_AT and
-#      OSS_LAB_DROP_BELOW. The WIP cap is applied by the caller on top.
+# Route one scored issue the way the weekly pass does. Prints "route<TAB>why".
+#   - claimed: drop
+#   - scorer said "drop" on a passing score: drop (only a claim explains it)
+#   - otherwise by score: todoist at 7.0+, queue at 5.0+, else drop (defaults)
+# The caller applies the WIP cap.
 oss_lab_route_scored() {
   jq -r --argjson at "$OSS_LAB_PROMOTE_AT" --argjson below "$OSS_LAB_DROP_BELOW" '
     if .claimed_by != null then ["drop", "claimed by \(.claimed_by)"]
