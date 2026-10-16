@@ -359,12 +359,19 @@ oss_lab_attach_comments() {
 
 # --- model output -------------------------------------------------------
 # Tolerant parse of a scoring reply on stdin: skip fences and prose rather
-# than dying on them, and require the fields the callers dereference, so a
-# malformed object cannot become a "Contribute: null" task or a "null"
-# seen-entry.
+# than dying on them, and keep only objects that meet the prompt.md output
+# contract on the fields the callers act on: a string .issue, a .route of
+# todoist | queue | drop, and a numeric .weighted_total. A malformed object
+# therefore cannot become a "Contribute: null" or "(score null)" task, a
+# seen-entry for an issue nobody scored, or a string sort key that kills the
+# routing and promotion sorts (in jq, -"7.5" is an error and "7.5" >= 7.0 is
+# true). Whether .issue belongs to the batch is the caller's check.
 oss_lab_parse_scores() {
   jq -cR 'fromjson?
-    | select(type == "object" and .route != null and (.issue | type) == "string")'
+    | select(type == "object"
+             and (.issue | type) == "string"
+             and (.route | IN("todoist", "queue", "drop"))
+             and (.weighted_total | type) == "number")'
 }
 
 # --- state files --------------------------------------------------------
