@@ -7,10 +7,11 @@ description: >-
   brief (change type, hypotheses to verify, required checks) tailored to that
   PR, then hands it to a read-only reviewer. Use this when the user wants a
   review saved to a file, wants to keep working while a PR is reviewed, wants
-  to compare review runs (models, effort levels, tools), or invokes
+  to compare review runs (models, effort levels, tools), wants to re-review a
+  PR after fixes and see which earlier findings were resolved, or invokes
   /pr-review-report. For an inline merge verdict in the conversation, use
   pr-review instead.
-argument-hint: <PR number> [--effort <level>] [extra focus]
+argument-hint: <PR number> [--effort <level>] [--fresh] [extra focus]
 ---
 
 # pr-review-report
@@ -37,6 +38,9 @@ If the arguments contain `--effort <level>`, take `<level>` as the review
 effort and remove both tokens before reading the extra focus. `<level>` must be
 one of `low`, `medium`, `high`, `xhigh`, `max`. If it is not, tell the user and
 stop.
+
+If the arguments contain `--fresh`, remove it and skip the previous report in
+step 3, so the review runs without knowledge of earlier rounds.
 
 ## 1. Fetch the PR
 
@@ -109,6 +113,25 @@ Create `reviews/` if needed. If `reviews/` is not in the repository's
 `.gitignore`, mention that once in your final report rather than editing
 `.gitignore` yourself.
 
+Find the previous round. Every run writes a new report and never edits an old
+one. The latest report carries forward every finding still open, so it is the
+only earlier report the reviewer needs.
+
+1. List `reviews/pr-<PR>-*.md` and take the most recently modified file,
+   excluding the output path just picked.
+2. Read only its `- Head:` line to get the previous full HEAD SHA. Do not read
+   the rest of the report.
+3. Set PREVIOUS_REPORT, PREVIOUS_HEAD_SHA, and HISTORY:
+   - no earlier report, or `--fresh` was given: all three are `none`
+   - the previous head equals the current head (a rerun on the same code, for
+     example to compare models): all three are `none`, so the runs stay
+     independent. Mention this in your final report.
+   - otherwise, set PREVIOUS_REPORT to that path and PREVIOUS_HEAD_SHA to the
+     SHA, then check the history:
+     `git cat-file -e <previous head>^{commit} && git merge-base --is-ancestor <previous head> <headRefOid>`.
+     HISTORY is `linear` if both succeed and `rewritten` otherwise (force-push
+     or rebase).
+
 Resolve the shared checklist: the absolute path of `../pr-review/SKILL.md`
 relative to this skill's folder, with symlinks resolved (for example,
 `realpath <this skill's folder>/../pr-review/SKILL.md`). Both skills ship from
@@ -129,9 +152,10 @@ Do not wait for the result.
 
 ## 4. Report on completion
 
-When the completion notice arrives, the subagent's reply is three lines (path,
-verdict, counts). Report them to the user. If there are Blockers, add their
-one-line headings from the report file. Do not paste the report body.
+When the completion notice arrives, the subagent's reply is four lines (path,
+verdict, counts, previous-round status). Report them to the user. If there are
+Blockers, add their IDs and one-line headings from the report file. Do not
+paste the report body.
 
-If the subagent's reply does not follow the three-line format, or the report
+If the subagent's reply does not follow the four-line format, or the report
 file is missing, say so plainly and show what the subagent returned.

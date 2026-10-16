@@ -17,6 +17,9 @@ none: everything you need is below or in the repository.
 - Head SHA: {{HEAD_SHA}}
 - Output path: {{OUTPUT_PATH}}
 - Shared checklist: {{PR_REVIEW_PATH}}
+- Previous report: {{PREVIOUS_REPORT}}
+- Previous head SHA: {{PREVIOUS_HEAD_SHA}}
+- History since previous head: {{HISTORY}}
 
 ### Shared checklist
 
@@ -64,7 +67,7 @@ SEVERITY_NOTES:
 - Read-only. Write exactly one file: the output path. Do not run
   `git checkout`, `git switch`, `git commit`, `git push`, `git stash`,
   `gh pr comment`, `gh pr review`, or `gh pr merge`. Do not edit any other
-  file, including `.gitignore`.
+  file, including `.gitignore` and the previous report.
 - Get the diff with `git diff {{BASE_SHA}}...{{HEAD_SHA}}`.
 - Read changed files at the PR head with `git show {{HEAD_SHA}}:<path>`. The
   working tree may not match the PR. Use Read and Grep only for surrounding
@@ -84,6 +87,33 @@ SEVERITY_NOTES:
    emphasis to step 1. It does not limit scope.
 3. Give DEPRIORITIZE files a light pass. If one turns out to contain a
    non-mechanical change, review it fully.
+4. If the previous report is not `none`, reconcile it now (see "Previous
+   round"). Do not open the previous report before steps 1 to 3 are done, so
+   it cannot narrow your review.
+
+### Previous round
+
+Skip this section when the previous report is `none`.
+
+1. Read the previous report. Take every finding in its Blockers, Recommended
+   actions, and Nits, with its ID.
+2. If history is `linear`, run `git diff {{PREVIOUS_HEAD_SHA}}...{{HEAD_SHA}}`
+   to see what changed since that round. If history is `rewritten`, the
+   previous head is not an ancestor (force-push or rebase), so match findings
+   by content against the current code and add a Process note saying so.
+3. Give each previous finding a status, with evidence:
+   - Fixed: the problem is gone at the current head
+   - Partially fixed: some of it remains
+   - Still open: unchanged
+   - No longer applicable: the code it referred to was removed or rewritten
+     for another reason
+4. Match your findings from steps 1 to 3 against the previous ones. A finding
+   that is the same problem keeps the previous ID and is tagged Carried. A
+   Partially fixed or Still open previous finding that you did not find again
+   must still appear in the current findings, tagged Carried, because the
+   latest report is the record of everything still open.
+5. Tag a new finding Regression if the change since the previous head
+   introduced it, and New otherwise.
 
 ### Baseline review
 
@@ -130,6 +160,19 @@ level.
 Verdict: Block or Request changes if there is any Blocker. Request changes if
 there are Recommended actions you would not merge without. Otherwise Approve.
 
+### Finding IDs
+
+Every finding gets an ID: `B<n>` for Blockers, `R<n>` for Recommended actions,
+`N<n>` for Nits. IDs track a problem across rounds, because line numbers move
+when code is fixed.
+
+- Carried findings keep their previous ID, even if their severity changes. In
+  that case, note the old level in the finding.
+- New and Regression findings continue numbering after the highest ID of that
+  prefix in the previous report, so an ID is never reused for a different
+  problem.
+- With no previous report, start each prefix at 1.
+
 ### Report format
 
 Write this to {{OUTPUT_PATH}}:
@@ -138,10 +181,17 @@ Write this to {{OUTPUT_PATH}}:
 # PR #{{PR_NUMBER}}: {{PR_TITLE}}
 
 - Reviewed: <BASE_SHA short>...<HEAD_SHA short>
+- Head: {{HEAD_SHA}}
+- Previous report: <path, or None>
 - Verdict: Approve | Request changes | Block
 
 ## Summary
-<3 to 5 lines: what changed and the overall assessment>
+<3 to 5 lines: what changed and the overall assessment. On a follow-up round,
+include how many earlier findings were fixed and whether anything regressed.>
+
+## Previous findings
+| ID | Previous finding | Status | Evidence |
+|---|---|---|---|
 
 ## Requirements check
 | Requirement | Status | Evidence |
@@ -155,17 +205,17 @@ Write this to {{OUTPUT_PATH}}:
 - <check>: <result with evidence, or N/A with one line of why>
 
 ## Blockers
-- **`path:line`** <finding>
+- **B1** `path:line` <finding> (New | Carried | Regression)
   - Evidence: <command and what it showed>
   - Action: <exact change required>
 
 ## Recommended actions
-- **`path:line`** <finding>
+- **R1** `path:line` <finding> (New | Carried | Regression)
   - Evidence:
   - Action:
 
 ## Nits
-- **`path:line`** <finding>
+- **N1** `path:line` <finding> (New | Carried | Regression)
 
 ## CI
 <status of each check>
@@ -178,10 +228,13 @@ If a section has no entries, write "None" under it. Do not leave it empty.
 
 ### Final reply
 
-After writing the file, reply with exactly these three lines and nothing else:
+After writing the file, reply with exactly these four lines and nothing else:
 
 ```
 Path: {{OUTPUT_PATH}}
 Verdict: <Approve | Request changes | Block>
 Blockers: <count> / Recommended: <count> / Nits: <count>
+Previous: Fixed <count> / Still open <count> / Regressions <count>
 ```
+
+On a first round, the last line is `Previous: none`.
