@@ -76,9 +76,15 @@ Write the brief with these fields:
   them from the diff. When the PR description claims a behavior, turn that
   claim into a hypothesis. Good: "`retry.ts`: the new retry loop re-sends a
   non-idempotent POST". Bad: "check error handling".
-- **REQUIRED_CHECKS**: checks that must run for this change type. For example:
-  - removal or deps: the stale-config sweep, code-usage verification, and
-    lockfile hygiene sections of `pr-review`
+- **REQUIRED_CHECKS**: checks that must run for this change type. The
+  reviewer reads `pr-review`'s checklist itself, so name its sections by number
+  and title instead of copying their steps. For example:
+  - removal: `pr-review` sections 2 (Stale-config sweep), 3 (Code-usage
+    verification), and 6 (Lockfile hygiene)
+  - dependency removal: also sections 4 (Channel / registry orphan audit) and
+    5 (Transitive-dependency audit)
+  - deps upgrade: breaking changes between the old and new versions, plus
+    section 6
   - infra (Terraform, CDKTF, Kubernetes manifests): broadened IAM or RBAC,
     resources that would be destroyed or replaced, state impact
   - concurrency changes: goroutine or promise leaks, cancellation and context
@@ -102,6 +108,12 @@ exists (for example, a rerun with another model), append `-2`, `-3`, and so on.
 Create `reviews/` if needed. If `reviews/` is not in the repository's
 `.gitignore`, mention that once in your final report rather than editing
 `.gitignore` yourself.
+
+Resolve the shared checklist: the absolute path of `../pr-review/SKILL.md`
+relative to this skill's folder, with symlinks resolved (for example,
+`realpath <this skill's folder>/../pr-review/SKILL.md`). Both skills ship from
+the same repository, so it is normally present. If the file does not exist,
+use `none`. Do not read it yourself. The reviewer reads it.
 
 Read `references/reviewer-prompt.md` in this skill's folder, fill every
 double-brace placeholder, and launch a general-purpose subagent **in the background**
