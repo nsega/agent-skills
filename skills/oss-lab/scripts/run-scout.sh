@@ -124,10 +124,15 @@ QUEUED=0
 
 # Highest scores first, so a batch larger than the budget spends it on the
 # best candidates rather than on whichever line the model emitted first.
+# The route is the runner's (oss_lab_route_scored), not the one the model
+# wrote, so the hourly and weekly passes apply one contract. This loop's
+# stdout is the seen list, so diagnostics go to stderr.
 while IFS= read -r item; do
   [[ -n "$item" ]] || continue
-  route="$(jq -r '.route' <<<"$item")"
   id="$(jq -r '.issue' <<<"$item")"
+  IFS=$'\t' read -r route why <<<"$(oss_lab_route_scored <<<"$item")"
+  [[ -n "$why" ]] && echo "route: dropping $id ($why)" >&2
+  item="$(jq -c --arg r "$route" '.route = $r' <<<"$item")"
 
   if [[ "$route" == "todoist" ]] && (( CREATED >= BUDGET )); then
     route="queue"

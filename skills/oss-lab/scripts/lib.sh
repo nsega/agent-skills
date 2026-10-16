@@ -329,12 +329,17 @@ oss_lab_shape_issue() {
   }'
 }
 
-# Attach the tail of the comment thread to each shaped issue (JSONL on
-# stdin) that has one, so the scorer can see a soft claim ("I can take
-# this") that leaves no assignee and no PR. Only issues with comments cost
-# an extra call. Strips the .number/.repo plumbing on the way out.
+# Attach the newest three comments to each shaped issue (JSONL on stdin)
+# that has any, so the scorer can see a soft claim ("I can take this") that
+# leaves no assignee and no PR. The endpoint returns oldest first, 30 per
+# page by default, so the first page alone would show comments 28-30 of a
+# long thread: fetch the last page of 100 instead, plus the page before when
+# the last one holds fewer than three. A body over 240 characters keeps its
+# first and last 120, so a claim at either end of a long comment survives.
+# Only issues with comments cost an extra call (two past a page boundary).
+# Strips the .number/.repo plumbing on the way out.
 oss_lab_attach_comments() {
-  local item n repo num recent
+  local item n repo num recent last on_last
   while IFS= read -r item; do
     [[ -n "$item" ]] || continue
     n="$(jq -r '.comments' <<<"$item")"
@@ -344,10 +349,18 @@ oss_lab_attach_comments() {
     fi
     repo="$(jq -r '.repo' <<<"$item")"
     num="$(jq -r '.number' <<<"$item")"
-    recent="$(gh api "repos/$repo/issues/$num/comments" \
-                --jq '[.[-3:][] | {author: .user.login,
-                                   body: (.body // "" | gsub("\\s+"; " ") | .[0:240])}]' \
-              2>/dev/null || echo '[]')"
+    last=$(( (n + 99) / 100 ))
+    on_last=$(( n - (last - 1) * 100 ))
+    recent="$( {
+        if (( on_last < 3 && last > 1 )); then
+          gh api "repos/$repo/issues/$num/comments?per_page=100&page=$((last - 1))"
+        fi
+        gh api "repos/$repo/issues/$num/comments?per_page=100&page=$last"
+      } 2>/dev/null \
+      | jq -cs 'add | .[-3:] | map({author: .user.login,
+                                    body: (.body // "" | gsub("\\s+"; " ")
+                                           | if length > 240 then .[0:120] + " … " + .[-120:] else . end)})' \
+          2>/dev/null || echo '[]')"
     # Validate rather than trust: a nonzero exit is caught above, but a call
     # that exits 0 while printing anything other than an array would reach
     # --argjson as invalid JSON, and jq's usage error would kill the whole
@@ -372,6 +385,27 @@ oss_lab_parse_scores() {
              and (.issue | type) == "string"
              and (.route | IN("todoist", "queue", "drop"))
              and (.weighted_total | type) == "number")'
+}
+
+# The runner's route for one scored object on stdin (hourly pass), printed as
+# "<route><TAB><why>", where <why> is set only when the issue is dropped as
+# claimed. The model scores; the runner routes, by the same rules the weekly
+# pass applies (run-reeval.sh, "Decide each score"):
+#   1. a claim drops the issue whatever it scored;
+#   2. a "drop" with no claimed_by on a score at or above the drop bar can
+#      only be a claim too (the threshold is the only other reason to drop),
+#      and the loop would rather lose a candidate than take announced work;
+#   3. otherwise weighted_total decides against OSS_LAB_PROMOTE_AT and
+#      OSS_LAB_DROP_BELOW. The WIP cap is applied by the caller on top.
+oss_lab_route_scored() {
+  jq -r --argjson at "$OSS_LAB_PROMOTE_AT" --argjson below "$OSS_LAB_DROP_BELOW" '
+    if .claimed_by != null then ["drop", "claimed by \(.claimed_by)"]
+    elif .route == "drop" and .weighted_total >= $below then
+      ["drop", "dropped by the scorer at \(.weighted_total) with no claimed_by, treated as a claim"]
+    elif .weighted_total >= $at then ["todoist", ""]
+    elif .weighted_total >= $below then ["queue", ""]
+    else ["drop", ""]
+    end | @tsv'
 }
 
 # --- state files --------------------------------------------------------

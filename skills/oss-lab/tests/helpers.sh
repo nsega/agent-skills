@@ -79,7 +79,14 @@ case "$all" in
   *"/comments"*)
     key="$(sed -E 's#.*repos/([^ ]+)/issues/([0-9]+)/comments.*#\1#' <<<"$all")"
     num="$(sed -E 's#.*repos/[^ ]+/issues/([0-9]+)/comments.*#\1#' <<<"$all")"
-    raw="$(lookup "${MOCK_COMMENTS_JSON:-}" "$key#$num" '[]')" ;;
+    raw="$(lookup "${MOCK_COMMENTS_JSON:-}" "$key#$num" '[]')"
+    # Paginate like the real endpoint: oldest first, per_page defaults to 30,
+    # pages count from 1. Without this a long thread would look complete.
+    q="$(grep -oE '/comments\?[^ ]*' <<<"$all")"
+    per="$(grep -oE '[?&]per_page=[0-9]+' <<<"$q" | grep -oE '[0-9]+$')"
+    page="$(grep -oE '[?&]page=[0-9]+' <<<"$q" | grep -oE '[0-9]+$')"
+    raw="$(jq -c --argjson per "${per:-30}" --argjson page "${page:-1}" \
+             '.[($page - 1) * $per : $page * $per]' <<<"$raw")" ;;
   *"repos/"*"/issues/"*)
     key="$(sed -E 's#.*repos/([^ ]+)/issues/([0-9]+).*#\1#' <<<"$all")"
     num="$(sed -E 's#.*repos/[^ ]+/issues/([0-9]+).*#\1#' <<<"$all")"

@@ -35,9 +35,12 @@ Every weekday hour (09:00–18:00), a launchd job runs one iteration:
    to the state repo, so a tool-less scorer has no way to act on an
    injected instruction (see Trust boundary).
 5. **Route (bash):** high scores become tasks, mid scores go to a
-   re-evaluation queue, low scores are recorded and dropped. The runner
-   enforces the WIP budget itself rather than trusting the model to,
-   spending it on the highest scores first.
+   re-evaluation queue, low scores are recorded and dropped. The route is
+   the runner's, decided from the score by the same rules as the weekly
+   pass (see Queue decay), not the one the model wrote: a claim drops the
+   issue whatever it scored. The runner also enforces the WIP budget itself
+   rather than trusting the model to, spending it on the highest scores
+   first.
 6. **Commit state:** `seen.json` and `last_run` advance so the next
    window resumes cleanly even after a rate-limit stop.
 
@@ -103,7 +106,10 @@ Flow controls:
   prior pass attached, so the model sees a queued issue exactly as it sees
   a new one and there is one scoring contract, not two. What happens to
   the score is the runner's decision, by the same principle as the WIP
-  cap: a claim drops the issue whatever it scored; a score at or above the
+  cap: a claim drops the issue whatever it scored, and a scorer "drop" with
+  no `claimed_by` on a score at or above the drop bar counts as a claim
+  (the threshold is the only other reason to drop, and the loop would
+  rather lose a candidate than take announced work); a score at or above the
   promote threshold is a promotion candidate regardless of the route the
   model wrote (so a 7.1 the model capped last week takes the next free
   slot instead of waiting to be re-rolled); two consecutive sub-threshold
@@ -174,6 +180,12 @@ Open for the next monthly review (2026-10):
   overlap", so a Go table-driven test refactor outside the two named lines
   has an anchor it is told to score against and nowhere to place it.
   Either give that anchor a band or drop the bullet.
+- The impact axis names test infrastructure, flaky-test fixes, and active
+  threads or SIG mentions as high and cosmetic changes as low, but says
+  nothing about a user-facing correctness bug. A one-operator TAS admission
+  bug (scorer fixture `kueue-tas-controller-bug`) scored impact 6, 6, and 8
+  across three runs: the rubric gives no anchor either way. Routing was
+  unaffected (7.8–8.2, task every time), so this is a wording question.
 
 ## Trust boundary
 
