@@ -117,14 +117,12 @@ new:
 	@scripts/new.sh "$(name)"
 
 # --- Tests (what CI runs) ---
-# Every suite fakes claude, gh, curl, codex, and opencode: no network, no
-# paid call, no credentials. Paid scorer evals (skills/oss-lab/evals/) are
-# run by hand on the Mac, never here.
+# All suites use fakes: no network, no paid calls. Paid evals are run by hand.
 test:
 	@fail=0; for t in skills/*/tests/test_*.sh; do \
 	  echo "==> $$t"; bash "$$t" || fail=1; \
 	done; exit $$fail
 
-# Info-level notes are skipped: the tests' `X && ok || bad` idiom is deliberate.
+# Skips info-level notes (the tests' `X && ok || bad` idiom is deliberate).
 lint:
 	@shellcheck -s bash -S warning $$(git ls-files '*.sh') skills/oss-lab/tests/fixtures/mocks/*

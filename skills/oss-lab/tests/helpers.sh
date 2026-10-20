@@ -14,9 +14,7 @@ ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 summary() { echo "$1: $pass passed, $fail failed"; [ "$fail" -eq 0 ]; }
 
-# axes_for <total>: integer axis scores (JSON) whose rubric-weighted sum
-# (0.3 / 0.3 / 0.2 / 0.2) is exactly <total>, for building scored objects
-# the runner will accept. Covers the 0.1 steps a test uses (not 0.1 itself).
+# axes_for <total>: integer axis scores (JSON) that weight to exactly <total>.
 axes_for() {
   jq -cn --argjson t "$1" '
     ($t * 10 | round) as $n
@@ -31,8 +29,8 @@ axes_for() {
 # claude : records argv and stdin, replays $MOCK_CLAUDE_OUT
 # gh     : serves canned GitHub responses, honouring --jq like the real gh
 # curl   : serves the Todoist API v1 surface, recording writes
-# Also points git at a private config, so the machine's signing, hooks, or
-# credential helpers can't break a test commit through a mocked binary.
+# Also points git at a private config, so the machine's signing or hooks
+# can't break a test commit.
 build_mockbin() {
   local d="$1"; mkdir -p "$d"
   export GIT_CONFIG_GLOBAL="$d/gitconfig" GIT_CONFIG_NOSYSTEM=1
@@ -152,8 +150,7 @@ case "$all" in
     done
     echo '{"id":"new"}' ;;
   *"/tasks"*)
-    # Paginate like Todoist API v1: limit (default 50) and an opaque cursor,
-    # here the offset of the next page.
+    # Page like Todoist v1: limit (default 50); the cursor is the next offset.
     limit=50; cursor=0
     for a in "$@"; do
       case "$a" in limit=*) limit="${a#limit=}" ;; cursor=*) cursor="${a#cursor=}" ;; esac

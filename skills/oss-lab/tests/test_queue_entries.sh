@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# A queued entry should say what it is. prompt.md demotes over-budget issues
-# to "queue" with wip_capped, and run-scout.sh promises to tag an issue it
-# queues after a failed Todoist POST, but both used to be stored with
-# route "todoist" (and the failed POST with no tag at all).
+# Queued entries are stored as route "queue": wip_capped when demoted,
+# todoist_failed after a failed POST (F11).
 # shellcheck disable=SC2015,SC1091
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

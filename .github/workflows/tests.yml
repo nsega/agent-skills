@@ -1,5 +1,4 @@
-# Zero-token checks for every skill: no secrets, no network calls from the
-# tests, no paid model calls. Paid scorer evals stay manual on the Mac.
+# Zero-token checks: no secrets, no network, no paid model calls.
 name: tests
 
 on:

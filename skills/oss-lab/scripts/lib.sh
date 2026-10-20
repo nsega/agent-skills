@@ -17,13 +17,11 @@ OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
 # keeps the two in step.
 OSS_LAB_PROMOTE_AT="${OSS_LAB_PROMOTE_AT:-7.0}"
 OSS_LAB_DROP_BELOW="${OSS_LAB_DROP_BELOW:-5.0}"
-# Rubric weights. The runner computes weighted_total from the axes with
-# these rather than trusting the model's arithmetic. Not overridable: a
-# weight change is a rubric change (see SKILL.md, Rubric governance), and a
-# test keeps these in step with prompt.md.
+# Rubric weights: the runner computes weighted_total from the axes itself.
+# Not overridable (a weight change is a rubric change); a test keeps them in
+# step with prompt.md.
 OSS_LAB_WEIGHTS='{"okr_alignment":0.3,"consistency":0.3,"impact":0.2,"feasibility":0.2}'
-# jq helper: show a total on the 0.1 grid with one decimal ("7.0", not "7")
-# in titles and logs; anything else (an old two-decimal total) prints as is.
+# jq helper: show totals with one decimal ("7.0", not "7"); others as is.
 OSS_LAB_JQ_FMT='def fmt1: if type == "number" and ((. * 10) - (. * 10 | round) | fabs) < 1e-9
   then (. * 10 | round) as $n | "\($n / 10 | floor).\($n % 10)" else tostring end;'
 
@@ -81,9 +79,8 @@ oss_lab_github_login() {
 }
 
 # --- Todoist ------------------------------------------------------------
-# Every result of a paginated Todoist v1 listing, as one JSON array:
-# follows next_cursor to the last page. Fails if any page fails (or after 50
-# pages), so a caller never acts on a partial list.
+# All pages of a Todoist listing as one JSON array (follows next_cursor).
+# Fails rather than return a partial list.
 # Usage: oss_lab_todoist_list <endpoint> [--data-urlencode key=value ...]
 oss_lab_todoist_list() {
   local endpoint="$1"; shift
@@ -392,9 +389,8 @@ oss_lab_attach_comments() {
 # seen-entry for an issue nobody scored, or a string sort key that kills the
 # routing and promotion sorts (in jq, -"7.5" is an error and "7.5" >= 7.0 is
 # true). Whether .issue belongs to the batch is the caller's check.
-# The four axis scores must be numbers from 0 to 10, and weighted_total is
-# then recomputed from them (rounded to 0.1); when the model's own total
-# differs, it is kept as .model_weighted_total for the caller to log.
+# Axes must be numbers 0-10; weighted_total is recomputed from them, and a
+# differing model total is kept as .model_weighted_total for logging.
 oss_lab_parse_scores() {
   jq -cR --argjson w "$OSS_LAB_WEIGHTS" 'fromjson?
     | select(type == "object"
@@ -409,8 +405,7 @@ oss_lab_parse_scores() {
     | .weighted_total = $t'
 }
 
-# Log, on stderr, every object whose reported weighted_total differed from
-# its axes, then drop the field so state files keep the scoring shape.
+# Log where the model's total differed from its axes, then drop the field.
 oss_lab_note_recomputed() {
   local results="$1"
   [[ -n "$results" ]] || return 0

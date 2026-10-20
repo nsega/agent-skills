@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# SKILL.md says every open task is re-checked, but the Todoist listings read
-# one page (limit=200) and ignored next_cursor, so tasks past the first page
-# were neither revalidated nor counted by the WIP fallback. They now follow
-# the cursor to the last page.
+# Todoist listings follow next_cursor, so tasks past the first page are
+# revalidated and counted (F13).
 # shellcheck disable=SC2015,SC1091
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# prompt.md tells the scorer that a comment from the scout's own account is
-# not someone else's claim, but the scorer runs with no tools and used to be
-# given no login, so the owner's own "I'll take this" read as a claim and
-# dropped the issue. Both runners now pass the login as SCOUT_LOGIN.
+# Both runners pass the scout's login as SCOUT_LOGIN, so the owner's own
+# "I'll take this" isn't read as someone else's claim (F8).
 # shellcheck disable=SC2015,SC1091
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

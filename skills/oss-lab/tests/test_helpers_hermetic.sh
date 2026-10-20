@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# The suites must not depend on the machine's git config. A global config
-# that forces commit signing (or runs a hook through a mocked binary) used to
-# break every case that builds a state repo. build_mockbin now points git at a
-# private config, so this hostile one must have no effect.
+# The suites ignore the machine's git config: a global config that forces
+# commit signing must not break a test commit (F12).
 # shellcheck disable=SC2015,SC1091
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

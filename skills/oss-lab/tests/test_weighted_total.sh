@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# The runner routes on weighted_total, so it computes that number itself from
-# the four axis scores (prompt.md weights, rounded to 0.1) instead of trusting
-# the model's arithmetic, which real runs showed drifting by 0.1. A scored
-# object without four valid axis scores breaks the output contract and is
-# rejected like any other malformed object.
+# The runner computes weighted_total from the axes, not the model's number.
+# Objects without four valid axis scores are rejected.
 # shellcheck disable=SC2015,SC1091
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
