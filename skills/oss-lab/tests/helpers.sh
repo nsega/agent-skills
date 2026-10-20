@@ -18,8 +18,12 @@ summary() { echo "$1: $pass passed, $fail failed"; [ "$fail" -eq 0 ]; }
 # claude : records argv and stdin, replays $MOCK_CLAUDE_OUT
 # gh     : serves canned GitHub responses, honouring --jq like the real gh
 # curl   : serves the Todoist API v1 surface, recording writes
+# Also points git at a private config, so the machine's signing, hooks, or
+# credential helpers can't break a test commit through a mocked binary.
 build_mockbin() {
   local d="$1"; mkdir -p "$d"
+  export GIT_CONFIG_GLOBAL="$d/gitconfig" GIT_CONFIG_NOSYSTEM=1
+  printf '[user]\n\tname = test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n' > "$GIT_CONFIG_GLOBAL"
 
   cat > "$d/claude" <<'EOF'
 #!/bin/bash

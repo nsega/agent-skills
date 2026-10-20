@@ -1,0 +1,64 @@
+{
+  "id": "reeval/14-reeval-count-owned-by-runner",
+  "covers": [
+    "Q16"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:110-111 'reeval_count advanced from the queue's own record'; SKILL.md:114 'queue.json itself still holds only the scoring object'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:189-192",
+  "why": "The scorer emits its own reeval_count (9), wip_capped and claimed_by: null, and route todoist on a 6.5.",
+  "expected": "Stored: weighted_total 6.5, route 'queue', reeval_count 3 (prior 2 + 1), no wip_capped, no claimed_by.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902821",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 8
+        },
+        "weighted_total": 5.9,
+        "rationale_consistency": "prior rationale",
+        "route": "queue",
+        "reeval_count": 2
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902821",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 6,
+          "feasibility": 7
+        },
+        "weighted_total": 6.5,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902821",
+        "route": "todoist",
+        "reeval_count": 9,
+        "wip_capped": true,
+        "claimed_by": null
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902821",
+        "weighted_total": 6.5,
+        "route": "queue",
+        "reeval_count": 3,
+        "wip_capped": "<absent>",
+        "claimed_by": "<absent>"
+      }
+    ]
+  }
+}

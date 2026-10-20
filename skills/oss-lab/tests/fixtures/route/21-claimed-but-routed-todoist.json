@@ -1,0 +1,44 @@
+{
+  "id": "route/21-claimed-but-routed-todoist",
+  "covers": [
+    "C2"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:61-63 'routes the issue to drop whatever it scored'; SKILL.md:186-189 (runner validates every scored object); the weekly pass enforces this in the runner (SKILL.md:105-106, run-reeval.sh:180-181)",
+  "code": "F1 at f80c96d: run-scout.sh:116-127 (route taken from the model; claimed_by never read). Fixed in nsega/agent-skills#21 (oss_lab_route_scored)",
+  "why": "A scorer that reports claimed_by but still writes route todoist. The weekly pass drops such an issue in the runner; the hourly pass trusts the route.",
+  "expected": "Per SKILL.md: no task (claimed work is dropped whatever it scored); the issue is seen, not queued.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902211"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902211",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 9,
+          "impact": 8,
+          "feasibility": 9
+        },
+        "weighted_total": 8.5,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902211",
+        "route": "todoist",
+        "claimed_by": "fixture-user-h"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue_issues": [],
+    "seen": [
+      "kubernetes-sigs/kueue#902211"
+    ]
+  }
+}

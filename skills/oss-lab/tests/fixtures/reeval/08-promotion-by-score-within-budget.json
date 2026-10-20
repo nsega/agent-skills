@@ -1,0 +1,147 @@
+{
+  "id": "reeval/08-promotion-by-score-within-budget",
+  "covers": [
+    "Q12",
+    "Q13"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:105-110 'a score at or above the promote threshold is a promotion candidate regardless of the route the model wrote (so a 7.1 the model capped last week takes the next free slot)'; SKILL.md:49-50 'within the same WIP budget'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:214-253",
+  "why": "WIP 3 of 5: budget 2. Rescored: a=7.4 (model wrote queue + wip_capped), b=8.1 todoist, c=7.0 exactly (queue), d=6.9.",
+  "expected": "Promoted in score order: b, a. c (7.0) stays queued flagged wip_capped=true; d stays without the flag. All four are re-checked upstream; 'reeval complete: 4 rescored, 2 promoted, 0 stale-pruned, 0 dropped'.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902761",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902762",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes/kubernetes#902763",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902764",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 3
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902761",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 7,
+          "impact": 7,
+          "feasibility": 9
+        },
+        "weighted_total": 7.4,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902761",
+        "route": "queue",
+        "wip_capped": true
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902762",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 8,
+          "impact": 8,
+          "feasibility": 10
+        },
+        "weighted_total": 8.1,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902762",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes/kubernetes#902763",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 7,
+          "feasibility": 10
+        },
+        "weighted_total": 7.0,
+        "rationale_consistency": "synthetic rationale for kubernetes/kubernetes#902763",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902764",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 7,
+          "feasibility": 8
+        },
+        "weighted_total": 6.9,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/gateway-api-inference-extension#902764",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902762",
+      "kubernetes-sigs/kueue#902761"
+    ],
+    "queue": [
+      {
+        "issue": "kubernetes/kubernetes#902763",
+        "weighted_total": 7.0,
+        "wip_capped": true,
+        "route": "queue",
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902764",
+        "weighted_total": 6.9,
+        "wip_capped": "<absent>",
+        "reeval_count": 1
+      }
+    ],
+    "output_contains": [
+      "promote: kubernetes-sigs/kueue#902762 now a task",
+      "promote: kubernetes-sigs/kueue#902761 now a task",
+      "reeval complete: 4 rescored, 2 promoted, 0 stale-pruned, 0 dropped, 2 still queued"
+    ]
+  }
+}

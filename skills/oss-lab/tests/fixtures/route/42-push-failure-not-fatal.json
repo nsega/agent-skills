@@ -1,0 +1,46 @@
+{
+  "id": "route/42-push-failure-not-fatal",
+  "covers": [
+    "T3"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:222-223 'A failed push never fails the iteration'",
+  "code": "skills/oss-lab/scripts/run-scout.sh:158-160; skills/oss-lab/scripts/lib.sh:399-403",
+  "why": "State repo with no remote: the push fails.",
+  "expected": "Exit 0; 'warn: state sync incomplete'; state still committed locally; last_run advanced.",
+  "state": {
+    "git": "no_remote"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902511"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902511",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 6
+        },
+        "weighted_total": 5.5,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902511",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "output_contains": [
+      "warn: state sync incomplete"
+    ],
+    "last_run": "advanced",
+    "git_subject": "^scout: .* 1 scored, 0 tasked, 1 queued$"
+  }
+}

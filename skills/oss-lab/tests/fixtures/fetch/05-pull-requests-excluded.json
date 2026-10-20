@@ -1,0 +1,56 @@
+{
+  "id": "fetch/05-pull-requests-excluded",
+  "covers": [
+    "F5"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:25 'pulls new open issues' (the issues endpoint also lists PRs; only issues are candidates)",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:55",
+  "why": "GitHub's issues list includes pull requests; they are not contribution candidates.",
+  "expected": "The PR entry kueue#900501 is dropped; the issue kueue#900502 survives.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900501,
+          "title": "A pull request",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900501",
+          "body": "Synthetic fixture issue body.",
+          "pull_request": {
+            "url": "https://api.github.com/repos/kubernetes-sigs/kueue/pulls/900501"
+          }
+        },
+        {
+          "number": 900502,
+          "title": "Synthetic issue 900502",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900502",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#900502"
+    ]
+  }
+}

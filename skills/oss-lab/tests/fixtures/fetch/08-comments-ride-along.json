@@ -1,0 +1,114 @@
+{
+  "id": "fetch/08-comments-ride-along",
+  "covers": [
+    "F7"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:28-29 'Comment threads ride along so the scorer can see a claim that left no assignee and no PR'; prompt.md:102-103 'a recent_comments array (author plus the tail of each comment)'",
+  "code": "skills/oss-lab/scripts/lib.sh:336-358",
+  "why": "Only issues with comments cost a comments call; the newest three comments are attached as {author, body} with whitespace collapsed.",
+  "expected": "kueue#900801 carries recent_comments = the last 3 of its 5 comments (whitespace collapsed); kueue#900802 (0 comments) has no recent_comments; exactly one comments call.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900801,
+          "title": "Synthetic issue 900801",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 5,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900801",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900802,
+          "title": "Synthetic issue 900802",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900802",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "comments": {
+      "kubernetes-sigs/kueue#900801": [
+        {
+          "user": {
+            "login": "fixture-user-a"
+          },
+          "body": "first comment"
+        },
+        {
+          "user": {
+            "login": "fixture-user-b"
+          },
+          "body": "second comment"
+        },
+        {
+          "user": {
+            "login": "fixture-user-c"
+          },
+          "body": "Is this\nstill reproducible\ton main?"
+        },
+        {
+          "user": {
+            "login": "fixture-user-d"
+          },
+          "body": "Yes,   it fails about\n\n1 in 20 runs."
+        },
+        {
+          "user": {
+            "login": "fixture-user-e"
+          },
+          "body": "/triage accepted"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#900801",
+      "kubernetes-sigs/kueue#900802"
+    ],
+    "stdout_objects": [
+      {
+        "issue": "kubernetes-sigs/kueue#900801",
+        "recent_comments": [
+          {
+            "author": "fixture-user-c",
+            "body": "Is this still reproducible on main?"
+          },
+          {
+            "author": "fixture-user-d",
+            "body": "Yes, it fails about 1 in 20 runs."
+          },
+          {
+            "author": "fixture-user-e",
+            "body": "/triage accepted"
+          }
+        ]
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#900802",
+        "recent_comments": "<absent>"
+      }
+    ],
+    "gh_call_counts": {
+      "/comments": 1
+    }
+  }
+}

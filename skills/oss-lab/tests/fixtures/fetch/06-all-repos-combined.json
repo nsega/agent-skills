@@ -1,0 +1,193 @@
+{
+  "id": "fetch/06-all-repos-combined",
+  "covers": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F11",
+    "F12"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:25-28 'gh api pulls new open issues from the target repos, filters out assigned / stale / excluded-label issues and any issue that already has a linked pull request, and deduplicates against seen.json'; SKILL.md:60-61; prompt.md:20-22 (the three target repos); SKILL.md:57-59 'Read-only upstream'",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:17-21,47-75",
+  "why": "All three target repos are scanned in order, every filter applies, and every GitHub call is a read.",
+  "expected": "Survivors, in repo order: kubernetes#900601, kueue#900611, gaie#900621. No gh call is a write (checked for every case).",
+  "state": {
+    "seen": [
+      "kubernetes-sigs/gateway-api-inference-extension#900622"
+    ]
+  },
+  "upstream": {
+    "list": {
+      "kubernetes/kubernetes": [
+        {
+          "number": 900601,
+          "title": "Synthetic issue 900601",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "sig/scheduling"
+            },
+            {
+              "name": "kind/flake"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes/kubernetes/issues/900601",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900602,
+          "title": "Synthetic issue 900602",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [
+            {
+              "login": "fixture-user-b"
+            }
+          ],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes/kubernetes/issues/900602",
+          "body": "Synthetic fixture issue body."
+        }
+      ],
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900611,
+          "title": "Synthetic issue 900611",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "area/testing"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900611",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900612,
+          "title": "Synthetic issue 900612",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "lifecycle/stale"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900612",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900613,
+          "title": "Synthetic issue 900613",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900613",
+          "body": "Synthetic fixture issue body.",
+          "pull_request": {
+            "url": "https://api.github.com/repos/kubernetes-sigs/kueue/pulls/900613"
+          }
+        }
+      ],
+      "kubernetes-sigs/gateway-api-inference-extension": [
+        {
+          "number": 900621,
+          "title": "Synthetic issue 900621",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/issues/900621",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900622,
+          "title": "Synthetic issue 900622",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/issues/900622",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900623,
+          "title": "Synthetic issue 900623",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/issues/900623",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "linked": {
+      "kubernetes-sigs/gateway-api-inference-extension": [
+        900623
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes/kubernetes#900601",
+      "kubernetes-sigs/kueue#900611",
+      "kubernetes-sigs/gateway-api-inference-extension#900621"
+    ],
+    "gh_call_counts": {
+      "search/issues": 3,
+      "repos/kubernetes/kubernetes/issues": 1,
+      "repos/kubernetes-sigs/kueue/issues": 1,
+      "repos/kubernetes-sigs/gateway-api-inference-extension/issues": 1
+    }
+  }
+}

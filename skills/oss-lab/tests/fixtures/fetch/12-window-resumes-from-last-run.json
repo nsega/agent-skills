@@ -1,0 +1,43 @@
+{
+  "id": "fetch/12-window-resumes-from-last-run",
+  "covers": [
+    "F10"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:41-42 'seen.json and last_run advance so the next window resumes cleanly'",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:36-42,77",
+  "why": "The fetch window starts at the stored last_run. The fetch itself only writes last_run.pending (the runner commits it), and it initialises missing state files.",
+  "expected": "Every issues-list call uses since=2026-09-15T09:00:00Z; last_run is unchanged; last_run.pending holds a fresh ISO timestamp; seen.json and queue.json are created as [].",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 901201,
+          "title": "Synthetic issue 901201",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901201",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "since_param": "<last_run>",
+    "last_run": "unchanged",
+    "last_run_pending": "advanced",
+    "seen": [],
+    "queue": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "route/30-claude-fails-loudly",
+  "covers": [
+    "E1"
+  ],
+  "run": "scout",
+  "contract": "#18 (f80c96d) commit message: 'Take the exit code explicitly at both paid call sites and report it alongside a bounded excerpt'; 'the same runs still abort, and the window ... left uncommitted'. SKILL.md is silent on diagnostics.",
+  "code": "skills/oss-lab/scripts/run-scout.sh:80-92; skills/oss-lab/scripts/lib.sh:30-41",
+  "why": "The outage shape: claude exits 7 and explains itself on stdout, which the command substitution captures.",
+  "expected": "Nonzero exit; log names 'claude exited 7 (window not advanced)' and shows 'Invalid API key'; last_run, seen, queue unchanged; no task.",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902301"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      "Invalid API key - please run /login"
+    ],
+    "rc": 7
+  },
+  "expect": {
+    "rc": "nonzero",
+    "claude_called": true,
+    "last_run": "unchanged",
+    "seen": [],
+    "queue": [],
+    "tasks_created": [],
+    "output_contains": [
+      "claude exited 7 (window not advanced)",
+      "Invalid API key - please run /login"
+    ]
+  }
+}

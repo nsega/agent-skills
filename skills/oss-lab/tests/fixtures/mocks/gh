@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Fixture mock for `gh` (oss-lab regression fixtures). Never touches the network.
+# Serves the JSON document at $MOCK_UPSTREAM:
+#   login        : our GitHub login (default "nsega")
+#   gh_down      : true -> every call fails (GitHub unreachable)
+#   list         : {"owner/repo": [raw issue objects]}  issues LIST endpoint
+#   linked       : {"owner/repo": [numbers]}            search linked:pr
+#   search_fail  : ["owner/repo"]                        search call fails
+#   issues       : {"owner/repo#n": {raw issue} | "unreachable"}  single issue
+#   comments     : {"owner/repo#n": [raw comments] | "garbage"}
+# A single-issue read merges: defaults <- matching LIST entry <- issues override.
+# Logs every call to $MOCK_LOG/gh_calls.jsonl. Any non-GET call is a write to
+# upstream: it is logged to $MOCK_LOG/gh_writes and refused.
+set -u
+log="${MOCK_LOG:?}"; up="${MOCK_UPSTREAM:?}"
+printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]' >> "$log/gh_calls.jsonl"
+U() { jq -c "$@" "$up"; }
+
+[ "${1:-}" = api ] || { echo "gh $*" >> "$log/unexpected"; exit 1; }
+shift
+method=""; filter=""; endpoint=""; fields=()
+while (( $# )); do
+  case "$1" in
+    -X|--method) method="$2"; shift 2 ;;
+    -f|-F|--field|--raw-field) fields+=("$2"); shift 2 ;;
+    --jq|-q) filter="$2"; shift 2 ;;
+    --paginate|--silent|-i|--include|--verbose) shift ;;
+    -H|--header|--input|-t|--template|--hostname|--cache|-p|--preview) shift 2 ;;
+    -*) echo "gh api: unknown flag $1" >> "$log/unexpected"; shift ;;
+    *) endpoint="$1"; shift ;;
+  esac
+done
+eff="${method:-$([ ${#fields[@]} -gt 0 ] && echo POST || echo GET)}"
+if [ "$(printf '%s' "$eff" | tr '[:lower:]' '[:upper:]')" != GET ]; then
+  echo "$eff $endpoint ${fields[*]}" >> "$log/gh_writes"; exit 1
+fi
+[ "$(U '.gh_down // false')" = true ] && exit 1
+
+field() { local f; for f in "${fields[@]}"; do [ "${f%%=*}" = "$1" ] && { echo "${f#*=}"; return; }; done; }
+
+# A query string rides on the endpoint only for comment pages
+# (?per_page=N&page=M); split it off so the patterns below still match.
+query=""
+case "$endpoint" in *\?*) query="${endpoint#*\?}"; endpoint="${endpoint%%\?*}" ;; esac
+qparam() { grep -oE "(^|&)$1=[0-9]+" <<<"$query" | grep -oE '[0-9]+$'; }
+
+raw=""
+case "$endpoint" in
+  user)
+    raw="$(U '{login: (.login // "nsega")}')" ;;
+  search/issues)
+    q="$(field q)"; repo="$(sed -E 's/.*repo:([^ ]+).*/\1/' <<<"$q")"
+    echo "$repo" >> "$log/search_repos"
+    [ "$(jq -c --arg r "$repo" '(.search_fail // []) | index($r) != null' "$up")" = true ] && exit 1
+    raw="$(jq -c --arg r "$repo" '((.linked // {})[$r] // []) | {total_count: length, items: map({number: .})}' "$up")" ;;
+  repos/*/*/issues/*/comments)
+    id="$(sed -E 's#repos/([^/]+/[^/]+)/issues/([0-9]+)/comments#\1\#\2#' <<<"$endpoint")"
+    raw="$(jq -c --arg k "$id" '(.comments // {})[$k] // []' "$up")"
+    [ "$raw" = '"garbage"' ] && { echo "<html>rate limited</html>"; exit 0; }
+    # Paginate like the real endpoint: oldest first, per_page defaults to 30.
+    raw="$(jq -c --argjson per "$(qparam per_page || echo 30)" --argjson page "$(qparam page || echo 1)" \
+             '.[($page - 1) * $per : $page * $per]' <<<"$raw")" ;;
+  repos/*/*/issues/*)
+    repo="$(sed -E 's#repos/([^/]+/[^/]+)/issues/.*#\1#' <<<"$endpoint")"; num="${endpoint##*/}"
+    raw="$(jq -c --arg r "$repo" --argjson n "$num" '
+      ((.issues // {})["\($r)#\($n)"]) as $o
+      | if $o == "unreachable" then "unreachable"
+        else {number: $n, title: "", state: "open", assignees: [], labels: [],
+              comments: 0, created_at: "2026-09-01T00:00:00Z",
+              html_url: "https://github.com/\($r)/issues/\($n)", body: ""}
+             + ([((.list // {})[$r] // [])[] | select(.number == $n)][0] // {})
+             + ($o // {})
+        end' "$up")"
+    [ "$raw" = '"unreachable"' ] && exit 1 ;;
+  repos/*/*/issues)
+    repo="$(sed -E 's#repos/([^/]+/[^/]+)/issues#\1#' <<<"$endpoint")"
+    printf '%s\t%s\n' "$repo" "$(field since)" >> "$log/since"
+    raw="$(jq -c --arg r "$repo" '(.list // {})[$r] // []' "$up")" ;;
+  *)
+    echo "gh api $endpoint" >> "$log/unexpected"; exit 1 ;;
+esac
+if [ -n "$filter" ]; then jq -r "$filter" <<<"$raw"; else printf '%s\n' "$raw"; fi

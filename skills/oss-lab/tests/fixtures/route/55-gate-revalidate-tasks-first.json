@@ -1,0 +1,101 @@
+{
+  "id": "route/55-gate-revalidate-tasks-first",
+  "covers": [
+    "Q3",
+    "C3"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:18-24 (revalidation is step 1); run-scout.sh:28-36 (runs before the weekly pass, which sizes its promotion budget from WIP)",
+  "code": "skills/oss-lab/scripts/run-scout.sh:37,44-51",
+  "why": "A dead task (closed issue) holds a slot. It must be closed before the weekly pass reads WIP.",
+  "expected": "Task t-dead closed before claude runs; the queued 7.8 issue is promoted because the freed slot makes the budget 1.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902611",
+        "weighted_total": 6.6,
+        "route": "queue"
+      }
+    ],
+    "last_reeval": null
+  },
+  "upstream": {
+    "list": {},
+    "issues": {
+      "kubernetes/kubernetes#902619": {
+        "state": "closed"
+      }
+    }
+  },
+  "todoist": {
+    "tasks": [
+      {
+        "id": "t0",
+        "content": "Contribute: [kubernetes-sigs/kueue#902620](https://github.com/kubernetes-sigs/kueue/issues/902620) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t1",
+        "content": "Contribute: [kubernetes-sigs/kueue#902621](https://github.com/kubernetes-sigs/kueue/issues/902621) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t2",
+        "content": "Contribute: [kubernetes-sigs/kueue#902622](https://github.com/kubernetes-sigs/kueue/issues/902622) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t3",
+        "content": "Contribute: [kubernetes-sigs/kueue#902623](https://github.com/kubernetes-sigs/kueue/issues/902623) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-dead",
+        "content": "Contribute: [kubernetes/kubernetes#902619](https://github.com/kubernetes/kubernetes/issues/902619) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      }
+    ]
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902611",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 7,
+          "impact": 9,
+          "feasibility": 9
+        },
+        "weighted_total": 7.8,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902611",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_closed": [
+      "t-dead"
+    ],
+    "sequence_before": [
+      [
+        "close",
+        "claude"
+      ]
+    ],
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902611"
+    ],
+    "queue_issues": []
+  }
+}

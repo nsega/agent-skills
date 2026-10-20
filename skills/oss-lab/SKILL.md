@@ -244,3 +244,16 @@ reference setup (`~/dev/oss-lab-state`, a clone of the private state
 repo) and logs to `~/Library/Logs/oss-scout.log`. Verify
 `CLAUDE_CONFIG_DIR` resolves to the intended personal account before
 first run (the runner enforces this).
+
+## Tests
+
+`make test` (from the repo root) runs every suite, including
+`tests/test_fixtures.sh`, which replays the synthetic cases in
+`tests/fixtures/` against the real scripts with fake `gh`, `curl`, and
+`claude`. Nothing reaches the network or a paid model, so CI runs it on
+every pull request. Pass another checkout to compare behaviour before and
+after a change: `bash skills/oss-lab/tests/test_fixtures.sh ../other-checkout`.
+
+`evals/run_scorer_evals.sh` is the one paid check: it sends the scorer
+fixtures in `evals/evals.json` through the real `claude -p` exactly as
+`run-scout.sh` does and grades each reply. Run it by hand on the Mac.

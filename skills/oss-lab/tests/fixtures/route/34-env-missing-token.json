@@ -1,0 +1,26 @@
+{
+  "id": "route/34-env-missing-token",
+  "covers": [
+    "E4"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:206-211 (secrets live in $OSS_LAB_STATE_DIR/env)",
+  "code": "skills/oss-lab/scripts/lib.sh:55-65; run-scout.sh:18",
+  "why": "Without TODOIST_TOKEN the run aborts before doing anything.",
+  "expected": "Exit 1; 'TODOIST_TOKEN / TODOIST_PROJECT_ID not set'; claude not called.",
+  "state": {
+    "env": "missing_token"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902341"
+    ]
+  },
+  "expect": {
+    "rc": 1,
+    "claude_called": false,
+    "output_contains": [
+      "TODOIST_TOKEN / TODOIST_PROJECT_ID not set"
+    ]
+  }
+}

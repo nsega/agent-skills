@@ -1,0 +1,61 @@
+{
+  "id": "reeval/04-all-settled-no-claude",
+  "covers": [
+    "Q6"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:98-101; revalidating first means a fully settled queue is never paid for (SKILL.md:119-122)",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:63-71",
+  "why": "Every queued issue is settled.",
+  "expected": "Queue emptied; claude not called; stamp advanced; 'queue empty after revalidation (2 stale pruned)'.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902721",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902722",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 6
+        },
+        "weighted_total": 5.5,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902721": {
+        "state": "closed"
+      },
+      "kubernetes-sigs/kueue#902722": {
+        "state": "closed"
+      }
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "expect": {
+    "rc": 0,
+    "claude_called": false,
+    "queue": [],
+    "last_reeval": "advanced",
+    "output_contains": [
+      "queue empty after revalidation (2 stale pruned), claude not invoked"
+    ]
+  }
+}

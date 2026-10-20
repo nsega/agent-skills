@@ -1,0 +1,27 @@
+{
+  "id": "route/33-account-guard",
+  "covers": [
+    "E3"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:232-234 'Verify CLAUDE_CONFIG_DIR resolves to the intended personal account before first run (the runner enforces this)'",
+  "code": "skills/oss-lab/scripts/lib.sh:45-51; run-scout.sh:19",
+  "why": "A non-personal CLAUDE_CONFIG_DIR aborts before any upstream call or paid call.",
+  "expected": "Exit 1; 'CLAUDE_CONFIG_DIR points to'; claude not called; no issues-list call.",
+  "claude_config_dir": ".claude-work",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902331"
+    ]
+  },
+  "expect": {
+    "rc": 1,
+    "claude_called": false,
+    "output_contains": [
+      "abort: CLAUDE_CONFIG_DIR points to"
+    ],
+    "gh_call_counts": {
+      "repos/kubernetes-sigs/kueue/issues": 0
+    }
+  }
+}

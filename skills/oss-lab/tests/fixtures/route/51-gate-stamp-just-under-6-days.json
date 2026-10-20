@@ -1,0 +1,51 @@
+{
+  "id": "route/51-gate-stamp-just-under-6-days",
+  "covers": [
+    "Q1"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:123-125 'The hourly runner triggers run-reeval.sh once the last_reeval stamp is 6+ days old'",
+  "code": "skills/oss-lab/scripts/run-scout.sh:44-51",
+  "why": "Stamp 6 days minus 10 minutes old: not due.",
+  "expected": "Weekly pass skipped: claude not called, stamp unchanged.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902601",
+        "weighted_total": 5.6,
+        "rationale_consistency": "r",
+        "route": "queue"
+      }
+    ],
+    "last_reeval": {
+      "ago": 517800
+    }
+  },
+  "upstream": {
+    "list": {}
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902601",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902601",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_called": false,
+    "last_reeval": "unchanged"
+  }
+}

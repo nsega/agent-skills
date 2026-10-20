@@ -1,0 +1,128 @@
+{
+  "id": "reeval/21-commit-message",
+  "covers": [
+    "T2",
+    "Q12",
+    "Q14",
+    "Q6"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:221 'reeval: <date> <n> rescored, <p> promoted, <s> stale-pruned, <d> dropped'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:258-266",
+  "why": "One of each outcome: pruned (closed), promoted, two-strike dropped, kept.",
+  "expected": "Commit 'reeval: YYYY-MM-DD 3 rescored, 1 promoted, 1 stale-pruned, 1 dropped', pushed.",
+  "state": {
+    "git": true,
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902891",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902892",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902893",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 5,
+          "impact": 4,
+          "feasibility": 5
+        },
+        "weighted_total": 4.5,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902894",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902891": {
+        "state": "closed"
+      }
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902892",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 7,
+          "feasibility": 10
+        },
+        "weighted_total": 7.3,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902892",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902893",
+        "scores": {
+          "okr_alignment": 3,
+          "consistency": 4,
+          "impact": 3,
+          "feasibility": 7
+        },
+        "weighted_total": 4.1,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902893",
+        "route": "drop"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902894",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902894",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "git_subject": "^reeval: [0-9]{4}-[0-9]{2}-[0-9]{2} 3 rescored, 1 promoted, 1 stale-pruned, 1 dropped$",
+    "git_pushed": true,
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902894"
+    ],
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902892"
+    ]
+  }
+}

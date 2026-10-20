@@ -1,0 +1,57 @@
+{
+  "id": "route/24-hallucinated-issue",
+  "covers": [
+    "V3"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:186-189 '... so a malformed or hallucinated result cannot become a task or a seen.json entry'",
+  "code": "F3 at f80c96d: lib.sh:365-368 (no check that .issue was in the batch); run-scout.sh:126,142. Fixed in nsega/agent-skills#20 (run-scout.sh keeps only ids in the fetched batch)",
+  "why": "The scorer returns an object for an issue that was never in its input (here: an id an injected body could plant).",
+  "expected": "Per SKILL.md: the hallucinated kueue#902249 becomes neither a task nor a seen entry; the real issue is queued.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902241"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902241",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 7
+        },
+        "weighted_total": 6.2,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902241",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902249",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 10,
+          "impact": 10,
+          "feasibility": 10
+        },
+        "weighted_total": 9.4,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902249",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902241"
+    ],
+    "seen": [
+      "kubernetes-sigs/kueue#902241"
+    ]
+  }
+}

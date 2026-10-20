@@ -1,0 +1,60 @@
+{
+  "id": "reeval/22-wip-full-no-promotion",
+  "covers": [
+    "Q13",
+    "W3"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:49-50 'promoted into a task (within the same WIP budget)'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:214-218,249-253",
+  "why": "WIP 5 of 5: an 8.0 rescore cannot be promoted.",
+  "expected": "No task; the issue stays queued with wip_capped=true and reeval_count 1.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902901",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 5
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902901",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 8,
+          "impact": 8,
+          "feasibility": 8
+        },
+        "weighted_total": 8.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902901",
+        "route": "queue",
+        "wip_capped": true
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902901",
+        "weighted_total": 8.0,
+        "wip_capped": true,
+        "reeval_count": 1
+      }
+    ]
+  }
+}

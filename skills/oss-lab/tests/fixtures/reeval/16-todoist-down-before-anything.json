@@ -1,0 +1,61 @@
+{
+  "id": "reeval/16-todoist-down-before-anything",
+  "covers": [
+    "Q10"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:116-118 (abort without advancing the stamp); run-reeval.sh:45-46 'Read before anything is written, so every abort path leaves the state exactly as it found it'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:47-50",
+  "why": "Todoist unreachable: the promotion budget is unknown, so the pass aborts before the prune and before the paid call.",
+  "expected": "Exit 1; queue.json byte-identical (the closed issue is NOT pruned); no claude; stamp absent; no issue-status call.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902841",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902842",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902841": {
+        "state": "closed"
+      }
+    }
+  },
+  "todoist": {
+    "down": true
+  },
+  "expect": {
+    "rc": 1,
+    "claude_called": false,
+    "last_reeval": "absent",
+    "queue_unchanged": true,
+    "gh_call_counts": {
+      "repos/kubernetes-sigs/kueue/issues/": 0
+    },
+    "output_contains": [
+      "todoist unreachable, WIP count unknown (stamp not advanced)"
+    ]
+  }
+}

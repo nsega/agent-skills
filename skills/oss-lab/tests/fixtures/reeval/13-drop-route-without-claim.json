@@ -1,0 +1,79 @@
+{
+  "id": "reeval/13-drop-route-without-claim",
+  "covers": [
+    "Q13",
+    "Q15"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md Queue decay 'a scorer \"drop\" with no claimed_by on a score at or above the drop bar counts as a claim' (documented in nsega/agent-skills#21; F5 was this rule living only in the code comment at run-reeval.sh:156-159)",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:182-184 (route 'drop' with no claimed_by at >= 5.0 is treated as a claim)",
+  "why": "The scorer writes route drop with no claimed_by on a 7.6 and on a 5.5. Both are at or above the drop bar, so the only reason left to drop them is a claim, and the loop would rather lose a candidate than take announced work.",
+  "expected": "Both are dropped as claims: no task, and neither stays queued.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902811",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902812",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902811",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 7,
+          "impact": 9,
+          "feasibility": 8
+        },
+        "weighted_total": 7.6,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902811",
+        "route": "drop"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902812",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 6
+        },
+        "weighted_total": 5.5,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902812",
+        "route": "drop"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue": [],
+    "output_contains": [
+      "dropped by the scorer at 7.6 with no claimed_by, treated as a claim"
+    ]
+  }
+}

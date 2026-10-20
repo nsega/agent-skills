@@ -1,0 +1,83 @@
+{
+  "id": "reeval/09-promote-threshold-boundary",
+  "covers": [
+    "Q12"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:107 'a score at or above the promote threshold'; SKILL.md:88 (>= 7.0); lib.sh:20 OSS_LAB_PROMOTE_AT=7.0",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:241",
+  "why": "Exactly 7.0 promotes; 6.99 does not. Budget is ample (WIP 0).",
+  "expected": "Task for kueue#902771 (7.0); kueue#902772 (6.99) stays queued, not flagged.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902771",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902772",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902771",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 7,
+          "feasibility": 10
+        },
+        "weighted_total": 7.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902771",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902772",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 8,
+          "feasibility": 9
+        },
+        "weighted_total": 6.99,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902772",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902771"
+    ],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902772",
+        "weighted_total": 6.99,
+        "wip_capped": "<absent>"
+      }
+    ]
+  }
+}

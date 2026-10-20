@@ -1,0 +1,95 @@
+{
+  "id": "reeval/05-unknown-kept-untouched",
+  "covers": [
+    "Q8",
+    "Q9"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:114-116 'An issue whose fetch failed is left out of the paid call and stays queued untouched for next week'; SKILL.md:122-123 'A status of unknown keeps the issue'",
+  "code": "skills/oss-lab/scripts/lib.sh:205; run-reeval.sh:95-105,177",
+  "why": "One issue's fetch fails (5xx); the other is live.",
+  "expected": "Only kueue#902732 reaches claude; kueue#902731 stays byte-identical in content (same total, reeval_count 1); stamp advanced.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902731",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 9
+        },
+        "weighted_total": 6.1,
+        "rationale_consistency": "prior rationale",
+        "route": "queue",
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902732",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 8
+        },
+        "weighted_total": 5.9,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902731": "unreachable"
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902732",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 8
+        },
+        "weighted_total": 6.4,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902732",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_stdin_issues": [
+      "kubernetes-sigs/kueue#902732"
+    ],
+    "last_reeval": "advanced",
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902731",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 9
+        },
+        "weighted_total": 6.1,
+        "rationale_consistency": "prior rationale",
+        "route": "queue",
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902732",
+        "weighted_total": 6.4,
+        "reeval_count": 1
+      }
+    ],
+    "output_contains": [
+      "no fresh upstream copy of kubernetes-sigs/kueue#902731, leaving it queued for next week"
+    ]
+  }
+}

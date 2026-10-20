@@ -1,0 +1,62 @@
+{
+  "id": "reeval/20-promotion-post-fails",
+  "covers": [
+    "Q13"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:49-50 (promotion is the queue's exit); failure handling in run-reeval.sh:237-238",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:233-239,246-253",
+  "why": "The Todoist POST fails for the promotion candidate.",
+  "expected": "'todoist create failed ... leaving it queued'; the issue stays queued, flagged wip_capped, with its new score.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902881",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0,
+    "post_fail": true
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902881",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 8,
+          "impact": 7,
+          "feasibility": 9
+        },
+        "weighted_total": 7.7,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902881",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902881",
+        "weighted_total": 7.7,
+        "wip_capped": true,
+        "reeval_count": 1
+      }
+    ],
+    "output_contains": [
+      "warn: todoist create failed for kubernetes-sigs/kueue#902881, leaving it queued"
+    ]
+  }
+}

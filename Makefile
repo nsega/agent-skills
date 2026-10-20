@@ -34,7 +34,7 @@ OSS_LAB_PLIST_LABEL := dev.nsega.oss-scout
 OSS_LAB_PLIST_SRC   := $(REPO_SRC)/oss-lab/$(OSS_LAB_PLIST_LABEL).plist
 OSS_LAB_PLIST_DST   := $(HOME)/Library/LaunchAgents/$(OSS_LAB_PLIST_LABEL).plist
 
-.PHONY: install uninstall status install-codex uninstall-codex status-codex install-oss-lab new help
+.PHONY: install uninstall status install-codex uninstall-codex status-codex install-oss-lab new test lint help
 
 help:
 	@echo "Targets:"
@@ -42,6 +42,7 @@ help:
 	@echo "  install-codex / uninstall-codex / status-codex  (target: $(CODEX_SKILLS_DIR))"
 	@echo "  install-oss-lab                         symlink oss-lab + install launchd job"
 	@echo "  new name=<skill-name>                   scaffold a new skill"
+	@echo "  test / lint                             every skill's tests (zero-token) / shellcheck"
 	@echo ""
 	@echo "Sources: $(REPO_SRC) (all)"
 	@echo "         $(UPSTREAM_REPO) ($(UPSTREAM_SKILLS))"
@@ -114,3 +115,16 @@ status-codex:
 # --- Scaffold ---
 new:
 	@scripts/new.sh "$(name)"
+
+# --- Tests (what CI runs) ---
+# Every suite fakes claude, gh, curl, codex, and opencode: no network, no
+# paid call, no credentials. Paid scorer evals (skills/oss-lab/evals/) are
+# run by hand on the Mac, never here.
+test:
+	@fail=0; for t in skills/*/tests/test_*.sh; do \
+	  echo "==> $$t"; bash "$$t" || fail=1; \
+	done; exit $$fail
+
+# Info-level notes are skipped: the tests' `X && ok || bad` idiom is deliberate.
+lint:
+	@shellcheck -s bash -S warning $$(git ls-files '*.sh') skills/oss-lab/tests/fixtures/mocks/*

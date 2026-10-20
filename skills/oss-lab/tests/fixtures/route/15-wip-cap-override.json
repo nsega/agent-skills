@@ -1,0 +1,67 @@
+{
+  "id": "route/15-wip-cap-override",
+  "covers": [
+    "W4"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:91-94 'The cap lives in one place, OSS_LAB_WIP_CAP ... passed to the scorer as $WIP_CAP ... Override per run with the same variable.'",
+  "code": "skills/oss-lab/scripts/lib.sh:14; skills/oss-lab/scripts/run-scout.sh:83-84,107",
+  "why": "OSS_LAB_WIP_CAP=2 with WIP 1: budget 1, and the scorer is told WIP_CAP=2.",
+  "expected": "claude argv ends 'WIP_COUNT=1\\nWIP_CAP=2'; one task (8.8); 7.7 queued with wip_capped.",
+  "env": {
+    "OSS_LAB_WIP_CAP": "2"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902151",
+      "kubernetes-sigs/kueue#902152"
+    ]
+  },
+  "todoist": {
+    "wip": 1
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902151",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 8,
+          "impact": 7,
+          "feasibility": 9
+        },
+        "weighted_total": 7.7,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902151",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902152",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 8,
+          "impact": 10,
+          "feasibility": 10
+        },
+        "weighted_total": 8.8,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902152",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_prompt": {
+      "wip_count": 1,
+      "wip_cap": 2
+    },
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902152"
+    ],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902151",
+        "wip_capped": true
+      }
+    ]
+  }
+}

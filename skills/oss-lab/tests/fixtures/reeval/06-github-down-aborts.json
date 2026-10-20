@@ -1,0 +1,64 @@
+{
+  "id": "reeval/06-github-down-aborts",
+  "covers": [
+    "Q8",
+    "Q10"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:116-118 'if none could be fetched the pass aborts without advancing the stamp'; SKILL.md:122-123 'an unreachable GitHub cannot empty the queue'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:107-113",
+  "why": "GitHub unreachable: every status is unknown, nothing is pruned, nothing is fetched.",
+  "expected": "Exit 1; claude not called; stamp not advanced; both entries still queued with prior totals.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902741",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes/kubernetes#902742",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 5,
+          "impact": 5,
+          "feasibility": 6
+        },
+        "weighted_total": 5.2,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "gh_down": true
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "expect": {
+    "rc": 1,
+    "claude_called": false,
+    "last_reeval": "absent",
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902741",
+        "weighted_total": 6.0
+      },
+      {
+        "issue": "kubernetes/kubernetes#902742",
+        "weighted_total": 5.2
+      }
+    ],
+    "output_contains": [
+      "no fresh upstream copy of any queued issue, nothing to score (stamp not advanced)"
+    ]
+  }
+}
