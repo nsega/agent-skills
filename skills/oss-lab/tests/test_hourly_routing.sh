@@ -28,8 +28,8 @@ KUEUE='kubernetes-sigs/kueue#10'
 GAIE='kubernetes-sigs/gateway-api-inference-extension#10'
 
 score() {  # $1 issue, $2 weighted_total, $3 route [, $4 claimed_by]
-  printf '{"issue":"%s","scores":{"okr_alignment":8,"consistency":8,"impact":7,"feasibility":7},"weighted_total":%s,"rationale_consistency":"r","route":"%s"%s}' \
-    "$1" "$2" "$3" "${4:+,\"claimed_by\":\"$4\"}"
+  printf '{"issue":"%s","scores":%s,"weighted_total":%s,"rationale_consistency":"r","route":"%s"%s}' \
+    "$1" "$(axes_for "$2")" "$2" "$3" "${4:+,\"claimed_by\":\"$4\"}"
 }
 
 new_case() {  # $1: name; sets STATE, MOCK_LOG, MOCK_CLAUDE_OUT, FETCH

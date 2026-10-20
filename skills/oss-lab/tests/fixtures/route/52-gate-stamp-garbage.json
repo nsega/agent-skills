@@ -1,0 +1,55 @@
+{
+  "id": "route/52-gate-stamp-garbage",
+  "covers": [
+    "Q1"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:123-125 'The hourly runner triggers run-reeval.sh once the last_reeval stamp is 6+ days old'",
+  "code": "skills/oss-lab/scripts/run-scout.sh:44-51",
+  "why": "Stamp due (>= 6 days, missing, or unreadable): the weekly pass runs before the hourly fetch.",
+  "expected": "Weekly pass runs (claude called with the queued issue), stamp advanced; scout still exits 0 via 'no new issues'.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902601",
+        "weighted_total": 5.6,
+        "rationale_consistency": "r",
+        "route": "queue"
+      }
+    ],
+    "last_reeval": "garbage"
+  },
+  "upstream": {
+    "list": {}
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902601",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902601",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_called": true,
+    "last_reeval": "advanced",
+    "claude_stdin_issues": [
+      "kubernetes-sigs/kueue#902601"
+    ],
+    "output_contains": [
+      "no new issues, claude not invoked"
+    ]
+  }
+}

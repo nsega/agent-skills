@@ -1,0 +1,37 @@
+{
+  "id": "route/26-missing-total-routed-todoist",
+  "covers": [
+    "V5"
+  ],
+  "run": "scout",
+  "contract": "prompt.md:83-98 (output contract requires weighted_total); SKILL.md:186-189; run-scout.sh:94-95 'If NOTHING parses, abort without advancing the window so the batch is retried'",
+  "code": "F3 at f80c96d: lib.sh:366-367; lib.sh:127-128 (title renders '(score null)'). Fixed in nsega/agent-skills#20 (oss_lab_parse_scores requires a numeric weighted_total)",
+  "why": "An object with no weighted_total cannot be routed by score; at f80c96d it became 'Contribute: ... (score null)'. It is the only object, so nothing usable came back.",
+  "expected": "No task, not a seen entry; with no usable object the run aborts without advancing the window.",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902261"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902261",
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902261",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 1,
+    "last_run": "unchanged",
+    "tasks_created": [],
+    "seen": []
+  }
+}

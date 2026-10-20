@@ -1,0 +1,33 @@
+{
+  "id": "route/02-guard-all-seen",
+  "covers": [
+    "G1",
+    "F4"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:27-30",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:70; skills/oss-lab/scripts/run-scout.sh:54-59",
+  "why": "Issues updated upstream after being scored come back in the window but are deduplicated, so nothing is paid for.",
+  "expected": "claude not called; seen unchanged; last_run advanced.",
+  "state": {
+    "seen": [
+      "kubernetes-sigs/kueue#902011",
+      "kubernetes-sigs/kueue#902012"
+    ]
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902011",
+      "kubernetes-sigs/kueue#902012"
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_called": false,
+    "seen": [
+      "kubernetes-sigs/kueue#902011",
+      "kubernetes-sigs/kueue#902012"
+    ],
+    "last_run": "advanced"
+  }
+}

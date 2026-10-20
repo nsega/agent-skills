@@ -1,0 +1,120 @@
+{
+  "id": "route/40-task-revalidation",
+  "covers": [
+    "C3",
+    "C4"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:18-24 'every open task is re-checked upstream ... closed, assigned to someone else, or picked up in a pull request is closed, freeing its WIP slot'; SKILL.md:63-64 'Claims are re-checked continuously'",
+  "code": "skills/oss-lab/scripts/lib.sh:83-92,201-225,231-254; run-scout.sh:37",
+  "why": "Seven tasks: closed, assigned to another user, linked PR, assigned to us (claimed-but-undelivered, stays), live, renamed by the human (no issue id, left alone), plain pre-link title on a closed issue; plus a non-oss-lab task on a closed issue.",
+  "expected": "Closed: t-closed, t-other, t-linked, t-plain. Kept: t-ours, t-live, t-renamed, t-unrelated. Quiet hour: 'no new issues'.",
+  "upstream": {
+    "list": {},
+    "linked": {
+      "kubernetes-sigs/kueue": [
+        902403
+      ]
+    },
+    "issues": {
+      "kubernetes-sigs/kueue#902401": {
+        "state": "closed"
+      },
+      "kubernetes-sigs/kueue#902402": {
+        "assignees": [
+          {
+            "login": "fixture-user-i"
+          }
+        ]
+      },
+      "kubernetes-sigs/kueue#902404": {
+        "assignees": [
+          {
+            "login": "nsega"
+          }
+        ]
+      },
+      "kubernetes/kubernetes#902407": {
+        "state": "closed"
+      },
+      "kubernetes/kubernetes#902408": {
+        "state": "closed"
+      }
+    }
+  },
+  "todoist": {
+    "tasks": [
+      {
+        "id": "t-closed",
+        "content": "Contribute: [kubernetes-sigs/kueue#902401](https://github.com/kubernetes-sigs/kueue/issues/902401) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-other",
+        "content": "Contribute: [kubernetes-sigs/kueue#902402](https://github.com/kubernetes-sigs/kueue/issues/902402) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-linked",
+        "content": "Contribute: [kubernetes-sigs/kueue#902403](https://github.com/kubernetes-sigs/kueue/issues/902403) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-ours",
+        "content": "Contribute: [kubernetes-sigs/kueue#902404](https://github.com/kubernetes-sigs/kueue/issues/902404) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-live",
+        "content": "Contribute: [kubernetes-sigs/kueue#902405](https://github.com/kubernetes-sigs/kueue/issues/902405) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-renamed",
+        "content": "Look into the LWS flake myself",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-plain",
+        "content": "Contribute: kubernetes/kubernetes#902407 (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-unrelated",
+        "content": "Contribute: [kubernetes/kubernetes#902408](https://github.com/kubernetes/kubernetes/issues/902408) (score 7.3)",
+        "labels": [
+          "personal"
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_closed": [
+      "t-closed",
+      "t-other",
+      "t-linked",
+      "t-plain"
+    ],
+    "output_contains": [
+      "revalidate: closed kubernetes-sigs/kueue#902401 (closed)",
+      "revalidate: closed kubernetes-sigs/kueue#902402 (assigned to fixture-user-i)",
+      "revalidate: closed kubernetes-sigs/kueue#902403 (has a linked PR)",
+      "no new issues, claude not invoked"
+    ]
+  }
+}

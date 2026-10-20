@@ -1,0 +1,56 @@
+{
+  "id": "fetch/10-comment-tail-keeps-late-claim",
+  "covers": [
+    "F7"
+  ],
+  "run": "fetch",
+  "contract": "prompt.md Claimed work 'A body over 240 characters keeps its start and end with \" … \" between them'",
+  "code": "F6 at f80c96d: lib.sh:349 (`.[0:240]`, the HEAD of each comment). Fixed in nsega/agent-skills#21 (first and last 120 characters)",
+  "why": "A soft claim at the end of a long comment is exactly what recent_comments exists to surface; at f80c96d the code kept only the first 240 characters, so the claim never reached the scorer.",
+  "expected": "The attached body keeps the first and last 120 characters, so it ends with the claim sentence.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 901001,
+          "title": "Synthetic issue 901001",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 1,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901001",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "comments": {
+      "kubernetes-sigs/kueue#901001": [
+        {
+          "user": {
+            "login": "fixture-user-f"
+          },
+          "body": "Some background on the failure first. Some background on the failure first. Some background on the failure first. Some background on the failure first. Some background on the failure first. Some background on the failure first. Some background on the failure first. Some background on the failure first. Anyway, I'll take this one and open a PR on Friday."
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_objects": [
+      {
+        "issue": "kubernetes-sigs/kueue#901001",
+        "recent_comments": [
+          {
+            "author": "fixture-user-f",
+            "body": "Some background on the failure first. Some background on the failure first. Some background on the failure first. Some b … ckground on the failure first. Some background on the failure first. Anyway, I'll take this one and open a PR on Friday."
+          }
+        ]
+      }
+    ]
+  }
+}

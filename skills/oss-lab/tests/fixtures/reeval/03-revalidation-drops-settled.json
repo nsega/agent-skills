@@ -1,0 +1,163 @@
+{
+  "id": "reeval/03-revalidation-drops-settled",
+  "covers": [
+    "Q6",
+    "Q7"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:98-101 'the weekly pass first revalidates every queued issue upstream ... and drops the ones that closed, were assigned, or grew a linked PR; only the survivors are re-scored'; SKILL.md:44-46",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:58-61; skills/oss-lab/scripts/lib.sh:201-225,277-305",
+  "why": "Five queued issues: closed, assigned to another user, linked PR, assigned to us, live. Assignment to the scout's own login is not someone else's claim.",
+  "expected": "Dequeued with reasons: closed, assigned to fixture-user-j, has a linked PR. Only 'ours' and 'live' reach claude; both stay queued with reeval_count 1; stamp advanced; 'reeval complete: 2 rescored, 0 promoted, 3 stale-pruned, 0 dropped'.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902711",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902712",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes/kubernetes#902713",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902714",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902715",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "linked": {
+      "kubernetes/kubernetes": [
+        902713
+      ]
+    },
+    "issues": {
+      "kubernetes-sigs/kueue#902711": {
+        "state": "closed"
+      },
+      "kubernetes-sigs/kueue#902712": {
+        "assignees": [
+          {
+            "login": "fixture-user-j"
+          }
+        ]
+      },
+      "kubernetes-sigs/kueue#902714": {
+        "assignees": [
+          {
+            "login": "nsega"
+          }
+        ]
+      }
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902714",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 7
+        },
+        "weighted_total": 6.2,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902714",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902715",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 5,
+          "impact": 5,
+          "feasibility": 9
+        },
+        "weighted_total": 5.8,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/gateway-api-inference-extension#902715",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_stdin_issues": [
+      "kubernetes-sigs/kueue#902714",
+      "kubernetes-sigs/gateway-api-inference-extension#902715"
+    ],
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902714",
+      "kubernetes-sigs/gateway-api-inference-extension#902715"
+    ],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902714",
+        "weighted_total": 6.2,
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902715",
+        "weighted_total": 5.8,
+        "reeval_count": 1
+      }
+    ],
+    "last_reeval": "advanced",
+    "output_contains": [
+      "revalidate: dequeued kubernetes-sigs/kueue#902711 (closed)",
+      "revalidate: dequeued kubernetes-sigs/kueue#902712 (assigned to fixture-user-j)",
+      "revalidate: dequeued kubernetes/kubernetes#902713 (has a linked PR)",
+      "reeval complete: 2 rescored, 0 promoted, 3 stale-pruned, 0 dropped, 2 still queued"
+    ]
+  }
+}

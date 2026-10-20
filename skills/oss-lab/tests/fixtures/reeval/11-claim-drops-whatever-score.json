@@ -1,0 +1,98 @@
+{
+  "id": "reeval/11-claim-drops-whatever-score",
+  "covers": [
+    "C5"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:105-106 'a claim drops the issue whatever it scored'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:180-181",
+  "why": "The scorer saw a claim in the refreshed comments and returned claimed_by on an 8.6. Budget is free.",
+  "expected": "kueue#902791 dropped ('claimed by fixture-user-m'), never promoted; kueue#902792 kept.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902791",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 6,
+          "feasibility": 7
+        },
+        "weighted_total": 6.5,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902792",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902791": {
+        "comments": 1
+      }
+    },
+    "comments": {
+      "kubernetes-sigs/kueue#902791": [
+        {
+          "user": {
+            "login": "fixture-user-m"
+          },
+          "body": "I have a branch for this, will open the PR today."
+        }
+      ]
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902791",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 8,
+          "impact": 9,
+          "feasibility": 10
+        },
+        "weighted_total": 8.6,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902791",
+        "route": "drop",
+        "claimed_by": "fixture-user-m"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902792",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 9
+        },
+        "weighted_total": 6.1,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902792",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902792"
+    ],
+    "output_contains": [
+      "reeval: dropping kubernetes-sigs/kueue#902791 (claimed by fixture-user-m)"
+    ]
+  }
+}

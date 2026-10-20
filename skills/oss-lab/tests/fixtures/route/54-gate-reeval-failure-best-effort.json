@@ -1,0 +1,44 @@
+{
+  "id": "route/54-gate-reeval-failure-best-effort",
+  "covers": [
+    "Q2",
+    "E1"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:125-127 'The pass is best-effort (a failure never costs the scout iteration) and retries hourly until it succeeds'; #18 commit message ('carries its child's exit code into the warn line')",
+  "code": "skills/oss-lab/scripts/run-scout.sh:46-51; run-reeval.sh:127-140",
+  "why": "The weekly pass's claude call fails (exit 7).",
+  "expected": "Scout exits 0; log has 'claude exited 7 (stamp not advanced)' and 'reeval pass failed (exit 1)'; stamp unchanged; the hourly iteration still completes ('no new issues').",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902601",
+        "weighted_total": 5.6,
+        "rationale_consistency": "r",
+        "route": "queue"
+      }
+    ],
+    "last_reeval": null
+  },
+  "upstream": {
+    "list": {}
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      "Credit balance exhausted"
+    ],
+    "rc": 7
+  },
+  "expect": {
+    "rc": 0,
+    "last_reeval": "absent",
+    "output_contains": [
+      "claude exited 7 (stamp not advanced)",
+      "warn: reeval pass failed (exit 1), continuing",
+      "no new issues, claude not invoked"
+    ]
+  }
+}

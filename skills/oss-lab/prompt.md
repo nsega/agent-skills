@@ -111,8 +111,9 @@ progress on it, and nothing later releases it (they withdrew, or a
 maintainer reassigned it), route the issue `"drop"` and set
 `"claimed_by": "<their login>"`, whatever it scored. Taking work someone
 else has announced is the behavior this loop exists to avoid. A comment
-from the scout's own account is not someone else's claim, and a question,
-a bug report, or a maintainer triaging is not a claim.
+from the scout's own account (the runner passes its login as
+$SCOUT_LOGIN) is not someone else's claim, and a question, a bug report,
+or a maintainer triaging is not a claim.
 
 ## Routing rules
 

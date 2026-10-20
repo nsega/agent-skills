@@ -1,0 +1,34 @@
+# Zero-token checks: no secrets, no network, no paid model calls.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tools
+        run: |
+          command -v shellcheck >/dev/null || sudo apt-get install -y shellcheck
+          bash --version | head -1; jq --version; shellcheck --version | sed -n 2p
+
+      - name: Generated fixtures match their generators
+        run: |
+          python3 skills/oss-lab/tests/fixtures/generate_fixtures.py
+          python3 skills/oss-lab/evals/build_evals.py
+          git diff --exit-code
+
+      - name: Tests
+        run: make test
+
+      - name: shellcheck
+        run: make lint

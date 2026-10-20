@@ -128,7 +128,8 @@ CLAUDE_RC=0
 RESULTS="$(claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 WIP_COUNT=$WIP_COUNT
-WIP_CAP=$OSS_LAB_WIP_CAP" \
+WIP_CAP=$OSS_LAB_WIP_CAP
+SCOUT_LOGIN=$OSS_LAB_GITHUB_LOGIN" \
   --tools "" \
   --max-turns 15 \
   --output-format text < "$EVIDENCE")" || CLAUDE_RC=$?
@@ -147,6 +148,7 @@ if [[ -z "$VALID_RESULTS" ]]; then
   oss_lab_log_excerpt claude "$RESULTS"
   exit 1
 fi
+VALID_RESULTS="$(oss_lab_note_recomputed "$VALID_RESULTS")"
 
 # --- Decide each score (the runner's call, not the model's) -------------
 # Keyed join over the ORIGINAL queue. The model only scored; from here on
@@ -169,7 +171,7 @@ fi
 # "dropped" rather than "stale-pruned".
 DECISION="$(mktemp)"
 echo "$VALID_RESULTS" | jq -s --slurpfile orig "$QUEUE_FILE" \
-    --argjson drop_below "$OSS_LAB_DROP_BELOW" '
+    --argjson drop_below "$OSS_LAB_DROP_BELOW" "$OSS_LAB_JQ_FMT"'
   (map(select(.issue != null)) | map({key: .issue, value: .}) | from_entries) as $rescored
   | [ $orig[0][] | select(.issue != null)
       | . as $prior
@@ -181,10 +183,10 @@ echo "$VALID_RESULTS" | jq -s --slurpfile orig "$QUEUE_FILE" \
               {drop: {issue: .issue, why: "claimed by \($new.claimed_by)"}}
             elif $new.route == "drop" and $wt >= $drop_below then
               {drop: {issue: .issue,
-                      why: "dropped by the scorer at \($wt) with no claimed_by, treated as a claim"}}
+                      why: "dropped by the scorer at \($wt | fmt1) with no claimed_by, treated as a claim"}}
             elif $wt < $drop_below and ($prior.weighted_total // $drop_below) < $drop_below then
               {drop: {issue: .issue,
-                      why: "sub-threshold twice: \($prior.weighted_total) then \($wt)"}}
+                      why: "sub-threshold twice: \($prior.weighted_total | fmt1) then \($wt | fmt1)"}}
             else
               {keep: ($new
                       | del(.wip_capped, .claimed_by)

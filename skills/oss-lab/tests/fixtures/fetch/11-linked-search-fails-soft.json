@@ -1,0 +1,65 @@
+{
+  "id": "fetch/11-linked-search-fails-soft",
+  "covers": [
+    "F6"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:197-202 (claim detection through the search API); fail-soft is stated in the code comment fetch-issues.sh:48-51 ('a degraded search must not cost the whole window')",
+  "code": "skills/oss-lab/scripts/lib.sh:179-187",
+  "why": "A failed linked:pr search degrades the claim filter with a warning; the fetch still emits its window.",
+  "expected": "Warning 'linked-PR search failed for kubernetes-sigs/kueue, claim filter degraded'; both kueue issues are emitted (the scorer still sees comments); exit 0.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 901101,
+          "title": "Synthetic issue 901101",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901101",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 901102,
+          "title": "Synthetic issue 901102",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901102",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "search_fail": [
+      "kubernetes-sigs/kueue"
+    ],
+    "linked": {
+      "kubernetes-sigs/kueue": [
+        901101
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#901101",
+      "kubernetes-sigs/kueue#901102"
+    ],
+    "output_contains": [
+      "warn: linked-PR search failed for kubernetes-sigs/kueue, claim filter degraded"
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "route/25-route-not-in-contract",
+  "covers": [
+    "V4"
+  ],
+  "run": "scout",
+  "contract": "prompt.md:96 '\"route\": \"todoist | queue | drop\"'; SKILL.md:186-189 (malformed result cannot become a seen.json entry); run-scout.sh:94-95 'If NOTHING parses, abort without advancing the window so the batch is retried'",
+  "code": "F3 at f80c96d: lib.sh:366-367 (only .route != null); run-scout.sh:124-142 (unknown route falls through, id still seen). Fixed in nsega/agent-skills#20 (oss_lab_parse_scores enforces the route enum)",
+  "why": "route 'maybe' is outside the contract. Marking it seen means it is never scored again. It is the only object, so nothing usable came back.",
+  "expected": "kueue#902251 is not a task, not queued, and not a seen entry; with no usable object the run aborts without advancing the window, so the batch is retried next hour.",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902251"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902251",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 6,
+          "feasibility": 7
+        },
+        "weighted_total": 6.5,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902251",
+        "route": "maybe"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 1,
+    "last_run": "unchanged",
+    "tasks_created": [],
+    "queue_issues": [],
+    "seen": []
+  }
+}

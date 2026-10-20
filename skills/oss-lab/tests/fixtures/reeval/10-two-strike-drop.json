@@ -1,0 +1,165 @@
+{
+  "id": "reeval/10-two-strike-drop",
+  "covers": [
+    "Q14"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:110 'two consecutive sub-threshold scores drop it; anything else stays with its new score and reeval_count advanced'; SKILL.md:88 (< 5.0 is sub-threshold); lib.sh:21 OSS_LAB_DROP_BELOW=5.0",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:185-192",
+  "why": "Prior/new pairs: 4.4->4.2 (drop), 5.0->4.9 (prior not sub-threshold: keep), 4.9->5.0 (recovers: keep), 4.99->4.9 (drop; a two-decimal prior is an entry queued before the runner recomputed totals), no prior total->3.0 (first strike: keep).",
+  "expected": "Dropped: 902781, 902784 with 'sub-threshold twice'. Kept with new totals and reeval_count+1: 902782, 902783, 902785.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902781",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 4,
+          "impact": 4,
+          "feasibility": 6
+        },
+        "weighted_total": 4.4,
+        "rationale_consistency": "prior rationale",
+        "route": "queue",
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902782",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 5,
+          "impact": 5,
+          "feasibility": 5
+        },
+        "weighted_total": 5.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902783",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 5,
+          "impact": 4,
+          "feasibility": 7
+        },
+        "weighted_total": 4.9,
+        "rationale_consistency": "prior rationale",
+        "route": "queue",
+        "reeval_count": 2
+      },
+      {
+        "issue": "kubernetes/kubernetes#902784",
+        "scores": {
+          "okr_alignment": 3,
+          "consistency": 9,
+          "impact": 3,
+          "feasibility": 4
+        },
+        "weighted_total": 4.99,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902785",
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902781",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 4,
+          "impact": 4,
+          "feasibility": 5
+        },
+        "weighted_total": 4.2,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902781",
+        "route": "drop"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902782",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 5,
+          "impact": 4,
+          "feasibility": 7
+        },
+        "weighted_total": 4.9,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902782",
+        "route": "drop"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902783",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 5,
+          "impact": 5,
+          "feasibility": 5
+        },
+        "weighted_total": 5.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902783",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes/kubernetes#902784",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 5,
+          "impact": 4,
+          "feasibility": 7
+        },
+        "weighted_total": 4.9,
+        "rationale_consistency": "synthetic rationale for kubernetes/kubernetes#902784",
+        "route": "drop"
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902785",
+        "scores": {
+          "okr_alignment": 3,
+          "consistency": 3,
+          "impact": 3,
+          "feasibility": 3
+        },
+        "weighted_total": 3.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/gateway-api-inference-extension#902785",
+        "route": "drop"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902782",
+        "weighted_total": 4.9,
+        "route": "queue",
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902783",
+        "weighted_total": 5.0,
+        "reeval_count": 3
+      },
+      {
+        "issue": "kubernetes-sigs/gateway-api-inference-extension#902785",
+        "weighted_total": 3.0,
+        "route": "queue",
+        "reeval_count": 1
+      }
+    ],
+    "output_contains": [
+      "reeval: dropping kubernetes-sigs/kueue#902781 (sub-threshold twice: 4.4 then 4.2)",
+      "reeval: dropping kubernetes/kubernetes#902784 (sub-threshold twice: 4.99 then 4.9)",
+      "2 dropped"
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "id": "route/01-guard-nothing-survives",
+  "covers": [
+    "G1"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:30 'Guard: if nothing survives, exit before Claude starts'",
+  "code": "skills/oss-lab/scripts/run-scout.sh:54-59",
+  "why": "All upstream issues are filtered, so the paid step must not run; the window still advances.",
+  "expected": "'no new issues, claude not invoked'; claude never called; last_run advanced; seen/queue unchanged; exit 0.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 902001,
+          "title": "Synthetic issue 902001",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [
+            {
+              "login": "fixture-user-a"
+            }
+          ],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/902001",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 902002,
+          "title": "Synthetic issue 902002",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "lifecycle/rotten"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/902002",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "linked": {
+      "kubernetes/kubernetes": [
+        902003
+      ]
+    }
+  },
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "expect": {
+    "rc": 0,
+    "output_contains": [
+      "no new issues, claude not invoked"
+    ],
+    "claude_called": false,
+    "last_run": "advanced",
+    "last_run_pending": "absent",
+    "seen": [],
+    "queue": []
+  }
+}

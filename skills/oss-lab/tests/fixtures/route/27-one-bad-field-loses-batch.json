@@ -1,0 +1,57 @@
+{
+  "id": "route/27-one-bad-field-loses-batch",
+  "covers": [
+    "V6"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:186-189 (runner validates every scored object); SKILL.md:41-42 (window advances so the next run resumes cleanly); run-scout.sh:94-95 'If NOTHING parses, abort without advancing the window so the batch is retried'",
+  "code": "F4 at f80c96d: run-scout.sh:143 (`sort_by(-(.weighted_total // 0))` errors on a string; the process substitution's failure is not seen by set -e). Fixed in nsega/agent-skills#20 (oss_lab_parse_scores rejects a non-numeric weighted_total before the sort)",
+  "why": "One object carries weighted_total as a string. jq's sort fails, the routing loop reads nothing, and the run still advances last_run and reports success: the valid object and the window are both lost.",
+  "expected": "Per SKILL.md: the malformed object is rejected; the valid 6.3 object is queued and seen (or, at minimum, the window is not advanced).",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902271",
+      "kubernetes-sigs/kueue#902272"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902271",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 8,
+          "impact": 7,
+          "feasibility": 8
+        },
+        "weighted_total": "7.5",
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902271",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902272",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.3,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902272",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902272"
+    ],
+    "seen": [
+      "kubernetes-sigs/kueue#902272"
+    ]
+  }
+}

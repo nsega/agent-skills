@@ -1,0 +1,81 @@
+{
+  "id": "fetch/03-linked-pr-per-repo",
+  "covers": [
+    "F3"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:25-28 'gh api pulls new open issues from the target repos, filters out assigned / stale / excluded-label issues and any issue that already has a linked pull request, and deduplicates against seen.json'; SKILL.md:60-61; SKILL.md:197-200 (claim detection via the search API, linked:pr)",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:52,69; skills/oss-lab/scripts/lib.sh:170-190",
+  "why": "An issue with a linked PR is taken. The linked set is per repository: kueue#900301 having a PR must not filter kubernetes#900301.",
+  "expected": "kueue#900301 is filtered; kubernetes#900301 and kueue#900302 survive. One linked:pr search per repo.",
+  "upstream": {
+    "list": {
+      "kubernetes/kubernetes": [
+        {
+          "number": 900301,
+          "title": "Synthetic issue 900301",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes/kubernetes/issues/900301",
+          "body": "Synthetic fixture issue body."
+        }
+      ],
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900301,
+          "title": "Synthetic issue 900301",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900301",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900302,
+          "title": "Synthetic issue 900302",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900302",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "linked": {
+      "kubernetes-sigs/kueue": [
+        900301,
+        900999
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes/kubernetes#900301",
+      "kubernetes-sigs/kueue#900302"
+    ],
+    "gh_call_counts": {
+      "search/issues": 3,
+      "linked:pr": 3
+    }
+  }
+}

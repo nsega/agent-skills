@@ -1,0 +1,36 @@
+{
+  "id": "route/31-unparseable-output",
+  "covers": [
+    "E2"
+  ],
+  "run": "scout",
+  "contract": "run-scout.sh:94-95 (abort without advancing the window); #18 commit message (excerpt of what came back)",
+  "code": "skills/oss-lab/scripts/run-scout.sh:96-101",
+  "why": "claude exits 0 with prose. The run aborts, keeps the window, and (since #18) shows the body.",
+  "expected": "Exit 1; 'no parseable scores in claude output (window not advanced)'; the prose appears in the log; last_run unchanged.",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902311"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      "I could not score these issues right now."
+    ]
+  },
+  "expect": {
+    "rc": 1,
+    "last_run": "unchanged",
+    "seen": [],
+    "output_contains": [
+      "no parseable scores in claude output (window not advanced)",
+      "I could not score these issues right now."
+    ]
+  }
+}

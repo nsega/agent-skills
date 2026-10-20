@@ -1,0 +1,58 @@
+{
+  "id": "reeval/12-drop-route-first-strike-kept",
+  "covers": [
+    "Q14",
+    "Q15"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:105-111 (the runner decides: one sub-threshold score is not a drop; 'anything else stays with its new score')",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:182-192",
+  "why": "The scorer routes drop on a 4.0 (no claim) for an issue whose prior total was 6.0: first strike only.",
+  "expected": "Kept with weighted_total 4.0, route rewritten to 'queue', reeval_count 1.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902801",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902801",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 4,
+          "impact": 4,
+          "feasibility": 4
+        },
+        "weighted_total": 4.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902801",
+        "route": "drop"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902801",
+        "weighted_total": 4.0,
+        "route": "queue",
+        "reeval_count": 1
+      }
+    ]
+  }
+}

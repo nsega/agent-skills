@@ -1,0 +1,43 @@
+{
+  "id": "route/22-low-score-routed-todoist",
+  "covers": [
+    "R4"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:37-38 'Route (bash): high scores become tasks, mid scores go to a re-evaluation queue, low scores are recorded and dropped'; SKILL.md:88; SKILL.md:186-189",
+  "code": "F2 at f80c96d: run-scout.sh:116,124-140 (route taken from the model, score not consulted). Fixed in nsega/agent-skills#21 (oss_lab_route_scored routes by weighted_total)",
+  "why": "The scorer writes route todoist on a 4.2. The documented routing is by score and the runner validates scored objects.",
+  "expected": "Per SKILL.md: no task, not queued (score < 5.0), recorded in seen.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes/kubernetes#902221"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes/kubernetes#902221",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 4,
+          "impact": 4,
+          "feasibility": 5
+        },
+        "weighted_total": 4.2,
+        "rationale_consistency": "synthetic rationale for kubernetes/kubernetes#902221",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue_issues": [],
+    "seen": [
+      "kubernetes/kubernetes#902221"
+    ]
+  }
+}

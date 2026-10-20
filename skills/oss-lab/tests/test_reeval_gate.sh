@@ -13,7 +13,7 @@ RS="$HERE/../scripts/run-scout.sh"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 MOCKBIN="$WORK/bin"; build_mockbin "$MOCKBIN"
 
-QA='{"issue":"kubernetes/kubernetes#111","weighted_total":5.6,"route":"queue"}'
+QA='{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":9,"consistency":9,"impact":1,"feasibility":0},"weighted_total":5.6,"route":"queue"}'
 
 new_state() {  # $1: case name; sets STATE, MOCK_LOG, MOCK_CLAUDE_OUT
   STATE="$WORK/$1/state"; MOCK_LOG="$WORK/$1/log"; mkdir -p "$MOCK_LOG"
@@ -21,7 +21,7 @@ new_state() {  # $1: case name; sets STATE, MOCK_LOG, MOCK_CLAUDE_OUT
   printf '[%s]\n' "$QA" > "$STATE/queue.json"
   MOCK_CLAUDE_OUT="$WORK/$1/claude_out"
   printf '%s\n' \
-    '{"issue":"kubernetes/kubernetes#111","weighted_total":6.0,"route":"queue","reeval_count":1}' \
+    '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":10,"impact":0,"feasibility":0},"weighted_total":6.0,"route":"queue","reeval_count":1}' \
     > "$MOCK_CLAUDE_OUT"
 }
 

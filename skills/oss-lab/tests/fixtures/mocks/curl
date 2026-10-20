@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Fixture mock for `curl`: serves the Todoist API v1 surface the skill uses,
+# from the JSON document at $MOCK_TODOIST:
+#   down        : true -> every call fails (Todoist unreachable)
+#   filter_fail : true -> /tasks/filter fails (project-listing fallback)
+#   wip         : count returned by /tasks/filter. If absent, the count is the
+#                 oss-lab-labelled entries of `tasks` not closed during the run.
+#   tasks       : project task list (GET /tasks), used by revalidation
+#   post_fail   : true, or ["owner/repo#n", ...] -> task creation fails
+# Any URL outside https://api.todoist.com/api/v1/ is logged to
+# $MOCK_LOG/unexpected_network and refused: no call ever leaves the sandbox.
+set -u
+log="${MOCK_LOG:?}"; td="${MOCK_TODOIST:?}"
+printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]' >> "$log/curl_calls.jsonl"
+url=""; method=GET; data=""
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+  case "${args[$i]}" in
+    -X) method="${args[$((i+1))]}" ;;
+    -d|--data) data="${args[$((i+1))]}" ;;
+    http://*|https://*) url="${args[$i]}" ;;
+  esac
+done
+case "$url" in
+  https://api.todoist.com/api/v1/*) ;;
+  *) echo "$method $url" >> "$log/unexpected_network"; exit 7 ;;
+esac
+T() { jq -r "$@" "$td"; }
+[ "$(T '.down // false')" = true ] && exit 7
+path="${url#https://api.todoist.com/api/v1}"
+case "$method $path" in
+  "GET /tasks/filter")
+    [ "$(T '.filter_fail // false')" = true ] && exit 22
+    closed='[]'
+    [ -s "$log/todoist_closed" ] && closed="$(jq -Rsc 'split("\n") | map(select(length > 0))' "$log/todoist_closed")"
+    jq -c --argjson closed "$closed" '
+      (if has("wip") then .wip
+       else [(.tasks // [])[] | select(.labels | index("oss-lab")) | select(.id as $i | $closed | index($i) | not)] | length
+       end) as $n
+      | {results: [range(0; $n) | {id: "w\(.)"}], next_cursor: null}' "$td" ;;
+  "POST /tasks/"*"/close")
+    tid="${path#/tasks/}"; tid="${tid%/close}"
+    echo "$tid" >> "$log/todoist_closed"; echo close >> "$log/sequence"; echo '{}' ;;
+  "POST /tasks")
+    echo post >> "$log/sequence"
+    fail="$(jq -c --arg d "$data" '(.post_fail // false) as $p
+       | if $p == true then true
+         elif ($p | type) == "array" then any($p[]; . as $i | $d | contains("[\($i)]"))
+         else false end' "$td")"
+    [ "$fail" = true ] && { printf '%s\n' "$data" | jq -c . >> "$log/todoist_post_failed"; exit 22; }
+    printf '%s\n' "$data" | jq -c . >> "$log/todoist_posts.jsonl"; echo '{"id":"new"}' ;;
+  "GET /tasks")
+    jq -c '{results: (.tasks // []), next_cursor: null}' "$td" ;;
+  *)
+    echo "$method $url" >> "$log/unexpected_network"; exit 22 ;;
+esac

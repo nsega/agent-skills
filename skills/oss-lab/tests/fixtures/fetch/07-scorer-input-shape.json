@@ -1,0 +1,59 @@
+{
+  "id": "fetch/07-scorer-input-shape",
+  "covers": [
+    "F9"
+  ],
+  "run": "fetch",
+  "contract": "prompt.md:4-6 'one issue per line, each carrying an `issue` identifier plus its title, labels, and body'; SKILL.md:101-104 (re-score input is shaped exactly as fetch-issues.sh shapes a new issue)",
+  "code": "skills/oss-lab/scripts/lib.sh:314-330,341-343",
+  "why": "The scorer sees issue/title/labels/body (plus comments count, created_at, url); body is capped at 1500 characters; internal plumbing (number, repo) is stripped.",
+  "expected": "One line: {issue, title, labels:[names], comments:0, created_at, url, body[0:1500]} with no number/repo and no recent_comments (no comments).",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900701,
+          "title": "Shape check",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "area/testing"
+            },
+            {
+              "name": "kind/flake"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900701",
+          "body": "Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_objects": [
+      {
+        "issue": "kubernetes-sigs/kueue#900701",
+        "title": "Shape check",
+        "labels": [
+          "area/testing",
+          "kind/flake"
+        ],
+        "comments": 0,
+        "created_at": "2026-09-14T08:00:00Z",
+        "url": "https://github.com/kubernetes-sigs/kueue/issues/900701",
+        "body": "Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body paragraph. Synthetic body par",
+        "number": "<absent>",
+        "repo": "<absent>",
+        "recent_comments": "<absent>"
+      }
+    ]
+  }
+}

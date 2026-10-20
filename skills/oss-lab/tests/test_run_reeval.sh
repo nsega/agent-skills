@@ -14,8 +14,8 @@ WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 MOCKBIN="$WORK/bin"; build_mockbin "$MOCKBIN"
 
 # Two queued issues: A scored 5.6 last time, B already sub-threshold once.
-QA='{"issue":"kubernetes/kubernetes#111","weighted_total":5.6,"rationale_consistency":"anchor overlap","route":"queue"}'
-QB='{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.4,"rationale_consistency":"weak","route":"queue","reeval_count":1}'
+QA='{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":9,"consistency":9,"impact":1,"feasibility":0},"weighted_total":5.6,"rationale_consistency":"anchor overlap","route":"queue"}'
+QB='{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":7,"consistency":7,"impact":1,"feasibility":0},"weighted_total":4.4,"rationale_consistency":"weak","route":"queue","reeval_count":1}'
 
 new_state() {  # $1: case name; sets STATE, REMOTE, MOCK_LOG; queue = [QA, QB]
   STATE="$WORK/$1/state"; MOCK_LOG="$WORK/$1/log"; mkdir -p "$MOCK_LOG"
@@ -54,8 +54,8 @@ grep -qE '^[0-9]+$' "$STATE/last_reeval" && ok || bad "empty queue should still 
 new_state t2
 MOCK_CLAUDE_OUT="$WORK/t2/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"rationale_consistency":"r","route":"queue","reeval_count":1}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.2,"rationale_consistency":"r","route":"drop","reeval_count":2}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"rationale_consistency":"r","route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":7,"consistency":7,"impact":0,"feasibility":0},"weighted_total":4.2,"rationale_consistency":"r","route":"drop","reeval_count":2}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; run_rr >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "happy path should exit 0 (got $rc)"
@@ -109,8 +109,8 @@ MOCK_CLAUDE_OUT="$WORK/t4/claude_out"
 cat > "$MOCK_CLAUDE_OUT" <<'EOF'
 Here are the rescored issues:
 ```json
-{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}
-{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.2,"route":"drop","reeval_count":2}
+{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}
+{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":7,"consistency":7,"impact":0,"feasibility":0},"weighted_total":4.2,"route":"drop","reeval_count":2}
 ```
 EOF
 rc=0; run_rr >/dev/null 2>&1 || rc=$?
@@ -122,7 +122,7 @@ jq -e 'length == 1 and .[0].weighted_total == 6.1' "$STATE/queue.json" >/dev/nul
 new_state t5
 MOCK_CLAUDE_OUT="$WORK/t5/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; run_rr >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "partial results should exit 0 (got $rc)"
@@ -135,7 +135,7 @@ new_state t6
 MOCK_CLAUDE_OUT="$WORK/t6/claude_out"
 printf '%s\n' \
   '{"route":"drop","weighted_total":1.0}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.2,"route":"drop","reeval_count":2}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":7,"consistency":7,"impact":0,"feasibility":0},"weighted_total":4.2,"route":"drop","reeval_count":2}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; run_rr >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "issue-less object should not wedge the pass (got $rc)"
@@ -169,7 +169,7 @@ rc=0; err="$(env MOCK_TODOIST_DOWN=1 \
 new_state t9
 MOCK_CLAUDE_OUT="$WORK/t9/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 echo '{"kubernetes-sigs/kueue#222": {"state":"closed","assignees":[]}}' > "$WORK/t9/issues.json"
 rc=0; out="$(MOCK_ISSUES_JSON="$WORK/t9/issues.json" run_rr 2>&1)" || rc=$?
@@ -189,7 +189,7 @@ git -C "$STATE" log -1 --pretty=%s | grep -q "^reeval: .* 1 rescored, 0 promoted
 new_state t10
 MOCK_CLAUDE_OUT="$WORK/t10/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 echo '{"kubernetes-sigs/kueue#222": {"state":"open","assignees":[{"login":"someone-else"}]}}' \
   > "$WORK/t10/issues.json"
@@ -204,7 +204,7 @@ echo "$out" | grep -q "dequeued kubernetes-sigs/kueue#222 (assigned to someone-e
 new_state t11
 MOCK_CLAUDE_OUT="$WORK/t11/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; out="$(MOCK_LINKED="111" run_rr 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "prune linked: should exit 0 (got $rc)"
@@ -221,7 +221,7 @@ echo "$out" | grep -q "dequeued kubernetes/kubernetes#111 (has a linked PR)" \
 new_state t12
 MOCK_CLAUDE_OUT="$WORK/t12/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; err="$(MOCK_GH_DOWN=1 run_rr 2>&1 >/dev/null)" || rc=$?
 [ "$rc" -eq 1 ] && ok || bad "gh down: should abort with exit 1 (got $rc)"
@@ -266,8 +266,8 @@ cmp -s "$STATE/queue.json" "$WORK/t14/queue.before" \
 new_state t15
 MOCK_CLAUDE_OUT="$WORK/t15/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":10,"impact":5,"feasibility":5},"weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 echo '{}' > "$WORK/t15/issues.json"
 echo '{"kubernetes/kubernetes#111": {"state":"open","assignees":[{"login":"someone-else"}]}}' \
@@ -359,7 +359,7 @@ printf '[%s,%s]\n' "$QA" '{"weighted_total":5.0,"route":"queue","note":"no issue
   > "$STATE/queue.json"
 git -C "$STATE" commit --quiet -am seed22
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; out="$(run_rr 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "malformed entry: should exit 0 (got $rc)"
@@ -374,11 +374,11 @@ jq -e '[.[].issue] == ["kubernetes/kubernetes#111"]' "$STATE/queue.json" >/dev/n
 new_state t23
 MOCK_CLAUDE_OUT="$WORK/t23/claude_out"
 printf '[%s,%s,%s]\n' "$QA" "$QB" \
-  '{"issue":"kubernetes-sigs/kueue#333","weighted_total":5.0,"route":"queue"}' \
+  '{"issue":"kubernetes-sigs/kueue#333","scores":{"okr_alignment":8,"consistency":8,"impact":1,"feasibility":0},"weighted_total":5.0,"route":"queue"}' \
   > "$STATE/queue.json"
 git -C "$STATE" commit --quiet -am seed23
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 run_rr >/dev/null 2>&1 || true
 [ "$(wc -l < "$MOCK_LOG/gh_user_calls" 2>/dev/null | tr -d ' ')" -eq 1 ] \
@@ -403,7 +403,7 @@ ISSUE_111='{"state":"open","assignees":[],
 new_state t24
 MOCK_CLAUDE_OUT="$WORK/t24/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 printf '{"kubernetes/kubernetes#111": %s}\n' "$ISSUE_111" > "$WORK/t24/issues.json"
 rc=0; MOCK_ISSUES_JSON="$WORK/t24/issues.json" run_rr >/dev/null 2>&1 || rc=$?
@@ -443,7 +443,7 @@ jq -e 'has("recent_comments") | not' <<<"$line2" >/dev/null \
 new_state t26
 MOCK_CLAUDE_OUT="$WORK/t26/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":1}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":1}' \
   > "$MOCK_CLAUDE_OUT"
 echo '{"kubernetes-sigs/kueue#222": "unreachable"}' > "$WORK/t26/issues.json"
 rc=0; out="$(MOCK_ISSUES_JSON="$WORK/t26/issues.json" run_rr 2>&1)" || rc=$?
@@ -468,8 +468,8 @@ echo "$out" | grep -q "kubernetes-sigs/kueue#222" \
 new_state t27
 MOCK_CLAUDE_OUT="$WORK/t27/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue"}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.2,"route":"drop"}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":7,"consistency":7,"impact":0,"feasibility":0},"weighted_total":4.2,"route":"drop"}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; out="$(run_rr 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "decay: should exit 0 (got $rc)"
@@ -484,8 +484,8 @@ echo "$out" | grep -q "dropping kubernetes-sigs/kueue#222 (sub-threshold twice: 
 new_state t28
 MOCK_CLAUDE_OUT="$WORK/t28/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":4.2,"route":"drop"}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":7,"consistency":7,"impact":0,"feasibility":0},"weighted_total":4.2,"route":"drop"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; out="$(run_rr 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "first strike: should exit 0 (got $rc)"
@@ -503,8 +503,8 @@ jq -e '.[] | select(.issue == "kubernetes-sigs/kueue#222") | .weighted_total == 
 new_state t30
 MOCK_CLAUDE_OUT="$WORK/t30/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":8.0,"rationale_consistency":"r","route":"drop","claimed_by":"someone-else"}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":10,"impact":5,"feasibility":5},"weighted_total":8.0,"rationale_consistency":"r","route":"drop","claimed_by":"someone-else"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; out="$(MOCK_WIP=0 run_rr 2>&1)" || rc=$?
 [ ! -s "$MOCK_LOG/todoist_posts" ] && ok || bad "claim: an 8.0 that someone claimed must not become a task"
@@ -519,8 +519,8 @@ echo "$out" | grep -q "dropping kubernetes/kubernetes#111 (claimed by someone-el
 new_state t31
 MOCK_CLAUDE_OUT="$WORK/t31/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.0,"route":"drop"}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":10,"impact":0,"feasibility":0},"weighted_total":6.0,"route":"drop"}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"}' \
   > "$MOCK_CLAUDE_OUT"
 out="$(run_rr 2>&1)" || true
 jq -e '[.[].issue] == ["kubernetes-sigs/kueue#222"]' "$STATE/queue.json" >/dev/null \
@@ -535,8 +535,8 @@ echo "$out" | grep -q "dropping kubernetes/kubernetes#111 (dropped by the scorer
 new_state t32
 MOCK_CLAUDE_OUT="$WORK/t32/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":7.5,"rationale_consistency":"r","route":"queue","wip_capped":true}' \
-  '{"issue":"kubernetes-sigs/kueue#222","weighted_total":5.5,"route":"queue"}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":5,"feasibility":4},"weighted_total":7.5,"rationale_consistency":"r","route":"queue","wip_capped":true}' \
+  '{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"}' \
   > "$MOCK_CLAUDE_OUT"
 rc=0; out="$(MOCK_WIP=0 run_rr 2>&1)" || rc=$?
 grep -q "kubernetes/kubernetes#111" "$MOCK_LOG/todoist_posts" 2>/dev/null \
@@ -548,7 +548,7 @@ jq -e '[.[].issue] == ["kubernetes-sigs/kueue#222"]' "$STATE/queue.json" >/dev/n
 new_state t33
 MOCK_CLAUDE_OUT="$WORK/t33/claude_out"
 printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#111","weighted_total":6.1,"route":"queue","reeval_count":99}' \
+  '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":10,"consistency":9,"impact":1,"feasibility":1},"weighted_total":6.1,"route":"queue","reeval_count":99}' \
   > "$MOCK_CLAUDE_OUT"
 run_rr >/dev/null 2>&1 || true
 jq -e '.[] | select(.issue == "kubernetes/kubernetes#111") | .reeval_count == 1' "$STATE/queue.json" >/dev/null \

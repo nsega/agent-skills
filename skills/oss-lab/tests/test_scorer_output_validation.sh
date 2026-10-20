@@ -28,7 +28,11 @@ K8S='kubernetes/kubernetes#10'
 KUEUE='kubernetes-sigs/kueue#10'
 
 score() {  # $1 issue, $2 weighted_total (raw JSON), $3 route
-  printf '{"issue":"%s","scores":{"okr_alignment":8,"consistency":8,"impact":7,"feasibility":7},"weighted_total":%s,"rationale_consistency":"r","route":"%s"}' "$1" "$2" "$3"
+  # Axes that add up to a numeric total; a non-numeric one keeps fixed axes,
+  # since that object is meant to be rejected on its total anyway.
+  local axes='{"okr_alignment":8,"consistency":8,"impact":7,"feasibility":7}'
+  [[ "$2" =~ ^[0-9.]+$ ]] && axes="$(axes_for "$2")"
+  printf '{"issue":"%s","scores":%s,"weighted_total":%s,"rationale_consistency":"r","route":"%s"}' "$1" "$axes" "$2" "$3"
 }
 
 new_case() {  # $1: name; sets STATE, MOCK_LOG, MOCK_CLAUDE_OUT, FETCH
@@ -111,8 +115,8 @@ rc=0; out="$(run_scout 2>&1)" || rc=$?
 #    the malformed one is treated as skipped: left queued, untouched.
 CASE="$WORK/reeval_string_total"; STATE="$CASE/state"; MOCK_LOG="$CASE/log"
 mkdir -p "$MOCK_LOG"; build_state "$STATE" --git
-QA='{"issue":"kubernetes/kubernetes#111","weighted_total":5.6,"rationale_consistency":"anchor overlap","route":"queue"}'
-QB='{"issue":"kubernetes-sigs/kueue#222","weighted_total":4.4,"rationale_consistency":"weak","route":"queue","reeval_count":1}'
+QA='{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":9,"consistency":9,"impact":1,"feasibility":0},"weighted_total":5.6,"rationale_consistency":"anchor overlap","route":"queue"}'
+QB='{"issue":"kubernetes-sigs/kueue#222","scores":{"okr_alignment":7,"consistency":7,"impact":1,"feasibility":0},"weighted_total":4.4,"rationale_consistency":"weak","route":"queue","reeval_count":1}'
 printf '[%s,%s]\n' "$QA" "$QB" > "$STATE/queue.json"
 git -C "$STATE" commit --quiet -am seed
 MOCK_CLAUDE_OUT="$CASE/claude_out"

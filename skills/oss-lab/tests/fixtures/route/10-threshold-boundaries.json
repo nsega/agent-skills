@@ -1,0 +1,115 @@
+{
+  "id": "route/10-threshold-boundaries",
+  "covers": [
+    "R1",
+    "R2",
+    "R3",
+    "R5",
+    "S1",
+    "T1"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:88 'Routing: weighted ≥ 7.0 → task manager · 5.0–6.9 → queue · < 5.0 → drop.'; prompt.md:118-120; SKILL.md:31-36 (scorer runs with --tools \"\"); SKILL.md:92-93 ($WIP_CAP passed to the scorer); SKILL.md:41-42 (seen.json and last_run advance)",
+  "code": "skills/oss-lab/scripts/run-scout.sh:80-87,114-143,145-154",
+  "why": "Boundary scores 7.0 / 6.9 / 5.0 / 4.9, routed consistently by the scorer. Also pins the exact claude argv (prompt.md + WIP_COUNT/WIP_CAP, --tools \"\") and that every scored issue becomes seen.",
+  "expected": "7.0 -> task; 6.9 and 5.0 -> queue (highest first); 4.9 -> recorded in seen only. seen = prior entry + all 4. 'iteration complete: 4 scored, 1 tasked, 2 queued, WIP=0'.",
+  "state": {
+    "seen": [
+      "kubernetes/kubernetes#902199"
+    ]
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902101",
+      "kubernetes-sigs/kueue#902102",
+      "kubernetes-sigs/kueue#902103",
+      "kubernetes-sigs/kueue#902104"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902101",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 7,
+          "impact": 7,
+          "feasibility": 8
+        },
+        "weighted_total": 6.9,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902101",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902102",
+        "scores": {
+          "okr_alignment": 4,
+          "consistency": 5,
+          "impact": 4,
+          "feasibility": 7
+        },
+        "weighted_total": 4.9,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902102",
+        "route": "drop"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902103",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 7,
+          "feasibility": 10
+        },
+        "weighted_total": 7.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902103",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902104",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 5,
+          "impact": 5,
+          "feasibility": 5
+        },
+        "weighted_total": 5.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902104",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_prompt": {
+      "wip_count": 0,
+      "wip_cap": 5
+    },
+    "claude_stdin_issues": [
+      "kubernetes-sigs/kueue#902101",
+      "kubernetes-sigs/kueue#902102",
+      "kubernetes-sigs/kueue#902103",
+      "kubernetes-sigs/kueue#902104"
+    ],
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902103"
+    ],
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902101",
+      "kubernetes-sigs/kueue#902104"
+    ],
+    "seen": [
+      "kubernetes/kubernetes#902199",
+      "kubernetes-sigs/kueue#902101",
+      "kubernetes-sigs/kueue#902102",
+      "kubernetes-sigs/kueue#902103",
+      "kubernetes-sigs/kueue#902104"
+    ],
+    "last_run": "advanced",
+    "output_contains": [
+      "iteration complete: 4 scored, 1 tasked, 2 queued, WIP=0"
+    ]
+  }
+}

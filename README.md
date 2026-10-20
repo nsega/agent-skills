@@ -62,7 +62,12 @@ make install      # symlink all skills (repo + upstream subset) into every Claud
 make status       # link state per skill (ok / missing / wrong / blocked) + unmanaged entries
 make uninstall    # remove ONLY the symlinks that point back into the source repos
 make new name=my-skill   # scaffold skills/my-skill/SKILL.md from the template
+make test         # every skill's tests; fakes stand in for claude/gh/curl/codex, so no network or paid calls
+make lint         # shellcheck (warnings and errors) over every shell script
 ```
+
+CI (`.github/workflows/tests.yml`) runs `make test` and `make lint` on every
+pull request, and checks that generated fixtures match their generators.
 
 Codex is opt-in (this repo's own skills only, separate target):
 

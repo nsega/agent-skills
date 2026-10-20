@@ -1,0 +1,66 @@
+{
+  "id": "fetch/09-comments-garbage-response",
+  "covers": [
+    "F8"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:28-29 (comment threads ride along); code comment lib.sh:351-354 'One odd comment thread must not cost the window'",
+  "code": "skills/oss-lab/scripts/lib.sh:347-356",
+  "why": "A comments call that answers 0 with non-JSON must degrade to an empty thread, not kill the batch.",
+  "expected": "Both issues are emitted; kueue#900901 has recent_comments [] .",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900901,
+          "title": "Synthetic issue 900901",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 2,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900901",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900902,
+          "title": "Synthetic issue 900902",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900902",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "comments": {
+      "kubernetes-sigs/kueue#900901": "garbage"
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#900901",
+      "kubernetes-sigs/kueue#900902"
+    ],
+    "stdout_objects": [
+      {
+        "issue": "kubernetes-sigs/kueue#900901",
+        "recent_comments": []
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#900902"
+      }
+    ]
+  }
+}

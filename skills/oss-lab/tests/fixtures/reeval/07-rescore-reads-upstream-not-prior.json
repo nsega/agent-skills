@@ -1,0 +1,123 @@
+{
+  "id": "reeval/07-rescore-reads-upstream-not-prior",
+  "covers": [
+    "Q11"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:46-48 'the paid step reads each issue as it stands today (title, labels, body, recent comments), never its own prior score'; SKILL.md:101-104 'shaped exactly as fetch-issues.sh shapes a new issue and with nothing from the prior pass attached'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:94-105; skills/oss-lab/scripts/lib.sh:314-358",
+  "why": "The queued entry carries a prior rationale and scores; upstream has a new title, labels, body and comments.",
+  "expected": "claude stdin is one line with exactly the fetch-shaped keys plus recent_comments, carrying the upstream title; no prior rationale, scores, weighted_total or reeval_count.",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902751",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 8
+        },
+        "weighted_total": 6.4,
+        "rationale_consistency": "PRIOR-RATIONALE-MARKER",
+        "route": "queue",
+        "reeval_count": 2
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902751": {
+        "title": "Updated: LWS e2e times out on restart",
+        "labels": [
+          {
+            "name": "kind/flake"
+          }
+        ],
+        "body": "Updated body with repro steps.",
+        "comments": 2
+      }
+    },
+    "comments": {
+      "kubernetes-sigs/kueue#902751": [
+        {
+          "user": {
+            "login": "fixture-user-k"
+          },
+          "body": "Still flaking on main."
+        },
+        {
+          "user": {
+            "login": "fixture-user-l"
+          },
+          "body": "Repro attached."
+        }
+      ]
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902751",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 9
+        },
+        "weighted_total": 6.6,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902751",
+        "route": "queue"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_stdin_keys": [
+      [
+        "body",
+        "comments",
+        "created_at",
+        "issue",
+        "labels",
+        "recent_comments",
+        "title",
+        "url"
+      ]
+    ],
+    "claude_stdin_objects": [
+      {
+        "issue": "kubernetes-sigs/kueue#902751",
+        "title": "Updated: LWS e2e times out on restart",
+        "labels": [
+          "kind/flake"
+        ],
+        "body": "Updated body with repro steps.",
+        "recent_comments": [
+          {
+            "author": "fixture-user-k",
+            "body": "Still flaking on main."
+          },
+          {
+            "author": "fixture-user-l",
+            "body": "Repro attached."
+          }
+        ]
+      }
+    ],
+    "claude_prompt": {
+      "wip_count": 0,
+      "wip_cap": 5
+    },
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902751",
+        "weighted_total": 6.6,
+        "reeval_count": 3
+      }
+    ]
+  }
+}

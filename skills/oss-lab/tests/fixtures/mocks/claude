@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Fixture mock for `claude`: zero tokens. Records argv (as a JSON array) and
+# stdin, replays $MOCK_CLAUDE_OUT, exits $MOCK_CLAUDE_RC. If $MOCK_RACE is
+# set, swaps it in as the upstream state at the moment of the paid call, so a
+# case can make an issue go stale between revalidation and promotion.
+set -u
+log="${MOCK_LOG:?}"
+printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]' > "$log/claude_args.json"
+echo claude >> "$log/sequence"
+cat > "$log/claude_stdin"
+[ -n "${MOCK_RACE:-}" ] && cp "$MOCK_RACE" "$MOCK_UPSTREAM"
+cat "${MOCK_CLAUDE_OUT:-/dev/null}"
+exit "${MOCK_CLAUDE_RC:-0}"

@@ -1,0 +1,71 @@
+{
+  "id": "reeval/17-claude-fails-loudly",
+  "covers": [
+    "E1",
+    "Q10"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:125-127 (retries hourly until it succeeds); #18 commit message (exit code and excerpt reported)",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:127-140",
+  "why": "The re-score call exits 7 with an error on stdout. kueue#902852 closed upstream, so the free prune still applies.",
+  "expected": "Nonzero exit; 'claude exited 7 (stamp not advanced)' plus the error text; stamp absent; queue holds only kueue#902851 with its prior total and no reeval_count (no re-scored field applied).",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902851",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 5,
+          "impact": 5,
+          "feasibility": 8
+        },
+        "weighted_total": 5.6,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902852",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      }
+    ]
+  },
+  "upstream": {
+    "issues": {
+      "kubernetes-sigs/kueue#902852": {
+        "state": "closed"
+      }
+    }
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      "API Error: 401 authentication_error"
+    ],
+    "rc": 7
+  },
+  "expect": {
+    "rc": "nonzero",
+    "last_reeval": "absent",
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902851",
+        "weighted_total": 5.6,
+        "reeval_count": "<absent>"
+      }
+    ],
+    "output_contains": [
+      "claude exited 7 (stamp not advanced)",
+      "API Error: 401 authentication_error"
+    ]
+  }
+}

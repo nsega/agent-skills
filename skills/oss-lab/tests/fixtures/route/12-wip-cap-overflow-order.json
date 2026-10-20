@@ -1,0 +1,104 @@
+{
+  "id": "route/12-wip-cap-overflow-order",
+  "covers": [
+    "W1",
+    "W2"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:39-40 'The runner enforces the WIP budget itself ... spending it on the highest scores first'; SKILL.md:91 'overflow demotes to queue'; prompt.md:123-128",
+  "code": "skills/oss-lab/scripts/run-scout.sh:107-122,143",
+  "why": "WIP 3 of 5 leaves a budget of 2. The scorer (wrongly) routes four issues to todoist, in an order that is not score order; the runner must spend the budget on the two highest and demote the rest with wip_capped.",
+  "expected": "Tasks for 9.1 then 8.4; 7.2 and 7.0 queued (in that order) with wip_capped=true.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902121",
+      "kubernetes-sigs/kueue#902122",
+      "kubernetes-sigs/kueue#902123",
+      "kubernetes-sigs/kueue#902124"
+    ]
+  },
+  "todoist": {
+    "wip": 3
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902121",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 10,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 7.2,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902121",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902122",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 9,
+          "impact": 10,
+          "feasibility": 10
+        },
+        "weighted_total": 9.1,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902122",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902123",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 7,
+          "feasibility": 10
+        },
+        "weighted_total": 7.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902123",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902124",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 8,
+          "impact": 8,
+          "feasibility": 10
+        },
+        "weighted_total": 8.4,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902124",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "claude_prompt": {
+      "wip_count": 3,
+      "wip_cap": 5
+    },
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902122",
+      "kubernetes-sigs/kueue#902124"
+    ],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902121",
+        "weighted_total": 7.2,
+        "wip_capped": true
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902123",
+        "weighted_total": 7.0,
+        "wip_capped": true
+      }
+    ],
+    "seen": [
+      "kubernetes-sigs/kueue#902121",
+      "kubernetes-sigs/kueue#902122",
+      "kubernetes-sigs/kueue#902123",
+      "kubernetes-sigs/kueue#902124"
+    ]
+  }
+}

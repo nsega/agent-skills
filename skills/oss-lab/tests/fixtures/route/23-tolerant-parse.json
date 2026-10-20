@@ -1,0 +1,65 @@
+{
+  "id": "route/23-tolerant-parse",
+  "covers": [
+    "V1",
+    "V2"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:186-189 'The runner also validates every scored object before acting on it, so a malformed ... result cannot become a task or a seen.json entry'",
+  "code": "skills/oss-lab/scripts/lib.sh:365-368",
+  "why": "Prose and code fences around the JSONL are skipped; an object without route, an object whose issue is not a string, and a non-object line are rejected.",
+  "expected": "Only kueue#902231 (queue) is acted on and seen; kueue#902232 (no route) and kueue#902233 (issue is a number) are not seen, queued or tasked.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902231",
+      "kubernetes-sigs/kueue#902232",
+      "kubernetes-sigs/kueue#902233"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      "Here are the scores:",
+      "```json",
+      {
+        "issue": "kubernetes-sigs/kueue#902231",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 9
+        },
+        "weighted_total": 6.1,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902231",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902232",
+        "weighted_total": 7.9,
+        "rationale_consistency": "x"
+      },
+      {
+        "issue": 902233,
+        "weighted_total": 7.9,
+        "route": "todoist"
+      },
+      "[\"not\", \"an\", \"object\"]",
+      "```"
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "queue_issues": [
+      "kubernetes-sigs/kueue#902231"
+    ],
+    "tasks_created": [],
+    "seen": [
+      "kubernetes-sigs/kueue#902231"
+    ],
+    "output_contains": [
+      "iteration complete: 1 scored, 0 tasked, 1 queued"
+    ]
+  }
+}

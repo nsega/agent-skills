@@ -1,0 +1,106 @@
+{
+  "id": "route/16-wip-count-fallback",
+  "covers": [
+    "W5"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:91 (WIP cap counts active oss-lab tasks); fallback stated in lib.sh:101-105",
+  "code": "skills/oss-lab/scripts/lib.sh:106-118",
+  "why": "When the Todoist filter endpoint rejects the query, the count falls back to the project listing, counting only oss-lab-labelled tasks (the project also holds unrelated tasks).",
+  "expected": "WIP=4 (not 6): budget 1, one task for the 8.0 issue, the 7.6 issue queued with wip_capped.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902171",
+      "kubernetes-sigs/kueue#902172"
+    ]
+  },
+  "todoist": {
+    "filter_fail": true,
+    "tasks": [
+      {
+        "id": "fb0",
+        "content": "Contribute: [kubernetes-sigs/kueue#902160](https://github.com/kubernetes-sigs/kueue/issues/902160) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "fb1",
+        "content": "Contribute: [kubernetes-sigs/kueue#902161](https://github.com/kubernetes-sigs/kueue/issues/902161) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "fb2",
+        "content": "Contribute: [kubernetes-sigs/kueue#902162](https://github.com/kubernetes-sigs/kueue/issues/902162) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "fb3",
+        "content": "Contribute: [kubernetes-sigs/kueue#902163](https://github.com/kubernetes-sigs/kueue/issues/902163) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "other1",
+        "content": "Renew passport",
+        "labels": []
+      },
+      {
+        "id": "other2",
+        "content": "Contribute: [kubernetes/kubernetes#902169](x) (score 9)",
+        "labels": [
+          "personal"
+        ]
+      }
+    ]
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902171",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 8,
+          "impact": 8,
+          "feasibility": 8
+        },
+        "weighted_total": 8.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902171",
+        "route": "todoist"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902172",
+        "scores": {
+          "okr_alignment": 7,
+          "consistency": 7,
+          "impact": 9,
+          "feasibility": 8
+        },
+        "weighted_total": 7.6,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902172",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [
+      "kubernetes-sigs/kueue#902171"
+    ],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902172",
+        "wip_capped": true
+      }
+    ],
+    "output_contains": [
+      "WIP=4"
+    ],
+    "tasks_closed": []
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "id": "route/32-empty-output",
+  "covers": [
+    "E2"
+  ],
+  "run": "scout",
+  "contract": "as 31; #18 adds 'claude produced no output' so an empty reply is distinguishable",
+  "code": "skills/oss-lab/scripts/run-scout.sh:96-101; skills/oss-lab/scripts/lib.sh:32-35",
+  "why": "claude exits 0 and prints nothing.",
+  "expected": "Exit 1; 'no parseable scores'; 'claude produced no output'; last_run unchanged.",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902321"
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": []
+  },
+  "expect": {
+    "rc": 1,
+    "last_run": "unchanged",
+    "output_contains": [
+      "no parseable scores in claude output",
+      "claude produced no output"
+    ]
+  }
+}

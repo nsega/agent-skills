@@ -1,0 +1,48 @@
+{
+  "id": "route/11-task-format",
+  "covers": [
+    "R10"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:37-38 (high scores become tasks); SKILL.md:75-77 (routing to the task manager is where automation stops)",
+  "code": "skills/oss-lab/scripts/lib.sh:122-135",
+  "why": "Pins the Todoist payload: markdown-link title with the score, rationale as description, project and oss-lab label (the label is what the WIP count and revalidation key on).",
+  "expected": "One POST /tasks with content 'Contribute: [kubernetes-sigs/kueue#902111](https://github.com/kubernetes-sigs/kueue/issues/902111) (score 8.2)'.",
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902111"
+    ]
+  },
+  "todoist": {
+    "wip": 1
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902111",
+        "scores": {
+          "okr_alignment": 8,
+          "consistency": 8,
+          "impact": 9,
+          "feasibility": 8
+        },
+        "weighted_total": 8.2,
+        "rationale_consistency": "Extends the LWS e2e line.",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "task_objects": [
+      {
+        "content": "Contribute: [kubernetes-sigs/kueue#902111](https://github.com/kubernetes-sigs/kueue/issues/902111) (score 8.2)",
+        "description": "Extends the LWS e2e line.",
+        "project_id": "fixture-project",
+        "labels": [
+          "oss-lab"
+        ]
+      }
+    ]
+  }
+}

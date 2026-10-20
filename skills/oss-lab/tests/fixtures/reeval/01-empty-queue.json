@@ -1,0 +1,22 @@
+{
+  "id": "reeval/01-empty-queue",
+  "covers": [
+    "Q4"
+  ],
+  "run": "reeval",
+  "contract": "run-reeval.sh:29 'Guard R1: an empty queue never starts Claude'; SKILL.md:128 'a successful manual pass counts toward the weekly cadence'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:30-42",
+  "why": "Nothing queued: no paid call, and the pass counts as done.",
+  "expected": "'queue empty, claude not invoked'; claude not called; stamp advanced; exit 0.",
+  "state": {
+    "queue": []
+  },
+  "expect": {
+    "rc": 0,
+    "claude_called": false,
+    "last_reeval": "advanced",
+    "output_contains": [
+      "queue empty, claude not invoked"
+    ]
+  }
+}

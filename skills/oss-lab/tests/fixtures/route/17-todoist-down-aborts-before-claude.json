@@ -1,0 +1,31 @@
+{
+  "id": "route/17-todoist-down-aborts-before-claude",
+  "covers": [
+    "W6"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:39-40 (the runner enforces the WIP budget itself); never fail open to 0: lib.sh:101-105",
+  "code": "skills/oss-lab/scripts/run-scout.sh:62-65",
+  "why": "With the WIP count unknown the cap cannot be enforced, so the run aborts before the paid call and keeps the window.",
+  "expected": "Exit 1, 'todoist unreachable, WIP count unknown (window not advanced)'; claude not called; last_run unchanged; seen unchanged.",
+  "state": {
+    "last_run": "2026-09-15T09:00:00Z"
+  },
+  "upstream": {
+    "list_ids": [
+      "kubernetes-sigs/kueue#902181"
+    ]
+  },
+  "todoist": {
+    "down": true
+  },
+  "expect": {
+    "rc": 1,
+    "claude_called": false,
+    "last_run": "unchanged",
+    "seen": [],
+    "output_contains": [
+      "abort: todoist unreachable, WIP count unknown (window not advanced)"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "fetch/13-first-run-24h-lookback",
+  "covers": [
+    "F10"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:41-42; first-run default stated in fetch-issues.sh:34 ('Default lookback: 24h on first run')",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:36-38",
+  "why": "With no last_run the window starts 24 hours ago.",
+  "expected": "since is within 15 minutes of now-24h on every issues-list call.",
+  "upstream": {
+    "list": {}
+  },
+  "expect": {
+    "rc": 0,
+    "since_param": "<24h_ago>",
+    "stdout_issues": []
+  }
+}

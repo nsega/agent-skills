@@ -1,0 +1,23 @@
+{
+  "id": "reeval/02-corrupt-queue",
+  "covers": [
+    "Q5"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:116-118 (abort without advancing the stamp rather than a blind pass); run-reeval.sh:32-33",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:34-37",
+  "why": "A corrupt queue.json must not read as 'length 0' and silently skip a week.",
+  "expected": "Exit 1; 'is missing or not a JSON array (stamp not advanced)'; queue file untouched; no claude call.",
+  "state": {
+    "queue_raw": "{\"issue\": \"kubernetes-sigs/kueue#902701\""
+  },
+  "expect": {
+    "rc": 1,
+    "claude_called": false,
+    "last_reeval": "absent",
+    "queue_unchanged": true,
+    "output_contains": [
+      "not a JSON array (stamp not advanced)"
+    ]
+  }
+}

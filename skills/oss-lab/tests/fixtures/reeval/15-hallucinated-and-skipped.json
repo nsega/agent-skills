@@ -1,0 +1,88 @@
+{
+  "id": "reeval/15-hallucinated-and-skipped",
+  "covers": [
+    "Q17",
+    "V3"
+  ],
+  "run": "reeval",
+  "contract": "SKILL.md:186-189 (a hallucinated result cannot become a task); run-reeval.sh:163-164 'An issue the model skipped stays untouched ... a hallucinated issue never enters'",
+  "code": "skills/oss-lab/scripts/run-reeval.sh:171-197,240-243",
+  "why": "Output covers kueue#902831, invents kueue#902839 at 9.0, and skips kueue#902832.",
+  "expected": "No task (the ghost is never promoted though budget is free); queue = [902831 rescored, 902832 untouched].",
+  "state": {
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902831",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 6
+        },
+        "weighted_total": 6.0,
+        "rationale_consistency": "prior rationale",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902832",
+        "scores": {
+          "okr_alignment": 5,
+          "consistency": 6,
+          "impact": 5,
+          "feasibility": 7
+        },
+        "weighted_total": 5.7,
+        "rationale_consistency": "prior rationale",
+        "route": "queue",
+        "reeval_count": 1
+      }
+    ]
+  },
+  "todoist": {
+    "wip": 0
+  },
+  "claude": {
+    "out": [
+      {
+        "issue": "kubernetes-sigs/kueue#902831",
+        "scores": {
+          "okr_alignment": 6,
+          "consistency": 6,
+          "impact": 6,
+          "feasibility": 7
+        },
+        "weighted_total": 6.2,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902831",
+        "route": "queue"
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902839",
+        "scores": {
+          "okr_alignment": 9,
+          "consistency": 9,
+          "impact": 9,
+          "feasibility": 9
+        },
+        "weighted_total": 9.0,
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902839",
+        "route": "todoist"
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_created": [],
+    "queue": [
+      {
+        "issue": "kubernetes-sigs/kueue#902831",
+        "weighted_total": 6.2,
+        "reeval_count": 1
+      },
+      {
+        "issue": "kubernetes-sigs/kueue#902832",
+        "weighted_total": 5.7,
+        "reeval_count": 1
+      }
+    ]
+  }
+}

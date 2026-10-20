@@ -1,0 +1,121 @@
+{
+  "id": "fetch/02-excluded-labels",
+  "covers": [
+    "F2"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:25-28 'gh api pulls new open issues from the target repos, filters out assigned / stale / excluded-label issues and any issue that already has a linked pull request, and deduplicates against seen.json'; SKILL.md:60-61",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:24-28,68",
+  "why": "lifecycle/stale, lifecycle/rotten and triage/unresolved disqualify an issue; other labels, including other lifecycle/* labels, do not.",
+  "expected": "900204 (lifecycle/frozen + kind/flake) and 900205 (no labels) survive; 900201-900203 are filtered.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900201,
+          "title": "Synthetic issue 900201",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "lifecycle/stale"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900201",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900202,
+          "title": "Synthetic issue 900202",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "kind/bug"
+            },
+            {
+              "name": "lifecycle/rotten"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900202",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900203,
+          "title": "Synthetic issue 900203",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "triage/unresolved"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900203",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900204,
+          "title": "Synthetic issue 900204",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [
+            {
+              "name": "lifecycle/frozen"
+            },
+            {
+              "name": "kind/flake"
+            }
+          ],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900204",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900205,
+          "title": "Synthetic issue 900205",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900205",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#900204",
+      "kubernetes-sigs/kueue#900205"
+    ]
+  }
+}

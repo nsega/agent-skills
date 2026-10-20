@@ -14,12 +14,27 @@ ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 summary() { echo "$1: $pass passed, $fail failed"; [ "$fail" -eq 0 ]; }
 
+# axes_for <total>: integer axis scores (JSON) that weight to exactly <total>.
+axes_for() {
+  jq -cn --argjson t "$1" '
+    ($t * 10 | round) as $n
+    | first(range(20; -1; -1) as $x
+            | ($n - 3 * $x) as $r
+            | select($r >= 0 and $r % 2 == 0 and $r / 2 <= 20) | [$x, $r / 2])
+    | {okr_alignment: ((.[0] + 1) / 2 | floor), consistency: (.[0] / 2 | floor),
+       impact: ((.[1] + 1) / 2 | floor), feasibility: (.[1] / 2 | floor)}'
+}
+
 # build_mockbin <dir>
 # claude : records argv and stdin, replays $MOCK_CLAUDE_OUT
 # gh     : serves canned GitHub responses, honouring --jq like the real gh
 # curl   : serves the Todoist API v1 surface, recording writes
+# Also points git at a private config, so the machine's signing or hooks
+# can't break a test commit.
 build_mockbin() {
   local d="$1"; mkdir -p "$d"
+  export GIT_CONFIG_GLOBAL="$d/gitconfig" GIT_CONFIG_NOSYSTEM=1
+  printf '[user]\n\tname = test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n' > "$GIT_CONFIG_GLOBAL"
 
   cat > "$d/claude" <<'EOF'
 #!/bin/bash
@@ -135,9 +150,16 @@ case "$all" in
     done
     echo '{"id":"new"}' ;;
   *"/tasks"*)
-    if [ -n "${MOCK_TASKS_JSON:-}" ] && [ -f "$MOCK_TASKS_JSON" ]; then
-      echo "{\"results\":$(cat "$MOCK_TASKS_JSON"),\"next_cursor\":null}"
-    else echo '{"results":[],"next_cursor":null}'; fi ;;
+    # Page like Todoist v1: limit (default 50); the cursor is the next offset.
+    limit=50; cursor=0
+    for a in "$@"; do
+      case "$a" in limit=*) limit="${a#limit=}" ;; cursor=*) cursor="${a#cursor=}" ;; esac
+    done
+    tasks='[]'
+    [ -n "${MOCK_TASKS_JSON:-}" ] && [ -f "$MOCK_TASKS_JSON" ] && tasks="$(cat "$MOCK_TASKS_JSON")"
+    jq -c --argjson o "$cursor" --argjson l "$limit" \
+      '{results: .[$o:$o + $l], next_cursor: (if length > $o + $l then ($o + $l | tostring) else null end)}' \
+      <<<"$tasks" ;;
   *) echo '{}' ;;
 esac
 EOF

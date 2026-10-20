@@ -17,6 +17,13 @@ OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
 # keeps the two in step.
 OSS_LAB_PROMOTE_AT="${OSS_LAB_PROMOTE_AT:-7.0}"
 OSS_LAB_DROP_BELOW="${OSS_LAB_DROP_BELOW:-5.0}"
+# Rubric weights: the runner computes weighted_total from the axes itself.
+# Not overridable (a weight change is a rubric change); a test keeps them in
+# step with prompt.md.
+OSS_LAB_WEIGHTS='{"okr_alignment":0.3,"consistency":0.3,"impact":0.2,"feasibility":0.2}'
+# jq helper: show totals with one decimal ("7.0", not "7"); others as is.
+OSS_LAB_JQ_FMT='def fmt1: if type == "number" and ((. * 10) - (. * 10 | round) | fabs) < 1e-9
+  then (. * 10 | round) as $n | "\($n / 10 | floor).\($n % 10)" else tostring end;'
 
 # --- diagnostics --------------------------------------------------------
 # Print a bounded excerpt of a captured stream to stderr. Every paid call
@@ -72,6 +79,25 @@ oss_lab_github_login() {
 }
 
 # --- Todoist ------------------------------------------------------------
+# All pages of a Todoist listing as one JSON array (follows next_cursor).
+# Fails rather than return a partial list.
+# Usage: oss_lab_todoist_list <endpoint> [--data-urlencode key=value ...]
+oss_lab_todoist_list() {
+  local endpoint="$1"; shift
+  local all='[]' page cursor="" pages=0 args
+  while (( pages < 50 )); do
+    args=("$@" --data-urlencode "limit=200")
+    [[ -n "$cursor" ]] && args+=(--data-urlencode "cursor=$cursor")
+    page="$(curl -sf --get "$TODOIST_API/$endpoint" "${args[@]}" \
+              -H "Authorization: Bearer $TODOIST_TOKEN")" || return 1
+    all="$(jq -c --argjson all "$all" '$all + .results' <<<"$page")" || return 1
+    cursor="$(jq -r '.next_cursor // empty' <<<"$page")"
+    [[ -z "$cursor" ]] && { echo "$all"; return 0; }
+    pages=$((pages + 1))
+  done
+  return 1
+}
+
 # Active oss-lab tasks as JSONL: {id, content, issue}. `issue` is parsed
 # back out of the task title, so a task the user renamed yields null and
 # is left alone by revalidation rather than being closed on a guess.
@@ -79,11 +105,8 @@ oss_lab_github_login() {
 # link, "Contribute: [owner/repo#1](url)", and the plain
 # "Contribute: owner/repo#1" that earlier tasks still carry.
 oss_lab_active_tasks() {
-  curl -sf --get "$TODOIST_API/tasks" \
-    --data-urlencode "project_id=$TODOIST_PROJECT_ID" \
-    --data-urlencode "limit=200" \
-    -H "Authorization: Bearer $TODOIST_TOKEN" |
-    jq -c '.results[]
+  oss_lab_todoist_list tasks --data-urlencode "project_id=$TODOIST_PROJECT_ID" |
+    jq -c '.[]
            | select(.labels | index("oss-lab"))
            | {id, content,
               issue: (.content | capture("Contribute: \\[?(?<i>[^\\[\\] ]+#[0-9]+)").i? // null)}'
@@ -103,15 +126,10 @@ oss_lab_issue_url() {
 # disable the cap.
 oss_lab_wip_count() {
   local n
-  n="$(curl -sf --get "$TODOIST_API/tasks/filter" \
-        --data-urlencode "query=@oss-lab & !@done" \
-        -H "Authorization: Bearer $TODOIST_TOKEN" |
-        jq -e '.results | length')" && { echo "$n"; return 0; }
-  n="$(curl -sf --get "$TODOIST_API/tasks" \
-        --data-urlencode "project_id=$TODOIST_PROJECT_ID" \
-        --data-urlencode "limit=200" \
-        -H "Authorization: Bearer $TODOIST_TOKEN" |
-        jq -e '[.results[] | select(.labels | index("oss-lab"))] | length')" && { echo "$n"; return 0; }
+  n="$(oss_lab_todoist_list tasks/filter --data-urlencode "query=@oss-lab & !@done" |
+        jq -e 'length')" && { echo "$n"; return 0; }
+  n="$(oss_lab_todoist_list tasks --data-urlencode "project_id=$TODOIST_PROJECT_ID" |
+        jq -e '[.[] | select(.labels | index("oss-lab"))] | length')" && { echo "$n"; return 0; }
   return 1
 }
 
@@ -123,7 +141,7 @@ oss_lab_create_task() {
   # the link text as the visible title, so the id still reads plainly.
   url="$(oss_lab_issue_url "$(jq -r '.issue' <<<"$item")")"
   title="$(jq -r --arg url "$url" \
-    '"Contribute: [\(.issue)](\($url)) (score \(.weighted_total))"' <<<"$item")"
+    "$OSS_LAB_JQ_FMT"'"Contribute: [\(.issue)](\($url)) (score \(.weighted_total | fmt1))"' <<<"$item")"
   body="$(jq -r '.rationale_consistency // ""' <<<"$item")"
   curl -sf -X POST "$TODOIST_API/tasks" \
     -H "Authorization: Bearer $TODOIST_TOKEN" \
@@ -371,12 +389,30 @@ oss_lab_attach_comments() {
 # seen-entry for an issue nobody scored, or a string sort key that kills the
 # routing and promotion sorts (in jq, -"7.5" is an error and "7.5" >= 7.0 is
 # true). Whether .issue belongs to the batch is the caller's check.
+# Axes must be numbers 0-10; weighted_total is recomputed from them, and a
+# differing model total is kept as .model_weighted_total for logging.
 oss_lab_parse_scores() {
-  jq -cR 'fromjson?
+  jq -cR --argjson w "$OSS_LAB_WEIGHTS" 'fromjson?
     | select(type == "object"
              and (.issue | type) == "string"
              and (.route | IN("todoist", "queue", "drop"))
-             and (.weighted_total | type) == "number")'
+             and (.weighted_total | type) == "number"
+             and (.scores | type) == "object"
+             and (. as $o | [$w | keys[] | $o.scores[.]
+                             | type == "number" and . >= 0 and . <= 10] | all))
+    | (. as $o | [$w | to_entries[] | $o.scores[.key] * .value] | add * 10 | round / 10) as $t
+    | (if (.weighted_total - $t | fabs) >= 0.05 then .model_weighted_total = .weighted_total else . end)
+    | .weighted_total = $t'
+}
+
+# Log where the model's total differed from its axes, then drop the field.
+oss_lab_note_recomputed() {
+  local results="$1"
+  [[ -n "$results" ]] || return 0
+  jq -r "$OSS_LAB_JQ_FMT"'select(.model_weighted_total != null)
+         | "note: \(.issue) reported weighted_total \(.model_weighted_total); its axes give \(.weighted_total | fmt1), which is used"' \
+    <<<"$results" >&2
+  jq -c 'del(.model_weighted_total)' <<<"$results"
 }
 
 # Route one scored issue the way the weekly pass does. Prints "route<TAB>why".
@@ -385,10 +421,10 @@ oss_lab_parse_scores() {
 #   - otherwise by score: todoist at 7.0+, queue at 5.0+, else drop (defaults)
 # The caller applies the WIP cap.
 oss_lab_route_scored() {
-  jq -r --argjson at "$OSS_LAB_PROMOTE_AT" --argjson below "$OSS_LAB_DROP_BELOW" '
+  jq -r --argjson at "$OSS_LAB_PROMOTE_AT" --argjson below "$OSS_LAB_DROP_BELOW" "$OSS_LAB_JQ_FMT"'
     if .claimed_by != null then ["drop", "claimed by \(.claimed_by)"]
     elif .route == "drop" and .weighted_total >= $below then
-      ["drop", "dropped by the scorer at \(.weighted_total) with no claimed_by, treated as a claim"]
+      ["drop", "dropped by the scorer at \(.weighted_total | fmt1) with no claimed_by, treated as a claim"]
     elif .weighted_total >= $at then ["todoist", ""]
     elif .weighted_total >= $below then ["queue", ""]
     else ["drop", ""]

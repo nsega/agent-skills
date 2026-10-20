@@ -1,0 +1,77 @@
+{
+  "id": "fetch/01-assignee-filtered",
+  "covers": [
+    "F1"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:25-28 'gh api pulls new open issues from the target repos, filters out assigned / stale / excluded-label issues and any issue that already has a linked pull request, and deduplicates against seen.json'; SKILL.md:60-61 'Issues with an assignee ... are hard-filtered before scoring'",
+  "code": "skills/oss-lab/scripts/fetch-issues.sh:67",
+  "why": "An assigned issue is someone's claimed work. Assignment to the scout's own login is still an assignee.",
+  "expected": "Only the unassigned issue survives; the issues assigned to another user and to nsega are filtered.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 900101,
+          "title": "Clean unassigned issue",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900101",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900102,
+          "title": "Assigned to someone else",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [
+            {
+              "login": "fixture-user-a"
+            }
+          ],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900102",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 900103,
+          "title": "Assigned to the scout owner",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [
+            {
+              "login": "nsega"
+            }
+          ],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/900103",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#900101"
+    ],
+    "last_run_pending": "present"
+  }
+}
