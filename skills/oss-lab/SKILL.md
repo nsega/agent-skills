@@ -33,7 +33,9 @@ Every weekday hour (09:00–18:00), a launchd job runs one iteration:
    `--tools ""`, so it holds no tools at all: issue bodies are attacker-
    controlled text, and its output is auto-POSTed to Todoist and pushed
    to the state repo, so a tool-less scorer has no way to act on an
-   injected instruction (see Trust boundary).
+   injected instruction (see Trust boundary). The runner then computes
+   `weighted_total` itself from the four axes rather than trusting the
+   model's arithmetic, and logs a note when the two differ.
 5. **Route (bash):** high scores become tasks, mid scores go to a
    re-evaluation queue, low scores are recorded and dropped. The route is
    the runner's, decided from the score by the same rules as the weekly
@@ -140,6 +142,8 @@ scoring bands) and the release phase live as static blocks in `prompt.md`
 and are reviewed monthly and quarterly respectively. Weight changes
 require a calibration note: compare routed tasks against actual outcomes
 (started / merged / abandoned) and record the adjustment rationale below.
+The weights also live in `OSS_LAB_WEIGHTS` in `scripts/lib.sh`, which the
+runner uses to compute totals; a test fails until the two agree.
 
 ### Calibration log
 
@@ -186,6 +190,11 @@ Open for the next monthly review (2026-10):
   bug (scorer fixture `kueue-tas-controller-bug`) scored impact 6, 6, and 8
   across three runs: the rubric gives no anchor either way. Routing was
   unaffected (7.8–8.2, task every time), so this is a wording question.
+- The release-phase block still reads "v1.35 cycle" (last updated 2026-08)
+  and tells the scorer to "check SIG Release schedule", which a tool-less
+  scorer cannot do, so it guesses BEFORE or AFTER freeze and feasibility or
+  impact can shift by 1-2 points. State the phase explicitly when the block
+  is next updated.
 
 ## Trust boundary
 
@@ -196,8 +205,10 @@ step is therefore sandboxed on both sides. It holds no tools
 `rationale_consistency`" instruction has nothing to read a file with, and
 `prompt.md` tells the model to treat input text as content to be scored
 rather than as instructions. The runner also validates every scored
-object before acting on it, so a malformed or hallucinated result cannot
-become a task or a `seen.json` entry. This matters because the scorer's
+object before acting on it (an issue from this batch, a known route, and
+four numeric axis scores from 0 to 10, from which it computes the total),
+so a malformed or hallucinated result cannot become a task or a
+`seen.json` entry. This matters because the scorer's
 output is acted on automatically: tasks are created and state is pushed
 without a human in the loop.
 

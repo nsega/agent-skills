@@ -140,13 +140,13 @@ jq -e 'select(.issue == "kubernetes/kubernetes#13") | .recent_comments == []' <<
 # Two queued issues rescore above the bar, budget allows one.
 case_dir promote; build_state "$STATE" --git
 cat > "$STATE/queue.json" <<'EOF'
-[{"issue":"k8s/k8s#20","weighted_total":5.5,"route":"queue"},
- {"issue":"k8s/k8s#21","weighted_total":5.4,"route":"queue"}]
+[{"issue":"k8s/k8s#20","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"},
+ {"issue":"k8s/k8s#21","scores":{"okr_alignment":9,"consistency":9,"impact":0,"feasibility":0},"weighted_total":5.4,"route":"queue"}]
 EOF
 git -C "$STATE" commit --quiet -am seed
 MOCK_CLAUDE_OUT="$CASE/out"; printf '%s\n' \
-  '{"issue":"k8s/k8s#20","weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
-  '{"issue":"k8s/k8s#21","weighted_total":7.6,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"k8s/k8s#20","scores":{"okr_alignment":10,"consistency":9,"impact":4,"feasibility":3},"weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"k8s/k8s#21","scores":{"okr_alignment":10,"consistency":10,"impact":4,"feasibility":4},"weighted_total":7.6,"rationale_consistency":"r","route":"todoist"}' \
   > "$MOCK_CLAUDE_OUT"
 # Cap pinned to 3 here (not the shipped default) so the budget is
 # exactly 1 and the test keeps meaning the same thing if the cap moves.
@@ -167,10 +167,10 @@ grep -q "promoted" <<<"$out" && ok || bad "promote: summary should report promot
 # rejecting it costs nothing; the promote-time check behind it only has to
 # cover an issue taken during the call itself (test_run_reeval.sh case 15).
 case_dir promote_taken; build_state "$STATE" --git
-echo '[{"issue":"k8s/k8s#30","weighted_total":5.5,"route":"queue"}]' > "$STATE/queue.json"
+echo '[{"issue":"k8s/k8s#30","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"}]' > "$STATE/queue.json"
 git -C "$STATE" commit --quiet -am seed
 MOCK_CLAUDE_OUT="$CASE/out"
-echo '{"issue":"k8s/k8s#30","weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' > "$MOCK_CLAUDE_OUT"
+echo '{"issue":"k8s/k8s#30","scores":{"okr_alignment":10,"consistency":10,"impact":5,"feasibility":5},"weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' > "$MOCK_CLAUDE_OUT"
 echo '{"k8s/k8s#30": {"state":"open","assignees":[{"login":"someone-else"}]}}' > "$CASE/issues.json"
 MOCK_WIP=0 MOCK_ISSUES_JSON="$CASE/issues.json" out="$(run_it "$RR" 2>&1)" || true
 [ ! -s "$MOCK_LOG/todoist_posts" ] && ok || bad "promote: must not task an issue someone else took"
@@ -182,10 +182,10 @@ jq -e 'length == 0' "$STATE/queue.json" >/dev/null \
 
 # Full WIP means no promotion at all, and nothing leaves the queue.
 case_dir promote_full; build_state "$STATE" --git
-echo '[{"issue":"k8s/k8s#40","weighted_total":5.5,"route":"queue"}]' > "$STATE/queue.json"
+echo '[{"issue":"k8s/k8s#40","scores":{"okr_alignment":9,"consistency":8,"impact":1,"feasibility":1},"weighted_total":5.5,"route":"queue"}]' > "$STATE/queue.json"
 git -C "$STATE" commit --quiet -am seed
 MOCK_CLAUDE_OUT="$CASE/out"
-echo '{"issue":"k8s/k8s#40","weighted_total":9.0,"rationale_consistency":"r","route":"todoist"}' > "$MOCK_CLAUDE_OUT"
+echo '{"issue":"k8s/k8s#40","scores":{"okr_alignment":10,"consistency":10,"impact":8,"feasibility":7},"weighted_total":9.0,"rationale_consistency":"r","route":"todoist"}' > "$MOCK_CLAUDE_OUT"
 OSS_LAB_WIP_CAP=3 MOCK_WIP=3 run_it "$RR" >/dev/null 2>&1 || true
 [ ! -s "$MOCK_LOG/todoist_posts" ] && ok || bad "promote: a full cap should create nothing"
 jq -e 'length == 1 and .[0].wip_capped == true' "$STATE/queue.json" >/dev/null \
@@ -200,9 +200,9 @@ for n in 41 42 43; do
   echo '{"number":'"$n"',"title":"t","pull_request":null,"assignees":[],"labels":[],"comments":0,"created_at":"x","html_url":"u","body":"b"}'
 done > "$CASE/raw.jsonl"
 MOCK_CLAUDE_OUT="$CASE/out"; printf '%s\n' \
-  '{"issue":"kubernetes/kubernetes#41","weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
-  '{"issue":"kubernetes/kubernetes#42","weighted_total":9.2,"rationale_consistency":"r","route":"todoist"}' \
-  '{"issue":"kubernetes/kubernetes#43","weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes/kubernetes#41","scores":{"okr_alignment":10,"consistency":9,"impact":4,"feasibility":3},"weighted_total":7.1,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes/kubernetes#42","scores":{"okr_alignment":10,"consistency":10,"impact":8,"feasibility":8},"weighted_total":9.2,"rationale_consistency":"r","route":"todoist"}' \
+  '{"issue":"kubernetes/kubernetes#43","scores":{"okr_alignment":10,"consistency":10,"impact":5,"feasibility":5},"weighted_total":8.0,"rationale_consistency":"r","route":"todoist"}' \
   > "$MOCK_CLAUDE_OUT"
 OSS_LAB_WIP_CAP=3 MOCK_WIP=2 MOCK_FETCH="$CASE/raw.jsonl" \
   out="$(run_it "$RS" 2>&1)" || bad "scout_budget: should exit 0"

@@ -65,7 +65,7 @@ grep -q "I cannot score these issues" <<<"$out" && ok || bad "unparseable: shoul
 # 3: a failing weekly pass must stay best-effort AND carry its exit code.
 #    Empty fetch, so the scout takes its no-new-issues exit after the gate.
 new_case reeval_rc
-printf '[%s]\n' '{"issue":"kubernetes/kubernetes#111","weighted_total":5.6,"route":"queue"}' > "$STATE/queue.json"
+printf '[%s]\n' '{"issue":"kubernetes/kubernetes#111","scores":{"okr_alignment":9,"consistency":9,"impact":1,"feasibility":0},"weighted_total":5.6,"route":"queue"}' > "$STATE/queue.json"
 rm -f "$STATE/last_reeval"        # no stamp: gate is open
 rc=0; out="$(MOCK_CLAUDE_RC=7 run_scout 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "reeval_rc: a failed weekly pass must not cost the iteration (rc=$rc)"

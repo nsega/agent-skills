@@ -843,12 +843,12 @@ case("reeval", "09-promote-threshold-boundary",
      covers=["Q12"], run="reeval",
      contract="SKILL.md:107 'a score at or above the promote threshold'; SKILL.md:88 (>= 7.0); lib.sh:20 OSS_LAB_PROMOTE_AT=7.0",
      code="skills/oss-lab/scripts/run-reeval.sh:241",
-     why="Exactly 7.0 promotes; 6.99 does not. Budget is ample (WIP 0).",
-     expected="Task for kueue#902771 (7.0); kueue#902772 (6.99) stays queued, not flagged.",
+     why="Exactly 7.0 promotes; 6.9, the next total down on the runner's 0.1 grid, does not. Budget is ample (WIP 0).",
+     expected="Task for kueue#902771 (7.0); kueue#902772 (6.9) stays queued, not flagged.",
      state={"queue": [q(BD["at"], 6.0), q(BD["under"], 6.0)]}, todoist={"wip": 0},
-     claude={"out": [score(BD["at"], 7.0, "todoist"), score(BD["under"], 6.99, "queue")]},
+     claude={"out": [score(BD["at"], 7.0, "todoist"), score(BD["under"], 6.9, "queue")]},
      expect={"rc": 0, "tasks_created": [BD["at"]],
-             "queue": [{"issue": BD["under"], "weighted_total": 6.99, "wip_capped": "<absent>"}]})
+             "queue": [{"issue": BD["under"], "weighted_total": 6.9, "wip_capped": "<absent>"}]})
 
 TS = {"twice": iid(Q, 902781), "prior_at_bar": iid(Q, 902782), "recovers": iid(Q, 902783),
       "edge_twice": iid(K, 902784), "no_prior": iid(G, 902785)}
@@ -858,20 +858,21 @@ case("reeval", "10-two-strike-drop",
               "advanced'; SKILL.md:88 (< 5.0 is sub-threshold); lib.sh:21 OSS_LAB_DROP_BELOW=5.0",
      code="skills/oss-lab/scripts/run-reeval.sh:185-192",
      why="Prior/new pairs: 4.4->4.2 (drop), 5.0->4.9 (prior not sub-threshold: keep), 4.9->5.0 (recovers: keep), "
-         "4.99->4.99 (drop), no prior total->3.0 (first strike: keep).",
+         "4.99->4.9 (drop; a two-decimal prior is an entry queued before the runner recomputed totals), "
+         "no prior total->3.0 (first strike: keep).",
      expected="Dropped: 902781, 902784 with 'sub-threshold twice'. Kept with new totals and reeval_count+1: 902782, 902783, 902785.",
      state={"queue": [q(TS["twice"], 4.4, reeval_count=1), q(TS["prior_at_bar"], 5.0), q(TS["recovers"], 4.9, reeval_count=2),
                       q(TS["edge_twice"], 4.99), q(TS["no_prior"], None)]},
      todoist={"wip": 0},
      claude={"out": [score(TS["twice"], 4.2, "drop"), score(TS["prior_at_bar"], 4.9, "drop"),
-                     score(TS["recovers"], 5.0, "queue"), score(TS["edge_twice"], 4.99, "drop"),
+                     score(TS["recovers"], 5.0, "queue"), score(TS["edge_twice"], 4.9, "drop"),
                      score(TS["no_prior"], 3.0, "drop")]},
      expect={"rc": 0, "tasks_created": [],
              "queue": [{"issue": TS["prior_at_bar"], "weighted_total": 4.9, "route": "queue", "reeval_count": 1},
                        {"issue": TS["recovers"], "weighted_total": 5.0, "reeval_count": 3},
                        {"issue": TS["no_prior"], "weighted_total": 3.0, "route": "queue", "reeval_count": 1}],
              "output_contains": [f"reeval: dropping {TS['twice']} (sub-threshold twice: 4.4 then 4.2)",
-                                 f"reeval: dropping {TS['edge_twice']} (sub-threshold twice: 4.99 then 4.99)",
+                                 f"reeval: dropping {TS['edge_twice']} (sub-threshold twice: 4.99 then 4.9)",
                                  "2 dropped"]})
 
 CB = {"claimed": iid(Q, 902791), "keep": iid(Q, 902792)}

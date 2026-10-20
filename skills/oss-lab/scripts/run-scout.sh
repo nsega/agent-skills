@@ -81,7 +81,8 @@ CLAUDE_RC=0
 RESULTS="$(echo "$NEW_ISSUES" | claude -p "$(cat "$SKILL_DIR/prompt.md")
 
 WIP_COUNT=$WIP_COUNT
-WIP_CAP=$OSS_LAB_WIP_CAP" \
+WIP_CAP=$OSS_LAB_WIP_CAP
+SCOUT_LOGIN=$OSS_LAB_GITHUB_LOGIN" \
   --tools "" \
   --max-turns 15 \
   --output-format text)" || CLAUDE_RC=$?
@@ -98,12 +99,12 @@ fi
 BATCH_IDS="$(echo "$NEW_ISSUES" | jq -cs 'map(.issue)')"
 VALID_RESULTS="$(echo "$RESULTS" | oss_lab_parse_scores \
   | jq -c --argjson batch "$BATCH_IDS" 'select(.issue as $i | $batch | index($i) != null)')"
-IGNORED="$(echo "$RESULTS" | jq -cR 'fromjson? | select(type == "object")' \
-  | jq -rs --argjson valid "$(echo "$VALID_RESULTS" | jq -cs '.')" \
-      '. - $valid | map(.issue // "(no issue)" | tostring) | join(", ")')"
+IGNORED="$(echo "$RESULTS" | jq -cR 'fromjson? | select(type == "object") | .issue // "(no issue)" | tostring' \
+  | jq -rs --argjson valid "$(echo "$VALID_RESULTS" | jq -cs 'map(.issue)')" '. - $valid | join(", ")')"
 if [[ -n "$IGNORED" ]]; then
   echo "warn: ignoring scored objects that break the output contract or are not in this batch: $IGNORED" >&2
 fi
+VALID_RESULTS="$(oss_lab_note_recomputed "$VALID_RESULTS")"
 
 # If NOTHING usable comes back, abort without advancing the window so the
 # batch is retried next hour instead of being silently lost.
@@ -136,7 +137,7 @@ while IFS= read -r item; do
 
   if [[ "$route" == "todoist" ]] && (( CREATED >= BUDGET )); then
     route="queue"
-    item="$(jq -c '.wip_capped = true' <<<"$item")"
+    item="$(jq -c '.route = "queue" | .wip_capped = true' <<<"$item")"
   fi
 
   case "$route" in
@@ -147,6 +148,7 @@ while IFS= read -r item; do
         # A failed POST must not discard the paid score: queue it, tagged
         # so the weekly pass can promote it once a slot frees.
         echo "warn: todoist create failed for $id, routing to queue instead" >&2
+        item="$(jq -c '.route = "queue" | .todoist_failed = true' <<<"$item")"
         oss_lab_append_json "$STATE_DIR/queue.json" --argjson item "$item" '. + [$item]' || true
         QUEUED=$((QUEUED + 1))
       fi

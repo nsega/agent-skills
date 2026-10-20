@@ -14,6 +14,19 @@ ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 summary() { echo "$1: $pass passed, $fail failed"; [ "$fail" -eq 0 ]; }
 
+# axes_for <total>: integer axis scores (JSON) whose rubric-weighted sum
+# (0.3 / 0.3 / 0.2 / 0.2) is exactly <total>, for building scored objects
+# the runner will accept. Covers the 0.1 steps a test uses (not 0.1 itself).
+axes_for() {
+  jq -cn --argjson t "$1" '
+    ($t * 10 | round) as $n
+    | first(range(20; -1; -1) as $x
+            | ($n - 3 * $x) as $r
+            | select($r >= 0 and $r % 2 == 0 and $r / 2 <= 20) | [$x, $r / 2])
+    | {okr_alignment: ((.[0] + 1) / 2 | floor), consistency: (.[0] / 2 | floor),
+       impact: ((.[1] + 1) / 2 | floor), feasibility: (.[1] / 2 | floor)}'
+}
+
 # build_mockbin <dir>
 # claude : records argv and stdin, replays $MOCK_CLAUDE_OUT
 # gh     : serves canned GitHub responses, honouring --jq like the real gh
@@ -139,9 +152,17 @@ case "$all" in
     done
     echo '{"id":"new"}' ;;
   *"/tasks"*)
-    if [ -n "${MOCK_TASKS_JSON:-}" ] && [ -f "$MOCK_TASKS_JSON" ]; then
-      echo "{\"results\":$(cat "$MOCK_TASKS_JSON"),\"next_cursor\":null}"
-    else echo '{"results":[],"next_cursor":null}'; fi ;;
+    # Paginate like Todoist API v1: limit (default 50) and an opaque cursor,
+    # here the offset of the next page.
+    limit=50; cursor=0
+    for a in "$@"; do
+      case "$a" in limit=*) limit="${a#limit=}" ;; cursor=*) cursor="${a#cursor=}" ;; esac
+    done
+    tasks='[]'
+    [ -n "${MOCK_TASKS_JSON:-}" ] && [ -f "$MOCK_TASKS_JSON" ] && tasks="$(cat "$MOCK_TASKS_JSON")"
+    jq -c --argjson o "$cursor" --argjson l "$limit" \
+      '{results: .[$o:$o + $l], next_cursor: (if length > $o + $l then ($o + $l | tostring) else null end)}' \
+      <<<"$tasks" ;;
   *) echo '{}' ;;
 esac
 EOF

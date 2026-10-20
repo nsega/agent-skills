@@ -11,8 +11,10 @@
 #   echo "<issue JSONL>" | claude -p "$(cat prompt.md)
 #
 #   WIP_COUNT=<eval wip_count>
-#   WIP_CAP=$OSS_LAB_WIP_CAP" --tools "" --max-turns 15 --output-format text
-# with OSS_LAB_WIP_CAP taken from the checkout's scripts/lib.sh, and the same
+#   WIP_CAP=$OSS_LAB_WIP_CAP
+#   SCOUT_LOGIN=$SCOUT_LOGIN" --tools "" --max-turns 15 --output-format text
+# with OSS_LAB_WIP_CAP taken from the checkout's scripts/lib.sh, SCOUT_LOGIN
+# from OSS_LAB_GITHUB_LOGIN (default nsega; no gh call), and the same
 # CLAUDE_CONFIG_DIR guard the runner enforces (oss_lab_guard_account).
 #
 # Each reply is graded by grade.jq against:
@@ -80,7 +82,8 @@ CALLS=$(( ${#IDS[@]} * REPEAT ))
 
 echo "oss-lab scorer evals: ${#IDS[@]} eval(s) x $REPEAT repeat(s) = $CALLS paid claude call(s)"
 echo "  skill:  $SKILL_DIR ($(git -C "$AS" rev-parse --short HEAD 2>/dev/null || echo 'not a git checkout'))"
-echo "  claude: $(claude --version 2>/dev/null || echo unknown)   WIP_CAP=$OSS_LAB_WIP_CAP"
+SCOUT_LOGIN="${OSS_LAB_GITHUB_LOGIN:-nsega}"
+echo "  claude: $(claude --version 2>/dev/null || echo unknown)   WIP_CAP=$OSS_LAB_WIP_CAP   SCOUT_LOGIN=$SCOUT_LOGIN"
 if (( ! YES )); then
   echo "Re-run with --yes to spend these calls." >&2
   exit 2
@@ -101,11 +104,13 @@ for id in "${IDS[@]}"; do
     reply="$OUT/$id.r$k.reply.txt"
     rc=0
     # Identical to run-scout.sh: stdin carries the JSONL, the prompt is
-    # prompt.md plus the two WIP lines, and the scorer holds no tools.
+    # prompt.md plus the runner lines (WIP_COUNT, WIP_CAP, SCOUT_LOGIN), and
+    # the scorer holds no tools.
     echo "$issues" | claude -p "$PROMPT_MD
 
 WIP_COUNT=$wip_count
-WIP_CAP=$OSS_LAB_WIP_CAP" \
+WIP_CAP=$OSS_LAB_WIP_CAP
+SCOUT_LOGIN=$SCOUT_LOGIN" \
       --tools "" \
       --max-turns 15 \
       --output-format text > "$reply" 2> "$OUT/$id.r$k.stderr.txt" || rc=$?

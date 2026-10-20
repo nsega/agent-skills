@@ -217,14 +217,16 @@ run_case() {
     [ "$called" = "$(ex claude_called)" ] || msgs+=("claude called: expected $(ex claude_called), got $called")
   fi
   if has claude_prompt && [ -e "$L/claude_args.json" ]; then
-    local wc cap want
+    local wc cap login want
     wc="$(jq -r '.claude_prompt.wip_count' <<<"$X")"; cap="$(jq -r '.claude_prompt.wip_cap' <<<"$X")"
+    login="$(jq -r '.claude_prompt.scout_login // "nsega"' <<<"$X")"   # the mock gh login
     want="$(jq -nc --arg p "$(cat "$WORK/skill/prompt.md")
 
 WIP_COUNT=$wc
-WIP_CAP=$cap" '["-p", $p, "--tools", "", "--max-turns", "15", "--output-format", "text"]')"
+WIP_CAP=$cap
+SCOUT_LOGIN=$login" '["-p", $p, "--tools", "", "--max-turns", "15", "--output-format", "text"]')"
     [ "$want" = "$(cat "$L/claude_args.json")" ] \
-      || msgs+=("claude argv differs from prompt.md + WIP_COUNT=$wc/WIP_CAP=$cap + --tools \"\" (got tail: $(jq -c '.[2:]' "$L/claude_args.json"), prompt tail: $(jq -r '.[1][-40:]' "$L/claude_args.json" | tr '\n' '|'))")
+      || msgs+=("claude argv differs from prompt.md + WIP_COUNT=$wc/WIP_CAP=$cap/SCOUT_LOGIN=$login + --tools \"\" (got tail: $(jq -c '.[2:]' "$L/claude_args.json"), prompt tail: $(jq -r '.[1][-60:]' "$L/claude_args.json" | tr '\n' '|'))")
   fi
   if has claude_stdin_issues; then
     local got='[]'; [ -e "$L/claude_stdin" ] && got="$(jsonl_to_array "$L/claude_stdin" | jq -c '[.[] | .issue]')"

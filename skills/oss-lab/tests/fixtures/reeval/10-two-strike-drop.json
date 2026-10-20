@@ -6,7 +6,7 @@
   "run": "reeval",
   "contract": "SKILL.md:110 'two consecutive sub-threshold scores drop it; anything else stays with its new score and reeval_count advanced'; SKILL.md:88 (< 5.0 is sub-threshold); lib.sh:21 OSS_LAB_DROP_BELOW=5.0",
   "code": "skills/oss-lab/scripts/run-reeval.sh:185-192",
-  "why": "Prior/new pairs: 4.4->4.2 (drop), 5.0->4.9 (prior not sub-threshold: keep), 4.9->5.0 (recovers: keep), 4.99->4.99 (drop), no prior total->3.0 (first strike: keep).",
+  "why": "Prior/new pairs: 4.4->4.2 (drop), 5.0->4.9 (prior not sub-threshold: keep), 4.9->5.0 (recovers: keep), 4.99->4.9 (drop; a two-decimal prior is an entry queued before the runner recomputed totals), no prior total->3.0 (first strike: keep).",
   "expected": "Dropped: 902781, 902784 with 'sub-threshold twice'. Kept with new totals and reeval_count+1: 902782, 902783, 902785.",
   "state": {
     "queue": [
@@ -111,12 +111,12 @@
       {
         "issue": "kubernetes/kubernetes#902784",
         "scores": {
-          "okr_alignment": 3,
-          "consistency": 9,
-          "impact": 3,
-          "feasibility": 4
+          "okr_alignment": 4,
+          "consistency": 5,
+          "impact": 4,
+          "feasibility": 7
         },
-        "weighted_total": 4.99,
+        "weighted_total": 4.9,
         "rationale_consistency": "synthetic rationale for kubernetes/kubernetes#902784",
         "route": "drop"
       },
@@ -158,7 +158,7 @@
     ],
     "output_contains": [
       "reeval: dropping kubernetes-sigs/kueue#902781 (sub-threshold twice: 4.4 then 4.2)",
-      "reeval: dropping kubernetes/kubernetes#902784 (sub-threshold twice: 4.99 then 4.99)",
+      "reeval: dropping kubernetes/kubernetes#902784 (sub-threshold twice: 4.99 then 4.9)",
       "2 dropped"
     ]
   }
