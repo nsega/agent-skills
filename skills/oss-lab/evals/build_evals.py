@@ -4,7 +4,7 @@
 Format follows skills/illustrate-with-html/evals/evals.json (skill_name, evals[]
 with id, prompt, expected_output, files) plus:
   name        short slug
-  wip_count   WIP_COUNT rendered into the prompt (WIP_CAP is the runner's cap, 5)
+  wip_count   WIP_COUNT rendered into the prompt (WIP_CAP is the runner's cap, 8)
   why         why the expected bands/route follow from prompt.md
   assertions  machine-checked expectations (graded by grade.jq):
      {"type":"band","issue":..,"axis":..,"min":..,"max":..}
@@ -274,20 +274,20 @@ E_W2 = issue(Q, 903016, "test/util: add a helper for 'evicted with reason' check
 add("wip-one-slot-left", [E_W1, E_W2],
     [B((8, 10), (8, 10), (7, 10), (7, 10)), B((7, 10), (8, 10), (6, 9), (7, 10))],
     [None, None],
-    "WIP_COUNT=4 with WIP_CAP=5 leaves one slot (prompt.md:123-128). Both issues clear 7.0, so the higher weighted_total takes "
+    "WIP_COUNT=7 with WIP_CAP=8 leaves one slot (prompt.md:123-128). Both issues clear 7.0, so the higher weighted_total takes "
     "the slot and the other is demoted to queue with wip_capped:true. Which one is higher is the scorer's call; the assertion "
     "is on its own numbers.",
     "Two objects; exactly one route todoist (the higher weighted_total), the other route queue with wip_capped true.",
-    wip_count=4, claimed=[None, None],
+    wip_count=7, claimed=[None, None],
     extra=[{"type": "wip_highest_takes_slots"}])
 
 E_FULL = issue(Q, 903017, "LWS e2e: 'should report group readiness' flakes in singlecluster/extended",
                ["kind/flake", "area/testing"], LWS_BODY.replace("should recreate the group when a worker pod fails", "should report group readiness"))
 add("wip-full", [E_FULL], B((8, 10), (8, 10), (7, 10), (7, 10)), "queue",
-    "WIP_COUNT=5 equals WIP_CAP=5: 'If WIP_COUNT is at or above WIP_CAP, demote them all' (prompt.md:127-128). A todoist-quality "
+    "WIP_COUNT=8 equals WIP_CAP=8: 'If WIP_COUNT is at or above WIP_CAP, demote them all' (prompt.md:127-128). A todoist-quality "
     "issue routes queue with wip_capped:true.",
     "kueue#903017: high bands, route queue, wip_capped true.",
-    wip_count=5, wip_capped=True, extra=[{"type": "wip_highest_takes_slots"}])
+    wip_count=8, wip_capped=True, extra=[{"type": "wip_highest_takes_slots"}])
 
 
 def main():
