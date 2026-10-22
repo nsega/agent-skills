@@ -4,23 +4,23 @@
     "W3"
   ],
   "run": "scout",
-  "contract": "SKILL.md:91 'at most 5 active tasks'; prompt.md:127-128 'If WIP_COUNT is at or above WIP_CAP, demote them all. Never exceed the cap.'",
+  "contract": "SKILL.md:91 'at most 8 active tasks'; prompt.md:127-128 'If WIP_COUNT is at or above WIP_CAP, demote them all. Never exceed the cap.'",
   "code": "skills/oss-lab/scripts/run-scout.sh:107-108,119-122",
-  "why": "WIP_COUNT=7 with cap 5: the budget is zero (never negative), so no task may be created.",
+  "why": "WIP_COUNT=10 with cap 8: the budget is zero (never negative), so no task may be created.",
   "expected": "No task; both todoist-routed issues queued with wip_capped=true.",
   "upstream": {
     "list_ids": [
-      "kubernetes-sigs/kueue#902137",
-      "kubernetes-sigs/kueue#902147"
+      "kubernetes-sigs/kueue#902140",
+      "kubernetes-sigs/kueue#902150"
     ]
   },
   "todoist": {
-    "wip": 7
+    "wip": 10
   },
   "claude": {
     "out": [
       {
-        "issue": "kubernetes-sigs/kueue#902137",
+        "issue": "kubernetes-sigs/kueue#902140",
         "scores": {
           "okr_alignment": 8,
           "consistency": 8,
@@ -28,11 +28,11 @@
           "feasibility": 8
         },
         "weighted_total": 8.0,
-        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902137",
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902140",
         "route": "todoist"
       },
       {
-        "issue": "kubernetes-sigs/kueue#902147",
+        "issue": "kubernetes-sigs/kueue#902150",
         "scores": {
           "okr_alignment": 7,
           "consistency": 8,
@@ -40,7 +40,7 @@
           "feasibility": 8
         },
         "weighted_total": 7.5,
-        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902147",
+        "rationale_consistency": "synthetic rationale for kubernetes-sigs/kueue#902150",
         "route": "todoist"
       }
     ]
@@ -49,16 +49,16 @@
     "rc": 0,
     "tasks_created": [],
     "claude_prompt": {
-      "wip_count": 7,
-      "wip_cap": 5
+      "wip_count": 10,
+      "wip_cap": 8
     },
     "queue": [
       {
-        "issue": "kubernetes-sigs/kueue#902137",
+        "issue": "kubernetes-sigs/kueue#902140",
         "wip_capped": true
       },
       {
-        "issue": "kubernetes-sigs/kueue#902147",
+        "issue": "kubernetes-sigs/kueue#902150",
         "wip_capped": true
       }
     ]

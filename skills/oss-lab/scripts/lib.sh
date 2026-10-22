@@ -11,7 +11,7 @@ TODOIST_API="${TODOIST_API:-https://api.todoist.com/api/v1}"
 # the only place the cap is defined: the runners pass it to the scorer
 # as $WIP_CAP, so prompt.md never hardcodes a number that could drift
 # out of step with the budget the runner actually enforces.
-OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-5}"
+OSS_LAB_WIP_CAP="${OSS_LAB_WIP_CAP:-8}"
 # Routing thresholds (flow control #3). Both runners route by score with
 # these, hourly and weekly. prompt.md repeats them for the model, and a test
 # keeps the two in step.

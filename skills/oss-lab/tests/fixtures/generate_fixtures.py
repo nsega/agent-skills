@@ -311,7 +311,7 @@ case("route", "10-threshold-boundaries",
      todoist={"wip": 0},
      claude={"out": [score(B[0], 6.9, "queue"), score(B[1], 4.9, "drop"), score(B[2], 7.0, "todoist"),
                      score(B[3], 5.0, "queue")]},
-     expect={"rc": 0, "claude_prompt": {"wip_count": 0, "wip_cap": 5}, "claude_stdin_issues": B,
+     expect={"rc": 0, "claude_prompt": {"wip_count": 0, "wip_cap": 8}, "claude_stdin_issues": B,
              "tasks_created": [B[2]], "queue_issues": [B[0], B[3]],
              "seen": [iid(K, 902199)] + B, "last_run": "advanced",
              "output_contains": ["iteration complete: 4 scored, 1 tasked, 2 queued, WIP=0"]})
@@ -336,29 +336,29 @@ case("route", "12-wip-cap-overflow-order",
      contract="SKILL.md:39-40 'The runner enforces the WIP budget itself ... spending it on the highest scores first'; "
               "SKILL.md:91 'overflow demotes to queue'; prompt.md:123-128",
      code="skills/oss-lab/scripts/run-scout.sh:107-122,143",
-     why="WIP 3 of 5 leaves a budget of 2. The scorer (wrongly) routes four issues to todoist, in an order that is not "
+     why="WIP 6 of 8 leaves a budget of 2. The scorer (wrongly) routes four issues to todoist, in an order that is not "
          "score order; the runner must spend the budget on the two highest and demote the rest with wip_capped.",
      expected="Tasks for 9.1 then 8.4; 7.2 and 7.0 queued (in that order) with wip_capped=true.",
      upstream={"list_ids": W},
-     todoist={"wip": 3},
+     todoist={"wip": 6},
      claude={"out": [score(W[0], 7.2, "todoist"), score(W[1], 9.1, "todoist"), score(W[2], 7.0, "todoist"),
                      score(W[3], 8.4, "todoist")]},
-     expect={"rc": 0, "claude_prompt": {"wip_count": 3, "wip_cap": 5}, "tasks_created": [W[1], W[3]],
+     expect={"rc": 0, "claude_prompt": {"wip_count": 6, "wip_cap": 8}, "tasks_created": [W[1], W[3]],
              "queue": [{"issue": W[0], "weighted_total": 7.2, "wip_capped": True},
                        {"issue": W[2], "weighted_total": 7.0, "wip_capped": True}],
              "seen": W})
 
-for cid, wip in (("13-wip-at-cap", 5), ("14-wip-above-cap", 7)):
+for cid, wip in (("13-wip-at-cap", 8), ("14-wip-above-cap", 10)):
     ids = two_ids(902130 + wip, 902140 + wip)
     case("route", cid,
          covers=["W3"], run="scout",
-         contract="SKILL.md:91 'at most 5 active tasks'; prompt.md:127-128 'If WIP_COUNT is at or above WIP_CAP, demote them all. Never exceed the cap.'",
+         contract="SKILL.md:91 'at most 8 active tasks'; prompt.md:127-128 'If WIP_COUNT is at or above WIP_CAP, demote them all. Never exceed the cap.'",
          code="skills/oss-lab/scripts/run-scout.sh:107-108,119-122",
-         why=f"WIP_COUNT={wip} with cap 5: the budget is zero (never negative), so no task may be created.",
+         why=f"WIP_COUNT={wip} with cap 8: the budget is zero (never negative), so no task may be created.",
          expected="No task; both todoist-routed issues queued with wip_capped=true.",
          upstream={"list_ids": ids}, todoist={"wip": wip},
          claude={"out": [score(ids[0], 8.0, "todoist"), score(ids[1], 7.5, "todoist")]},
-         expect={"rc": 0, "tasks_created": [], "claude_prompt": {"wip_count": wip, "wip_cap": 5},
+         expect={"rc": 0, "tasks_created": [], "claude_prompt": {"wip_count": wip, "wip_cap": 8},
                  "queue": [{"issue": ids[0], "wip_capped": True}, {"issue": ids[1], "wip_capped": True}]})
 
 O = two_ids(902151, 902152)
@@ -375,7 +375,7 @@ case("route", "15-wip-cap-override",
              "queue": [{"issue": O[0], "wip_capped": True}]})
 
 FB_TASKS = [{"id": f"fb{i}", "content": f"Contribute: [{iid(Q, 902160 + i)}](https://github.com/{Q}/issues/{902160 + i}) (score 7.4)",
-             "labels": ["oss-lab"]} for i in range(4)] + \
+             "labels": ["oss-lab"]} for i in range(7)] + \
            [{"id": "other1", "content": "Renew passport", "labels": []},
             {"id": "other2", "content": "Contribute: [kubernetes/kubernetes#902169](x) (score 9)", "labels": ["personal"]}]
 F2 = two_ids(902171, 902172)
@@ -385,12 +385,12 @@ case("route", "16-wip-count-fallback",
      code="skills/oss-lab/scripts/lib.sh:106-118",
      why="When the Todoist filter endpoint rejects the query, the count falls back to the project listing, counting only "
          "oss-lab-labelled tasks (the project also holds unrelated tasks).",
-     expected="WIP=4 (not 6): budget 1, one task for the 8.0 issue, the 7.6 issue queued with wip_capped.",
+     expected="WIP=7 (not 9): budget 1, one task for the 8.0 issue, the 7.6 issue queued with wip_capped.",
      upstream={"list_ids": F2},
      todoist={"filter_fail": True, "tasks": FB_TASKS},
      claude={"out": [score(F2[0], 8.0, "todoist"), score(F2[1], 7.6, "todoist")]},
      expect={"rc": 0, "tasks_created": [F2[0]], "queue": [{"issue": F2[1], "wip_capped": True}],
-             "output_contains": ["WIP=4"], "tasks_closed": []})
+             "output_contains": ["WIP=7"], "tasks_closed": []})
 
 case("route", "17-todoist-down-aborts-before-claude",
      covers=["W6"], run="scout",
@@ -816,7 +816,7 @@ case("reeval", "07-rescore-reads-upstream-not-prior",
                                        "body": "Updated body with repro steps.",
                                        "recent_comments": [{"author": "fixture-user-k", "body": "Still flaking on main."},
                                                            {"author": "fixture-user-l", "body": "Repro attached."}]}],
-             "claude_prompt": {"wip_count": 0, "wip_cap": 5},
+             "claude_prompt": {"wip_count": 0, "wip_cap": 8},
              "queue": [{"issue": EV, "weighted_total": 6.6, "reeval_count": 3}]})
 
 PR = {"a": iid(Q, 902761), "b": iid(Q, 902762), "c": iid(K, 902763), "d": iid(G, 902764)}
@@ -825,11 +825,11 @@ case("reeval", "08-promotion-by-score-within-budget",
      contract="SKILL.md:105-110 'a score at or above the promote threshold is a promotion candidate regardless of the route the model "
               "wrote (so a 7.1 the model capped last week takes the next free slot)'; SKILL.md:49-50 'within the same WIP budget'",
      code="skills/oss-lab/scripts/run-reeval.sh:214-253",
-     why="WIP 3 of 5: budget 2. Rescored: a=7.4 (model wrote queue + wip_capped), b=8.1 todoist, c=7.0 exactly (queue), d=6.9.",
+     why="WIP 6 of 8: budget 2. Rescored: a=7.4 (model wrote queue + wip_capped), b=8.1 todoist, c=7.0 exactly (queue), d=6.9.",
      expected="Promoted in score order: b, a. c (7.0) stays queued flagged wip_capped=true; d stays without the flag. "
               "All four are re-checked upstream; 'reeval complete: 4 rescored, 2 promoted, 0 stale-pruned, 0 dropped'.",
      state={"queue": [q(v, 6.0) for v in PR.values()]},
-     todoist={"wip": 3},
+     todoist={"wip": 6},
      claude={"out": [score(PR["a"], 7.4, "queue", wip_capped=True), score(PR["b"], 8.1, "todoist"),
                      score(PR["c"], 7.0, "queue"), score(PR["d"], 6.9, "queue")]},
      expect={"rc": 0, "tasks_created": [PR["b"], PR["a"]],
@@ -1022,9 +1022,9 @@ case("reeval", "22-wip-full-no-promotion",
      covers=["Q13", "W3"], run="reeval",
      contract="SKILL.md:49-50 'promoted into a task (within the same WIP budget)'",
      code="skills/oss-lab/scripts/run-reeval.sh:214-218,249-253",
-     why="WIP 5 of 5: an 8.0 rescore cannot be promoted.",
+     why="WIP 8 of 8: an 8.0 rescore cannot be promoted.",
      expected="No task; the issue stays queued with wip_capped=true and reeval_count 1.",
-     state={"queue": [q(iid(Q, 902901), 6.0)]}, todoist={"wip": 5},
+     state={"queue": [q(iid(Q, 902901), 6.0)]}, todoist={"wip": 8},
      claude={"out": [score(iid(Q, 902901), 8.0, "queue", wip_capped=True)]},
      expect={"rc": 0, "tasks_created": [],
              "queue": [{"issue": iid(Q, 902901), "weighted_total": 8.0, "wip_capped": True, "reeval_count": 1}]})
