@@ -7,7 +7,7 @@
   "contract": "SKILL.md:91 (WIP cap counts active oss-lab tasks); fallback stated in lib.sh:101-105",
   "code": "skills/oss-lab/scripts/lib.sh:106-118",
   "why": "When the Todoist filter endpoint rejects the query, the count falls back to the project listing, counting only oss-lab-labelled tasks (the project also holds unrelated tasks).",
-  "expected": "WIP=4 (not 6): budget 1, one task for the 8.0 issue, the 7.6 issue queued with wip_capped.",
+  "expected": "WIP=7 (not 9): budget 1, one task for the 8.0 issue, the 7.6 issue queued with wip_capped.",
   "upstream": {
     "list_ids": [
       "kubernetes-sigs/kueue#902171",
@@ -41,6 +41,27 @@
       {
         "id": "fb3",
         "content": "Contribute: [kubernetes-sigs/kueue#902163](https://github.com/kubernetes-sigs/kueue/issues/902163) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "fb4",
+        "content": "Contribute: [kubernetes-sigs/kueue#902164](https://github.com/kubernetes-sigs/kueue/issues/902164) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "fb5",
+        "content": "Contribute: [kubernetes-sigs/kueue#902165](https://github.com/kubernetes-sigs/kueue/issues/902165) (score 7.4)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "fb6",
+        "content": "Contribute: [kubernetes-sigs/kueue#902166](https://github.com/kubernetes-sigs/kueue/issues/902166) (score 7.4)",
         "labels": [
           "oss-lab"
         ]
@@ -99,7 +120,7 @@
       }
     ],
     "output_contains": [
-      "WIP=4"
+      "WIP=7"
     ],
     "tasks_closed": []
   }

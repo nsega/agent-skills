@@ -1,6 +1,6 @@
 # grade.jq: grade one scorer reply against one evals.json case.
 #
-#   jq -n --argjson eval "$EVAL_JSON" --rawfile out reply.txt --argjson wip_cap 5 -f grade.jq
+#   jq -n --argjson eval "$EVAL_JSON" --rawfile out reply.txt --argjson wip_cap 8 -f grade.jq
 #
 # Validity rules come from prompt.md's output contract and routing rules and
 # apply to every case. Expectations come from the case's assertions. Result:

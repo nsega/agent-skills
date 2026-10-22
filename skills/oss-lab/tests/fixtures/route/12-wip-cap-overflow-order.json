@@ -7,7 +7,7 @@
   "run": "scout",
   "contract": "SKILL.md:39-40 'The runner enforces the WIP budget itself ... spending it on the highest scores first'; SKILL.md:91 'overflow demotes to queue'; prompt.md:123-128",
   "code": "skills/oss-lab/scripts/run-scout.sh:107-122,143",
-  "why": "WIP 3 of 5 leaves a budget of 2. The scorer (wrongly) routes four issues to todoist, in an order that is not score order; the runner must spend the budget on the two highest and demote the rest with wip_capped.",
+  "why": "WIP 6 of 8 leaves a budget of 2. The scorer (wrongly) routes four issues to todoist, in an order that is not score order; the runner must spend the budget on the two highest and demote the rest with wip_capped.",
   "expected": "Tasks for 9.1 then 8.4; 7.2 and 7.0 queued (in that order) with wip_capped=true.",
   "upstream": {
     "list_ids": [
@@ -18,7 +18,7 @@
     ]
   },
   "todoist": {
-    "wip": 3
+    "wip": 6
   },
   "claude": {
     "out": [
@@ -75,8 +75,8 @@
   "expect": {
     "rc": 0,
     "claude_prompt": {
-      "wip_count": 3,
-      "wip_cap": 5
+      "wip_count": 6,
+      "wip_cap": 8
     },
     "tasks_created": [
       "kubernetes-sigs/kueue#902122",

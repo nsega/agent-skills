@@ -7,7 +7,7 @@
   "run": "reeval",
   "contract": "SKILL.md:49-50 'promoted into a task (within the same WIP budget)'",
   "code": "skills/oss-lab/scripts/run-reeval.sh:214-218,249-253",
-  "why": "WIP 5 of 5: an 8.0 rescore cannot be promoted.",
+  "why": "WIP 8 of 8: an 8.0 rescore cannot be promoted.",
   "expected": "No task; the issue stays queued with wip_capped=true and reeval_count 1.",
   "state": {
     "queue": [
@@ -26,7 +26,7 @@
     ]
   },
   "todoist": {
-    "wip": 5
+    "wip": 8
   },
   "claude": {
     "out": [

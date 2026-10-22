@@ -70,7 +70,7 @@ below are deliberate, not incidental:
   after it was surfaced. In this project most claims arrive as a PR or
   a comment rather than an assignment, so an assignee check alone would
   have led to duplicated effort.
-- **No hoarding.** The WIP cap (5 active tasks) exists so the loop
+- **No hoarding.** The WIP cap (8 active tasks) exists so the loop
   never queues up more claimed work than will actually be delivered.
 - **Depth over breadth.** The consistency axis anchors scoring to the
   code areas and reviewers where contributions have actually landed,
@@ -93,7 +93,7 @@ below are deliberate, not incidental:
 Routing: weighted ≥ 7.0 → task manager · 5.0–6.9 → queue · < 5.0 → drop.
 
 Flow controls:
-- **WIP cap:** at most 5 active tasks; overflow demotes to queue. The
+- **WIP cap:** at most 8 active tasks; overflow demotes to queue. The
   cap lives in one place, `OSS_LAB_WIP_CAP` in `scripts/lib.sh`, and is
   passed to the scorer as `$WIP_CAP`, so raising it does not leave a
   stale number in the prompt. Override per run with the same variable.
