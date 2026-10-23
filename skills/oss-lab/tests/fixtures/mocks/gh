@@ -6,6 +6,8 @@
 #   list         : {"owner/repo": [raw issue objects]}  issues LIST endpoint
 #   linked       : {"owner/repo": [numbers]}            search linked:pr
 #   search_fail  : ["owner/repo"]                        search call fails
+#   search_fail_times : {"owner/repo": N}                 the first N search calls fail
+# A failed search prints a gh-style HTTP error on stderr, like the real CLI.
 #   issues       : {"owner/repo#n": {raw issue} | "unreachable"}  single issue
 #   comments     : {"owner/repo#n": [raw comments] | "garbage"}
 # A single-issue read merges: defaults <- matching LIST entry <- issues override.
@@ -51,7 +53,14 @@ case "$endpoint" in
   search/issues)
     q="$(field q)"; repo="$(sed -E 's/.*repo:([^ ]+).*/\1/' <<<"$q")"
     echo "$repo" >> "$log/search_repos"
-    [ "$(jq -c --arg r "$repo" '(.search_fail // []) | index($r) != null' "$up")" = true ] && exit 1
+    fail=0
+    [ "$(jq -c --arg r "$repo" '(.search_fail // []) | index($r) != null' "$up")" = true ] && fail=1
+    times="$(jq -r --arg r "$repo" '(.search_fail_times // {})[$r] // 0' "$up")"
+    if (( times > 0 )); then
+      cf="$log/search_fail_count_${repo//\//_}"; n="$(cat "$cf" 2>/dev/null || echo 0)"
+      if (( n < times )); then echo $((n + 1)) > "$cf"; fail=1; fi
+    fi
+    if (( fail )); then echo "gh: HTTP 403: You have exceeded a secondary rate limit (mock)" >&2; exit 1; fi
     raw="$(jq -c --arg r "$repo" '((.linked // {})[$r] // []) | {total_count: length, items: map({number: .})}' "$up")" ;;
   repos/*/*/issues/*/comments)
     id="$(sed -E 's#repos/([^/]+/[^/]+)/issues/([0-9]+)/comments#\1\#\2#' <<<"$endpoint")"

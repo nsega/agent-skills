@@ -222,7 +222,13 @@ would silently report every taken issue as free. Claim detection
 therefore goes through the search API (`linked:pr`), which answers
 correctly under both fine-grained and classic tokens. The result is
 cached per repo per run, so the revalidation pass and the fetch filter
-share one lookup.
+share one lookup. The search fails transiently now and then (secondary
+rate limit, 5xx): a failed call is retried twice with a short backoff
+(`OSS_LAB_RETRY_SLEEP` seconds, default 10, scaled by attempt) and the
+`gh` error is kept in the warning. When every attempt fails, the previous
+run's list is served with a warning naming its age, and the claim filter
+only degrades to "nothing is claimed" when no list was ever cached. A
+repo that exhausted its retries is not retried again in the same run.
 
 ## Configuration
 

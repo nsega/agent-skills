@@ -1,0 +1,70 @@
+{
+  "id": "fetch/15-linked-search-serves-stale-cache",
+  "covers": [
+    "F6"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:222-225 (the linked-PR result is cached per repo); when every retry fails, the previous run's list is served instead of an empty one",
+  "code": "skills/oss-lab/scripts/lib.sh (oss_lab_linked_prs)",
+  "why": "Linked-PR sets change slowly, so a list from an earlier run is far closer to the truth than an empty one, which routes taken issues to the paid scorer and can create a task the next hour closes again.",
+  "expected": "Every kueue search fails; the stale cache (older than 50 min) holding 901501 is served with a warning naming its age; kueue#901501 is filtered, 901502 survives; no 'claim filter degraded' warning; exit 0.",
+  "state": {
+    "cache": {
+      "linked-kubernetes-sigs_kueue.json": [
+        901501
+      ]
+    },
+    "cache_stale": true
+  },
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 901501,
+          "title": "Synthetic issue 901501",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901501",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 901502,
+          "title": "Synthetic issue 901502",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901502",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "search_fail": [
+      "kubernetes-sigs/kueue"
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#901502"
+    ],
+    "output_contains": [
+      "warn: linked-PR search failed for kubernetes-sigs/kueue, serving cache from"
+    ],
+    "output_not_contains": [
+      "claim filter degraded"
+    ]
+  }
+}

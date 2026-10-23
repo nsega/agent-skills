@@ -1,0 +1,70 @@
+{
+  "id": "fetch/14-linked-search-retries",
+  "covers": [
+    "F6"
+  ],
+  "run": "fetch",
+  "contract": "SKILL.md:222-225 (claim detection through the search API); a transient search failure is retried before the claim filter degrades",
+  "code": "skills/oss-lab/scripts/lib.sh (oss_lab_linked_prs)",
+  "why": "GitHub's search endpoint fails transiently (secondary rate limit, 5xx). One failed request must not cost the claim filter for the hour, and the first stderr line is logged so the cause is visible afterwards.",
+  "expected": "The first kueue search fails, the retry succeeds: kueue#901401 (linked PR) is filtered, the attempt warning names the gh error, no 'claim filter degraded' warning, 4 search calls (3 repos + 1 retry); exit 0.",
+  "upstream": {
+    "list": {
+      "kubernetes-sigs/kueue": [
+        {
+          "number": 901401,
+          "title": "Synthetic issue 901401",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901401",
+          "body": "Synthetic fixture issue body."
+        },
+        {
+          "number": 901402,
+          "title": "Synthetic issue 901402",
+          "state": "open",
+          "user": {
+            "login": "fixture-user-reporter"
+          },
+          "assignees": [],
+          "labels": [],
+          "comments": 0,
+          "created_at": "2026-09-14T08:00:00Z",
+          "updated_at": "2026-09-15T08:00:00Z",
+          "html_url": "https://github.com/kubernetes-sigs/kueue/issues/901402",
+          "body": "Synthetic fixture issue body."
+        }
+      ]
+    },
+    "search_fail_times": {
+      "kubernetes-sigs/kueue": 1
+    },
+    "linked": {
+      "kubernetes-sigs/kueue": [
+        901401
+      ]
+    }
+  },
+  "expect": {
+    "rc": 0,
+    "stdout_issues": [
+      "kubernetes-sigs/kueue#901402"
+    ],
+    "output_contains": [
+      "warn: linked-PR search attempt 1 failed for kubernetes-sigs/kueue: gh: HTTP 403"
+    ],
+    "output_not_contains": [
+      "claim filter degraded"
+    ],
+    "gh_call_counts": {
+      "linked:pr": 4
+    }
+  }
+}

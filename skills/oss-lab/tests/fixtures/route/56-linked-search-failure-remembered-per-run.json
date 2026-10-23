@@ -1,0 +1,48 @@
+{
+  "id": "route/56-linked-search-failure-remembered-per-run",
+  "covers": [
+    "F6",
+    "C4"
+  ],
+  "run": "scout",
+  "contract": "SKILL.md:222-225 (the linked-PR lookup is cached per repo per run and shared by the revalidation pass and the fetch filter)",
+  "code": "skills/oss-lab/scripts/lib.sh (oss_lab_linked_prs)",
+  "why": "A repo whose search keeps failing must not be retried afresh by every revalidated task: with retries and backoff that would block the run for minutes. Once the retries are exhausted, later lookups in the same run go straight to the fallback.",
+  "expected": "Two active kueue tasks are revalidated (two lookups) and the fetch looks up all three repos: the kueue search is attempted 3 times in total, not 9, the other two repos once each (5 search calls); the tasks stay open; quiet hour, claude not called.",
+  "upstream": {
+    "list": {},
+    "search_fail": [
+      "kubernetes-sigs/kueue"
+    ]
+  },
+  "todoist": {
+    "tasks": [
+      {
+        "id": "t-a",
+        "content": "Contribute: [kubernetes-sigs/kueue#902561](https://github.com/kubernetes-sigs/kueue/issues/902561) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      },
+      {
+        "id": "t-b",
+        "content": "Contribute: [kubernetes-sigs/kueue#902562](https://github.com/kubernetes-sigs/kueue/issues/902562) (score 7.3)",
+        "labels": [
+          "oss-lab"
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "rc": 0,
+    "tasks_closed": [],
+    "claude_called": false,
+    "output_contains": [
+      "warn: linked-PR search attempt 3 failed for kubernetes-sigs/kueue",
+      "warn: linked-PR search failed for kubernetes-sigs/kueue, claim filter degraded"
+    ],
+    "gh_call_counts": {
+      "linked:pr": 5
+    }
+  }
+}
