@@ -8,7 +8,9 @@
 # compare before and after a change) (skills/oss-lab/scripts/*), with mock `gh`,
 # `curl`, and `claude` (fixtures/mocks/) first on PATH, a scrubbed environment
 # (env -i: no token variables can leak in), a throwaway HOME and state dir,
-# and an isolated git config. The checkout itself is never written to: the
+# and an isolated git config. OSS_LAB_RETRY_SLEEP=0 removes the backoff
+# between retried GitHub calls, so a failing-search case runs in seconds.
+# The checkout itself is never written to: the
 # skill directory is copied into a temp dir and run from there.
 #
 # Prints one line per case (PASS / FAIL) and a summary. Exit status:
@@ -122,6 +124,8 @@ run_case() {
     mkdir -p "$S/.cache"
     while IFS=$'\t' read -r name content; do printf '%s' "$content" > "$S/.cache/$name"; done \
       < <(jq -r '.state.cache | to_entries[] | "\(.key)\t\(.value | tojson)"' "$cf")
+    # cache_stale: age the seeded files past the per-run freshness window.
+    [ "$(E '.state.cache_stale // false')" = true ] && touch -t 202601010000 "$S/.cache/"*
   fi
   # Snapshot after seeding (the git commit below ages nothing).
   for f in seen.json queue.json last_run last_reeval; do
@@ -174,7 +178,7 @@ run_case() {
   t0="$(date +%s)"
   env -i \
     PATH="$WORK/bin:$PATH" HOME="$H" LANG=C TMPDIR="$C/tmp" \
-    OSS_LAB_STATE_DIR="$S" CLAUDE_CONFIG_DIR="$cfg_dir" \
+    OSS_LAB_STATE_DIR="$S" CLAUDE_CONFIG_DIR="$cfg_dir" OSS_LAB_RETRY_SLEEP=0 \
     GIT_CONFIG_GLOBAL="$WORK/gitconfig" GIT_CONFIG_NOSYSTEM=1 \
     MOCK_LOG="$L" MOCK_UPSTREAM="$C/upstream.json" MOCK_TODOIST="$C/todoist.json" \
     MOCK_CLAUDE_OUT="$C/claude_out" MOCK_CLAUDE_RC="$(jq -r '.claude.rc // 0' "$cf")" \

@@ -183,24 +183,55 @@ oss_lab_issue_cache() {
 # The result is cached per repo for the run so the revalidation pass and
 # the fetch filter share one computation instead of paying for it twice.
 # Cache files live outside the tracked state (sync commits by pathspec).
+#
+# The search fails transiently (secondary rate limit, 5xx), so a failed
+# call is retried with a short backoff, and its first stderr line is kept
+# in the warning so the cause is visible afterwards. When every attempt
+# fails, the previous run's list is served instead of an empty one: linked
+# PR sets change slowly, and an empty list would send taken issues to the
+# paid scorer. A repo that exhausted its retries is marked for the rest of
+# the run, so the lookups that follow (one per revalidated task) go
+# straight to the fallback instead of blocking the run for minutes.
 oss_lab_linked_prs() {
   local repo="$1" cache_dir; cache_dir="$(oss_lab_cache_dir)"
   local cache="$cache_dir/linked-${repo//\//_}.json"
+  local failed="$cache_dir/linked-${repo//\//_}.failed"
   mkdir -p "$cache_dir"
   # Fresh enough for one hourly iteration.
   if [[ -f "$cache" ]] && [[ -z "$(find "$cache" -mmin +50 2>/dev/null)" ]]; then
     cat "$cache"; return 0
   fi
-  local out
-  out="$(gh api -X GET search/issues --paginate \
-           -f q="repo:$repo is:issue is:open linked:pr" -f per_page=100 \
-           --jq '.items[].number' 2>/dev/null </dev/null |
-         jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' 2>/dev/null)" || out=""
+  local out="" err attempt=0 base="${OSS_LAB_RETRY_SLEEP:-10}"
+  if [[ -f "$failed" ]] && [[ -z "$(find "$failed" -mmin +50 2>/dev/null)" ]]; then
+    attempt=3
+  fi
+  err="$(mktemp)"
+  while (( attempt < 3 )); do
+    attempt=$((attempt + 1))
+    out="$(gh api -X GET search/issues --paginate \
+             -f q="repo:$repo is:issue is:open linked:pr" -f per_page=100 \
+             --jq '.items[].number' 2>"$err" </dev/null |
+           jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' 2>/dev/null)" && break
+    out=""
+    echo "warn: linked-PR search attempt $attempt failed for $repo: $(head -1 "$err")" >&2
+    if (( attempt < 3 )); then sleep $(( attempt * base )); fi
+  done
+  rm -f "$err"
   if [[ -z "$out" ]]; then
+    touch "$failed"
+    if [[ -f "$cache" ]]; then
+      local mtime age
+      # GNU stat first; BSD stat rejects -c with no stdout, then answers -f.
+      mtime="$(stat -c %Y "$cache" 2>/dev/null)" || mtime="$(stat -f %m "$cache")"
+      age=$(( ( $(date +%s) - mtime ) / 60 ))
+      echo "warn: linked-PR search failed for $repo, serving cache from $age min ago" >&2
+      cat "$cache"; return 0
+    fi
     echo "warn: linked-PR search failed for $repo, claim filter degraded" >&2
     echo '[]'
     return 0
   fi
+  rm -f "$failed"
   printf '%s' "$out" > "$cache"
   printf '%s' "$out"
 }

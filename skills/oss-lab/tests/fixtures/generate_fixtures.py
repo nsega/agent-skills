@@ -244,6 +244,36 @@ case("fetch", "11-linked-search-fails-soft",
      expect={"rc": 0, "stdout_issues": [iid(Q, 901101), iid(Q, 901102)],
              "output_contains": ["warn: linked-PR search failed for kubernetes-sigs/kueue, claim filter degraded"]})
 
+case("fetch", "14-linked-search-retries",
+     covers=["F6"], run="fetch",
+     contract="SKILL.md:222-225 (claim detection through the search API); a transient search failure is retried "
+              "before the claim filter degrades",
+     code="skills/oss-lab/scripts/lib.sh (oss_lab_linked_prs)",
+     why="GitHub's search endpoint fails transiently (secondary rate limit, 5xx). One failed request must not cost "
+         "the claim filter for the hour, and the first stderr line is logged so the cause is visible afterwards.",
+     expected="The first kueue search fails, the retry succeeds: kueue#901401 (linked PR) is filtered, the attempt warning "
+              "names the gh error, no 'claim filter degraded' warning, 4 search calls (3 repos + 1 retry); exit 0.",
+     upstream={"list": {Q: [raw(Q, 901401), raw(Q, 901402)]}, "search_fail_times": {Q: 1}, "linked": {Q: [901401]}},
+     expect={"rc": 0, "stdout_issues": [iid(Q, 901402)],
+             "output_contains": ["warn: linked-PR search attempt 1 failed for kubernetes-sigs/kueue: gh: HTTP 403"],
+             "output_not_contains": ["claim filter degraded"],
+             "gh_call_counts": {"linked:pr": 4}})
+
+case("fetch", "15-linked-search-serves-stale-cache",
+     covers=["F6"], run="fetch",
+     contract="SKILL.md:222-225 (the linked-PR result is cached per repo); when every retry fails, the previous "
+              "run's list is served instead of an empty one",
+     code="skills/oss-lab/scripts/lib.sh (oss_lab_linked_prs)",
+     why="Linked-PR sets change slowly, so a list from an earlier run is far closer to the truth than an empty one, "
+         "which routes taken issues to the paid scorer and can create a task the next hour closes again.",
+     expected="Every kueue search fails; the stale cache (older than 50 min) holding 901501 is served with a warning naming "
+              "its age; kueue#901501 is filtered, 901502 survives; no 'claim filter degraded' warning; exit 0.",
+     state={"cache": {"linked-kubernetes-sigs_kueue.json": [901501]}, "cache_stale": True},
+     upstream={"list": {Q: [raw(Q, 901501), raw(Q, 901502)]}, "search_fail": [Q]},
+     expect={"rc": 0, "stdout_issues": [iid(Q, 901502)],
+             "output_contains": ["warn: linked-PR search failed for kubernetes-sigs/kueue, serving cache from"],
+             "output_not_contains": ["claim filter degraded"]})
+
 case("fetch", "12-window-resumes-from-last-run",
      covers=["F10"], run="fetch",
      contract="SKILL.md:41-42 'seen.json and last_run advance so the next window resumes cleanly'",
@@ -1028,6 +1058,26 @@ case("reeval", "22-wip-full-no-promotion",
      claude={"out": [score(iid(Q, 902901), 8.0, "queue", wip_capped=True)]},
      expect={"rc": 0, "tasks_created": [],
              "queue": [{"issue": iid(Q, 902901), "weighted_total": 8.0, "wip_capped": True, "reeval_count": 1}]})
+
+
+LF = [iid(Q, 902561), iid(Q, 902562)]
+case("route", "56-linked-search-failure-remembered-per-run",
+     covers=["F6", "C4"], run="scout",
+     contract="SKILL.md:222-225 (the linked-PR lookup is cached per repo per run and shared by the revalidation pass "
+              "and the fetch filter)",
+     code="skills/oss-lab/scripts/lib.sh (oss_lab_linked_prs)",
+     why="A repo whose search keeps failing must not be retried afresh by every revalidated task: with retries and "
+         "backoff that would block the run for minutes. Once the retries are exhausted, later lookups in the same run "
+         "go straight to the fallback.",
+     expected="Two active kueue tasks are revalidated (two lookups) and the fetch looks up all three repos: the kueue "
+              "search is attempted 3 times in total, not 9, the other two repos once each (5 search calls); the tasks "
+              "stay open; quiet hour, claude not called.",
+     upstream={"list": {}, "search_fail": [Q]},
+     todoist={"tasks": [task("t-a", LF[0]), task("t-b", LF[1])]},
+     expect={"rc": 0, "tasks_closed": [], "claude_called": False,
+             "output_contains": ["warn: linked-PR search attempt 3 failed for kubernetes-sigs/kueue",
+                                 "warn: linked-PR search failed for kubernetes-sigs/kueue, claim filter degraded"],
+             "gh_call_counts": {"linked:pr": 5}})
 
 
 def main():
