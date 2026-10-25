@@ -15,7 +15,7 @@
   <array>
     <string>/bin/bash</string>
     <string>-lc</string>
-    <string>export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"; export OSS_LAB_STATE_DIR="${OSS_LAB_STATE_DIR:-$HOME/dev/oss-lab-state}"; mkdir -p "$HOME/Library/Logs"; exec ~/dev/agent-skills/skills/oss-lab/scripts/run-scout.sh >>"$HOME/Library/Logs/oss-scout.log" 2&gt;&amp;1</string>
+    <string>export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"; export OSS_LAB_STATE_DIR="${OSS_LAB_STATE_DIR:-$HOME/src/github.com/nsega/oss-lab-state}"; mkdir -p "$HOME/Library/Logs"; exec ~/dev/agent-skills/skills/oss-lab/scripts/run-scout.sh >>"$HOME/Library/Logs/oss-scout.log" 2&gt;&amp;1</string>
   </array>
 
   <!-- Weekdays (Mon=1 .. Fri=5), hourly 09:00-18:00 -->
