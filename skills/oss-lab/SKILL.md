@@ -251,7 +251,7 @@ personal Claude identity, copies the plist with the repo path rewritten
 to the current checkout (a verbatim copy would point launchd at a path
 that may not exist), and runs `launchctl load -w` only if the job is
 not already loaded. The shipped plist points `OSS_LAB_STATE_DIR` at the
-reference setup (`~/dev/oss-lab-state`, a clone of the private state
+reference setup (`~/src/github.com/nsega/oss-lab-state`, a clone of the private state
 repo) and logs to `~/Library/Logs/oss-scout.log`. Verify
 `CLAUDE_CONFIG_DIR` resolves to the intended personal account before
 first run (the runner enforces this).
