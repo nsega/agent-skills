@@ -173,6 +173,14 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   grep -qx -- "features.shell_tool=false" "$SHIM.args" && ok || bad "codex must disable the shell tool"
   grep -qx -- "-C" "$SHIM.args" && ok || bad "codex must be pointed at a scratch working root"
 
+  # The defaults above came from models.json. The env vars still win over it.
+  rm -f "$OUT"
+  rc=0; CODEX_BIN="$SHIM" CODEX_API_KEY=test CODEX_MODEL=some-other-model CODEX_EFFORT=low \
+    "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && ok || bad "CODEX_MODEL/CODEX_EFFORT override should exit 0 (got $rc)"
+  grep -qx -- "some-other-model" "$SHIM.args" && ok || bad "CODEX_MODEL should win over models.json"
+  grep -qx -- "model_reasoning_effort=low" "$SHIM.args" && ok || bad "CODEX_EFFORT should win over models.json"
+
   # The -o path above was the preferred one; stdout is the fallback when a codex
   # build writes nothing to the -o file.
   SHIM3="$WORK/codex-stdout"; make_shim "$SHIM3" "$VALID"
@@ -229,10 +237,11 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
     # ZEN_MODEL still wins over the backend's default (the documented escape
     # hatch, and how a third Zen model gets tried without touching the script).
     rm -f "$OUT"
-    rc=0; OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test ZEN_MODEL=opencode/deepseek-v4-flash \
+    rc=0; OPENCODE_BIN="$GSHIM" OPENCODE_API_KEY=test ZEN_MODEL=opencode/deepseek-v4-flash ZEN_VARIANT=low \
       "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend "$be" >/dev/null 2>&1 || rc=$?
     [ "$rc" -eq 0 ] && ok || bad "$be: ZEN_MODEL override should exit 0 (got $rc)"
     grep -qx -- "opencode/deepseek-v4-flash" "$GSHIM.args" && ok || bad "$be: ZEN_MODEL should override the default model"
+    grep -qx -- "low" "$GSHIM.args" && ok || bad "$be: ZEN_VARIANT should override the default variant"
   done
 
   # An empty answer must fail HERE, loudly, naming the backend. opencode exits 0
