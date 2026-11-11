@@ -14,7 +14,7 @@ immediately — no copy step. The same `SKILL.md` format works for Codex.
 | `cross-repo-context` | Work across sibling repos (`../other-repo`) as if they were a monorepo | You mention "the other repo" / "the public repo" / a `../` path, or want work in one repo to draw on context from another |
 | `desktop-organizer` | Sort loose screenshots/PDFs into themed, dated folders | "organize my Desktop", "clean up screenshots", "tidy these PDFs" |
 | `dual-model-debate` | Two-model dialectic that decides a question (Claude + GPT via codex): each argues its honest read, they exchange, and a neutral Claude synthesizes a recommended decision that surfaces the disagreements | You want the two models to "debate" / "hash out" / "argue both sides" a design question or tradeoff, or a stress-tested second opinion before you commit to a direction |
-| `dual-model-review` | Two-model review of a PR or design doc (Claude Opus 5.5 at medium plus a blind second lab: GPT-6.1 Sol via Codex by default, GPT-6 Astra one env var away, GLM-5.2 or Kimi K3 via OpenCode Zen as alternates), disagreements surfaced for the human | You want a second opinion or higher confidence before merge/sign-off: "cross-review this", "run the panel", "what did we miss?" |
+| `dual-model-review` | Two-model review of a PR or design doc (Claude plus a blind second lab: GPT via Codex by default, GLM or Kimi via OpenCode Zen as alternates), disagreements surfaced for the human | You want a second opinion or higher confidence before merge/sign-off: "cross-review this", "run the panel", "what did we miss?" |
 | `friction-log` | Maintain a personal friction log in an Obsidian vault | "log friction: X", "show friction log", weekly review, or graduating items ("shipped: X", "drop: X") |
 | `illustrate-with-html` | Explain/visualize anything as a single self-contained `.html` file | You want to *see* something rather than read it — a workflow, architecture, timeline, or report — even if you never say "diagram" |
 | `oss-lab` | Issue Scout loop for Kubernetes OSS contributions: a launchd job that hourly applies zero-token hard filters to new issues, scores the survivors against a weighted OKR rubric, and routes them to Todoist or a holding queue | You want contribution candidates surfaced in the background instead of triaging issue feeds by hand (opt-in, machine-local: `make install-oss-lab`) |
@@ -22,6 +22,9 @@ immediately — no copy step. The same `SKILL.md` format works for Codex.
 | `pr-review-report` | Background PR review with a PR-specific brief: main reads the change and decides how to review it, a read-only subagent verifies and saves a Markdown report, and main gets a short notice. Reruns after fixes track each earlier finding by ID (Fixed / Still open / Regression) | You want the review saved to a file, want to keep working while it runs, want to re-review after fixes, or want to compare runs across models, effort levels, or tools (`/pr-review-report <PR> [--effort high] [--fresh]`) |
 | `pr-visual-review` | PR review with sequence/class/flow diagrams (only when structurally warranted) | You need the *structure* of a change: call flow, blast radius, class relationships |
 | `repo-deepwiki` | Generate a DeepWiki-style, citation-heavy architecture wiki for a repo | Onboarding to or documenting a codebase: "describe this repo", "architecture overview", "how is this project structured?" |
+
+Current model IDs and effort defaults for the two `dual-model-*` skills live in
+`models/dual-model.json`; edit it, then run `make models`.
 
 ## Sources and targets
 
@@ -42,6 +45,7 @@ and `status` run against every dir in `CLAUDE_SKILLS_DIRS`.
 
 ```
 skills/<name>/SKILL.md   # one folder per skill (+ any assets the skill needs)
+models/dual-model.json   # model IDs and defaults for the dual-model-* skills (`make models` copies it into each)
 templates/SKILL.md       # frontmatter scaffold used by `make new`
 scripts/link.sh          # install | uninstall | status | unmanaged  (see script header)
 scripts/new.sh           # scaffold a new skill folder
@@ -62,6 +66,7 @@ make install      # symlink all skills (repo + upstream subset) into every Claud
 make status       # link state per skill (ok / missing / wrong / blocked) + unmanaged entries
 make uninstall    # remove ONLY the symlinks that point back into the source repos
 make new name=my-skill   # scaffold skills/my-skill/SKILL.md from the template
+make models       # copy models/dual-model.json into the two dual-model-* skill folders
 make test         # every skill's tests; fakes stand in for claude/gh/curl/codex, so no network or paid calls
 make lint         # shellcheck (warnings and errors) over every shell script
 ```

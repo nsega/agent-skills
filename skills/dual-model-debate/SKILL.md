@@ -2,8 +2,7 @@
 name: dual-model-debate
 description: >-
   Run a moderated dialectic between two models from two labs to decide a
-  question. Claude (opus, via Claude Code) and GPT (gpt-5.6-sol, via codex)
-  each argue their honest read, exchange rebuttals, and a neutral Claude
+  question. Claude (via Claude Code) and GPT (via the Codex CLI) each argue their honest read, exchange rebuttals, and a neutral Claude
   synthesizes a recommended decision that surfaces the disagreements that
   matter. Use whenever the user wants the two models to "debate", "hash out",
   "argue both sides", get a "dialectic" or a decision on a design question or
@@ -22,6 +21,10 @@ if the two agree, that agreement is stress-tested before it is trusted.
 Read `references/protocol.md` first. It defines the turn format, the three roles
 (honest opening / rebuttal / forced opposition), and the chair's synthesis and
 escalation rules.
+
+GPT's current model id and effort default are in `models.json` (`debate.codex`,
+with an "as of" date and sources). `scripts/codex_turn.sh` reads them from
+there, and `CODEX_MODEL` / `CODEX_EFFORT` win over the file.
 
 ## Step 1: Build the packet
 
@@ -60,8 +63,10 @@ dedicated directory, or leave it unset for `/tmp` (the same directory
 
    ```bash
    D="${DMD_OUT_DIR:-/tmp}"; : > "$D/dmd-gpt.md"
-   scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 0 opening "$PKT" "$D/dmd-gpt.md"
+   scripts/codex_turn.sh "GPT (codex)" 0 opening "$PKT" "$D/dmd-gpt.md"
    ```
+
+   The script prints the model and effort it used on stderr.
 3. Append GPT's opening to the transcript:
    `D="${DMD_OUT_DIR:-/tmp}"; cat "$D/dmd-gpt.md" >> "$D/dmd-transcript.md"`
 
@@ -75,7 +80,7 @@ Read both openings as the chair.
   stdin; it appends its block), then run GPT's:
 
   ```bash
-  scripts/codex_turn.sh "GPT (gpt-5.6-sol)" 1 rebuttal "$PKT" "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
+  scripts/codex_turn.sh "GPT (codex)" 1 rebuttal "$PKT" "${DMD_OUT_DIR:-/tmp}/dmd-transcript.md"
   ```
 
   Stop early the moment a round adds no new substantive argument (the chair's
@@ -239,9 +244,9 @@ and the `Result` column is left PENDING for the human to fill in later.
   prints to stderr.
 - **Data to OpenAI.** The packet is sent to OpenAI via codex. Do not route
   secrets through it.
-- **Parameters.** `CODEX_MODEL` (default `gpt-5.6-sol`), `CODEX_EFFORT` (default
-  `high`; low|medium|high|xhigh|max|ultra, where max/ultra need a model that
-  supports them, e.g. `gpt-5.6-sol`). Set `CODEX_FAKE=<file>` to replay a canned
+- **Parameters.** `CODEX_MODEL` and `CODEX_EFFORT` override the defaults in
+  `models.json` (low|medium|high|xhigh|max|ultra, where max/ultra need a model
+  that supports them). Set `CODEX_FAKE=<file>` to replay a canned
   turn instead of calling codex, for a free dry run. `DMD_OUT_DIR` sets the
   directory for the packet and the saved transcript (created if missing; default
   `/tmp`).
@@ -251,3 +256,4 @@ and the `Result` column is left PENDING for the human to fill in later.
 - `scripts/build_packet.sh`: assemble the debate packet (question + context).
 - `scripts/codex_turn.sh`: run one blind, read-only GPT turn; append to transcript.
 - `references/protocol.md`: turn format, the three roles, chair synthesis/escalation.
+- `models.json`: current model id, effort default and dated notes. A generated copy of the repo's `models/dual-model.json`; edit that file and run `make models`.
