@@ -166,7 +166,7 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   grep -qx -- "-" "$SHIM.args" && ok || bad "codex must get the '-' stdin placeholder"
   grep -qx -- "read-only" "$SHIM.args" && ok || bad "codex must run --sandbox read-only"
   grep -qx -- "model_reasoning_effort=medium" "$SHIM.args" && ok || bad "codex effort should default to medium"
-  grep -qx -- "gpt-6.1-sol" "$SHIM.args" && ok || bad "codex model should default to gpt-6.1-sol"
+  grep -qx -- "gpt-6-luna" "$SHIM.args" && ok || bad "codex model should default to gpt-6-luna"
   # Blindness + reproducibility flags, matching dual-model-debate's codex_turn.sh.
   grep -qx -- "--ignore-user-config" "$SHIM.args" && ok || bad "codex must run --ignore-user-config"
   grep -qx -- "--ephemeral" "$SHIM.args" && ok || bad "codex must run --ephemeral"

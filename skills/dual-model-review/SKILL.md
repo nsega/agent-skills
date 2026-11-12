@@ -37,7 +37,9 @@ X?" is debate; "is this X any good?" is review.
 `models.json`** (with an "as of" date and sources). Read it before a run:
 `review.reviewer1` is you, `review.backends.<name>` is reviewer #2. The scripts
 take their defaults from the same file, and the env vars above win over it.
-`CODEX_MODEL=<review.backends.codex.flagship>` swaps the flagship in for one run.
+The codex default is the model a free ChatGPT account can use in Codex. On a
+paid plan, `CODEX_MODEL=<review.backends.codex.plus_model>` or
+`<review.backends.codex.flagship>` swaps a stronger model in for one run.
 
 `glm` and `kimi` are one code path with different default models, so `ZEN_MODEL`
 overrides either and any other Zen model can be tried without touching the
@@ -57,12 +59,11 @@ standing setting. The scores and dates behind each point are in the `notes` of
   dispositions them by hand, so recall is the quantity to protect. Go to `high`
   for a `--level full` packet (security, data loss, migration, public API);
   leave xhigh/max alone.
-- **Reviewer #2 at medium, the flagship on demand.** The default is close to the
-  flagship on agentic coding at a fraction of the per-token price. That is what
-  makes the "run reviewer #2 two or three times and union" advice below
-  affordable. The flagship is still the stronger model, even at low effort, so
-  for the one packet where a single pass has to count, switching `CODEX_MODEL`
-  to the flagship beats raising `CODEX_EFFORT` on the default.
+- **Reviewer #2 at medium, a stronger model on demand.** The default is the
+  model a free ChatGPT account can run, which keeps the "run reviewer #2 two or
+  three times and union" advice below affordable. On a paid plan the stronger
+  models are available, so for the one packet where a single pass has to count,
+  switching `CODEX_MODEL` beats raising `CODEX_EFFORT` on the default.
 - **What effort does not fix.** Across effort levels the gains are task-dependent
   and shrink fast past medium. Where a packet has tests, one sweep showed every
   level from low to max solving the same tasks. Spend on a second blind pass or
@@ -127,7 +128,7 @@ Then run reviewer #2:
 scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json
 
-# flagship for a high-risk packet (id: review.backends.codex.flagship)
+# flagship for a high-risk packet (id: review.backends.codex.flagship; paid plan)
 CODEX_MODEL=<flagship id> scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json
 

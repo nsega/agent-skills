@@ -74,8 +74,8 @@ chmod +x "$work/codex"
 fresh="$(mktemp)"; : > "$fresh"
 rc=0; PATH="$work:$PATH" DMD_OUT_DIR="$work" "$CT" "GPT" 0 opening "$pk" "$fresh" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok || bad "a turn through the fake codex should succeed (got $rc)"
-grep -qx -- "gpt-6.1-sol" "$work/args" && ok || bad "codex model should default to gpt-6.1-sol"
-grep -qx -- "model_reasoning_effort=high" "$work/args" && ok || bad "codex effort should default to high"
+grep -qx -- "gpt-6-luna" "$work/args" && ok || bad "codex model should default to gpt-6-luna"
+grep -qx -- "model_reasoning_effort=medium" "$work/args" && ok || bad "codex effort should default to medium"
 fresh="$(mktemp)"; : > "$fresh"
 rc=0; PATH="$work:$PATH" DMD_OUT_DIR="$work" CODEX_MODEL=some-other-model CODEX_EFFORT=low \
   "$CT" "GPT" 0 opening "$pk" "$fresh" >/dev/null 2>&1 || rc=$?
