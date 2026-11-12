@@ -2,10 +2,10 @@
 name: dual-model-review
 description: >-
   Run a two-model review of a pull request or a system-design document.
-  Claude Code (Opus 5.5, medium effort) is the main reviewer and synthesizer; a
-  second, independent reviewer runs blind through another lab's model:
-  GPT-6.1 Sol via the Codex CLI by default (GPT-6 Astra one env var away), or
-  GLM-5.2 / Kimi K3 via opencode as alternates, for decorrelated blind spots. Use this whenever the user asks
+  Claude Code is the main reviewer and synthesizer; a second, independent
+  reviewer runs blind through another lab's model: GPT via the Codex CLI by
+  default, or GLM / Kimi via opencode as alternates, for decorrelated blind
+  spots. Use this whenever the user asks
   to "cross-review", wants a "second opinion" on a PR or design, says "review
   this with codex" / "with GPT" / "with GLM" / "with Kimi", "run the
   panel", or wants higher-confidence review of an architecture doc, RFC, or diff
@@ -28,50 +28,51 @@ X?" is debate; "is this X any good?" is review.
 | | reviewer #1 | reviewer #2 (default) | reviewer #2 (alt 1) | reviewer #2 (alt 2) |
 |---|---|---|---|---|
 | `--backend` | n/a | `codex` | `glm` | `kimi` |
-| model | `claude-opus-5-5` | `gpt-6.1-sol` (`CODEX_MODEL`) | `glm-5.2` | `kimi-k3` |
-| effort | medium (`/effort`) | medium (`CODEX_EFFORT`) | max (`ZEN_VARIANT`) | max (`ZEN_VARIANT`) |
+| model override | `/model` | `CODEX_MODEL` | `ZEN_MODEL` | `ZEN_MODEL` |
+| effort override | `/effort` | `CODEX_EFFORT` | `ZEN_VARIANT` | `ZEN_VARIANT` |
 | runs via | Claude Code | Codex CLI | opencode + OpenCode Zen | opencode + OpenCode Zen |
 | lab | Anthropic | OpenAI | Z.ai (US-hosted) | Moonshot AI (US-hosted) |
-| $/Mtok in-out (API) | 4 / 20 | 2 / 10 (Astra: 10 / 50) | 1.4 / 4.4 | 3.0 / 15.0 |
 
-Both subscription arms fit a $20 plan: Opus 5.5 is inside Claude Pro's limits
-(Fable 5.1 is not; it bills as usage credits there), and GPT-6.1 Sol is included
-for ChatGPT Plus in Codex. `CODEX_MODEL=gpt-6-astra` swaps the flagship back in
-for one run.
+**Current model ids, effort defaults, prices and plan notes are in
+`models.json`** (with an "as of" date and sources). Read it before a run:
+`review.reviewer1` is you, `review.backends.<name>` is reviewer #2. The scripts
+take their defaults from the same file, and the env vars above win over it.
+The codex default is the model a free ChatGPT account can use in Codex. On a
+paid plan, `CODEX_MODEL=<review.backends.codex.plus_model>` or
+`<review.backends.codex.flagship>` swaps a stronger model in for one run.
 
 `glm` and `kimi` are one code path with different default models, so `ZEN_MODEL`
 overrides either and any other Zen model can be tried without touching the
 script.
 
-### Model and effort defaults (as of 2026-10)
+### Model and effort defaults
 
 Both reviewers sit at **medium** on purpose; raise effort per packet, not as a
-standing setting.
+standing setting. The scores and dates behind each point are in the `notes` of
+`models.json`.
 
-- **Opus 5.5 at medium, not high.** Its system card's FrontierCode Main score is
-  54.6% at medium and 54.4% at max: flat. The Opus 5 card explains the shape:
-  at higher effort the model makes more changes than the task asks for. For a
-  reviewer the analogue is scope creep in findings, and one effort sweep on a
-  code-review benchmark (CodeRabbit, Opus 5) found xhigh *more precise but
-  lower recall*. This setup unions findings and dispositions them by hand, so
-  recall is the quantity to protect. Go to `high` for a `--level full` packet
-  (security, data loss, migration, public API); leave xhigh/max alone.
-- **GPT-6.1 Sol at medium, Astra on demand.** OpenAI puts Sol within a point of
-  Astra on agentic coding at one-fifth the per-token price, and Artificial
-  Analysis found no cheaper model at its level at any effort setting. That is
-  what makes the "run reviewer #2 two or three times and union" advice below
-  affordable. Astra is still the stronger model: OpenAI notes Astra at low can
-  beat Sol at high, so for the one packet where a single pass has to count,
-  `CODEX_MODEL=gpt-6-astra` beats `CODEX_EFFORT=xhigh` on Sol.
+- **Reviewer #1 at medium, not high.** Its system card shows the coding score
+  flat from medium to max, because at higher effort the model makes more changes
+  than the task asks for. For a reviewer the analogue is scope creep in
+  findings, and one effort sweep on a code-review benchmark found the highest
+  efforts *more precise but lower recall*. This setup unions findings and
+  dispositions them by hand, so recall is the quantity to protect. Go to `high`
+  for a `--level full` packet (security, data loss, migration, public API);
+  leave xhigh/max alone.
+- **Reviewer #2 at medium, a stronger model on demand.** The default is the
+  model a free ChatGPT account can run, which keeps the "run reviewer #2 two or
+  three times and union" advice below affordable. On a paid plan the stronger
+  models are available, so for the one packet where a single pass has to count,
+  switching `CODEX_MODEL` beats raising `CODEX_EFFORT` on the default.
 - **What effort does not fix.** Across effort levels the gains are task-dependent
   and shrink fast past medium. Where a packet has tests, one sweep showed every
   level from low to max solving the same tasks. Spend on a second blind pass or
   a better packet (non-goals, known worries) before spending on effort.
-- **Mid-session effort changes are cheap now.** Opus 5.5 and Fable 5.1 take a
-  per-message effort change without invalidating the cached prefix, so bumping
-  reviewer #1 to `high` for one packet costs only that packet.
+- **Mid-session effort changes are cheap now.** A per-message effort change does
+  not invalidate the cached prefix, so bumping reviewer #1 to `high` for one
+  packet costs only that packet.
 
-Re-check these numbers before trusting them: they are vendor cards plus a few
+Re-check the notes before trusting them: they are vendor cards plus a few
 third-party sweeps, not a benchmark of this skill.
 
 Reviewer #2 is pluggable *because only the CLI changes*: packet, rubric, schema,
@@ -82,12 +83,10 @@ algorithm, unusual threat model) `--backend glm` or `--backend kimi` is the more
 independent second opinion. Treat a unanimous clean pass as weak evidence either
 way.
 
-**Reliability, as of 2026-08:** prefer `kimi` over `glm` for the opencode arm.
-GLM-5.2 via Zen has stalled repeatedly (one `low`-effort run on a 591-byte packet
-ran 44 minutes and never returned; one `max`-effort run on a 75KB packet returned
-empty after ~10 minutes), while `kimi` returned in under three minutes on the same
-packet. Re-check before trusting this note; it is two observations, not a
-benchmark.
+**Reliability:** prefer `kimi` over `glm` for the opencode arm. The `glm`
+backend has stalled repeatedly where `kimi` returned in minutes on the same
+packet. The dated observations are in the `notes` of `models.json`; re-check
+before trusting them, they are two observations, not a benchmark.
 
 Both reviewers review **blind** (neither sees the other's findings). You also
 synthesize, so you are a disputant *and* the chair. Two habits contain that bias:
@@ -118,29 +117,31 @@ Do your own review first and **write it to `/tmp/claude-findings.json` before yo
 run reviewer #2**, so its output cannot anchor yours. Review against
 `references/rubric.md` at **medium reasoning effort** (`high` for a `--level
 full` packet; see "Model and effort defaults") and emit findings per
-`references/findings.schema.json` with `"reviewer": "claude-opus-5-5"` and
-`C-###` ids. (Better: run your review in a subagent, so the synthesizing context never
+`references/findings.schema.json` with `"reviewer"` set to your model id
+(`review.reviewer1.model` in `models.json`) and `C-###` ids. (Better: run your review in a subagent, so the synthesizing context never
 saw the authoring intent.)
 
 Then run reviewer #2:
 
 ```bash
-# default: GPT-6.1 Sol via codex, medium effort
+# default: the codex backend
 scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json
 
-# flagship for a high-risk packet: GPT-6 Astra via codex, medium effort
-CODEX_MODEL=gpt-6-astra scripts/second_review.sh <packet> references/rubric.md \
+# flagship for a high-risk packet (id: review.backends.codex.flagship; paid plan)
+CODEX_MODEL=<flagship id> scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json
 
-# alternate: GLM-5.2 via opencode, max effort
+# alternate: the glm backend via opencode
 scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json --backend glm
 
-# alternate: Kimi K3 via opencode, max effort
+# alternate: the kimi backend via opencode
 scripts/second_review.sh <packet> references/rubric.md \
   references/findings.schema.json /tmp/r2-findings.json --backend kimi
 ```
+
+Each run prints the backend, model and effort it used on stderr.
 
 Prereqs: `codex` on PATH and logged in (`codex login`), or `opencode` plus an
 OpenCode Zen key for `--backend glm|kimi`; and `python3` with `jsonschema`, without
@@ -213,7 +214,7 @@ regressed anything); do not re-send the whole artifact.
 ```markdown
 # Dual-model review: <target>
 
-**Reviewers:** Claude Opus 5.5, medium effort (author-aware) · <reviewer #2 model + effort, e.g. GPT-6.1 Sol via Codex, medium>
+**Reviewers:** <reviewer #1 model + effort> (author-aware) · <reviewer #2 model + effort, as printed by second_review.sh>
 **Verdict:** <approve | approve_with_nits | request_changes | block>
 
 ## ⚠️ Escalated to human (disagreements that matter)
@@ -264,16 +265,16 @@ was checked, not skipped.
   `config.toml`: `auth.json` lives there too, so a fresh `CODEX_HOME` means "not
   logged in". Hardening rides on `--ignore-user-config` plus `-c` overrides
   instead, which is also the highest-precedence config layer.
-- **glm backend: Zen, US-hosted, paid tier only.** GLM-5.2 = `opencode/glm-5.2`
-  (zero-retention). **Never** route internal code through Z.ai's own API. Z.ai is
+- **glm backend: Zen, US-hosted, paid tier only.** It runs the `opencode/` id in
+  `models.json` (zero-retention). **Never** route internal code through Z.ai's own API. Z.ai is
   also on the US BIS Entity List; that backend assumes your org's compliance has
   approved MIT-licensed GLM weights via a US host for internal artifacts.
-- **kimi backend: same posture, same caveat.** Kimi K3 = `opencode/kimi-k3`,
-  also a China-based lab (Moonshot AI) reached through the US-hosted,
+- **kimi backend: same posture, same caveat.** Its model is from
+  another China-based lab (Moonshot AI), reached through the US-hosted,
   zero-retention Zen tier. **Never** route internal code through Moonshot's own
   API. Confirm your org's compliance position covers this lab specifically: it
   is a separate decision from the GLM one, not covered by it.
-- **Swapping in another Zen model** is a one-line default in the `glm|kimi` arm
+- **Swapping in another Zen model** is a one-line default in `models.json`
   (or just `ZEN_MODEL=`). A different **CLI** (Gemini/Vertex, an Azure-hosted
   model) is a new `case` arm: prompt, rubric, schema, and synthesis are already
   backend-agnostic.
@@ -281,7 +282,8 @@ was checked, not skipped.
 ## Files
 
 - `scripts/gather_artifact.sh`: build the review packet (`--level full|minimal`, `--tests`).
-- `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm|kimi`, one blind, schema-validated pass; `CODEX_MODEL=gpt-6-astra` for the flagship).
+- `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm|kimi`, one blind, schema-validated pass).
+- `models.json`: current model ids, effort defaults, prices and dated notes. A generated copy of the repo's `models/dual-model.json`; edit that file and run `make models`.
 - `references/rubric.md`: severity/category source of truth + review lenses.
 - `references/findings.schema.json`: the per-reviewer findings contract.
 - `config/opencode.zen.json`: hardened opencode config (Zen, tools off, paid model), shared by `--backend glm` and `--backend kimi`.

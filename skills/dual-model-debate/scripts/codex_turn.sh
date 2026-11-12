@@ -19,8 +19,8 @@
 # exposed to the model (and to OpenAI).
 #
 # Env:
-#   CODEX_MODEL   default gpt-5.6-sol
-#   CODEX_EFFORT  default high            (low|medium|high|xhigh|max|ultra)
+#   CODEX_MODEL   default from ../models.json (a generated copy of the repo's
+#   CODEX_EFFORT  models/dual-model.json); low|medium|high|xhigh|max|ultra
 #   CODEX_FAKE    if set to a file path, use its contents as the model message
 #                 instead of calling codex (free dry runs and tests).
 set -euo pipefail
@@ -33,10 +33,23 @@ TRANSCRIPT="${5:?need transcript path}"
 
 case "$KIND" in opening|rebuttal|forced) ;; *) echo "bad role kind: '$KIND' (want opening|rebuttal|forced)" >&2; exit 2 ;; esac
 
-CODEX_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
-CODEX_EFFORT="${CODEX_EFFORT:-high}"
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Defaults come from models.json; it is read only when the env var is unset.
+MODELS_JSON="$SKILL_DIR/models.json"
+model_default() {  # model_default <dotted.key>
+  python3 -c 'import json, sys
+d = json.load(open(sys.argv[1]))
+for k in sys.argv[2].split("."):
+    d = d[k]
+print(d)' "$MODELS_JSON" "$1" 2>/dev/null \
+    || { echo "cannot read '$1' from $MODELS_JSON" >&2; return 1; }
+}
+
+CODEX_MODEL="${CODEX_MODEL:-$(model_default debate.codex.model)}" || exit 2
+CODEX_EFFORT="${CODEX_EFFORT:-$(model_default debate.codex.effort)}" || exit 2
 # Verified against `codex debug models`: every model in the catalog supports
-# low|medium|high|xhigh, gpt-5.6-sol/terra add max|ultra, and NO model accepts
+# low|medium|high|xhigh, the newest add max|ultra, and NO model accepts
 # "minimal" (the API rejects it with HTTP 400 after the turn has started).
 case "$CODEX_EFFORT" in low|medium|high|xhigh|max|ultra) ;; *) echo "bad CODEX_EFFORT: '$CODEX_EFFORT' (want low|medium|high|xhigh|max|ultra)" >&2; exit 2 ;; esac
 
@@ -55,7 +68,6 @@ if [ -n "${CODEX_FAKE:-}" ]; then
   MSG="$(cat "$CODEX_FAKE")"
 else
   command -v codex >/dev/null || { echo "codex not found on PATH" >&2; exit 127; }
-  SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   PROTOCOL="$SKILL_DIR/references/protocol.md"
   [ -f "$PROTOCOL" ] || { echo "protocol not found: $PROTOCOL" >&2; exit 2; }
   case "$KIND" in

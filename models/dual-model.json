@@ -1,0 +1,127 @@
+{
+  "as_of": "2026-11-12",
+  "edit": "Source of truth: models/dual-model.json. Edit it, then run `make models` to refresh skills/dual-model-review/models.json and skills/dual-model-debate/models.json. Never edit the copies.",
+  "sources": [
+    "https://learn.chatgpt.com/docs/models (OpenAI Codex models and plans, read 2026-11-11)",
+    "https://learn.chatgpt.com/docs/changelog (OpenAI changelog, read 2026-11-11)",
+    "Codex CLI 0.167.1 signed in with a ChatGPT Free account (codex exec per model and the /model picker, tested 2026-11-12)",
+    "skills/dual-model-review/SKILL.md as of 2026-10 (vendor system cards, API price lists, third-party effort sweeps; not re-checked on 2026-11-11)"
+  ],
+
+  "review": {
+    "reviewer1": {
+      "model": "claude-opus-5-5",
+      "label": "Claude Opus 5.5",
+      "effort": "medium",
+      "effort_full_packet": "high",
+      "runs_via": "Claude Code",
+      "lab": "Anthropic",
+      "usd_per_mtok": { "in": 4, "out": 20, "as_of": "2026-10" }
+    },
+    "backends": {
+      "codex": {
+        "model": "gpt-6-luna",
+        "label": "GPT-6 Luna",
+        "effort": "medium",
+        "plus_model": "gpt-6.1-sol",
+        "plus_label": "GPT-6.1 Sol",
+        "flagship": "gpt-6-astra",
+        "flagship_label": "GPT-6 Astra",
+        "runs_via": "Codex CLI",
+        "lab": "OpenAI",
+        "plus_usd_per_mtok": { "in": 2, "out": 10, "as_of": "2026-10" },
+        "flagship_usd_per_mtok": { "in": 10, "out": 50, "as_of": "2026-10" }
+      },
+      "glm": {
+        "model": "opencode/glm-5.2",
+        "label": "GLM-5.2",
+        "effort": "max",
+        "runs_via": "opencode + OpenCode Zen",
+        "lab": "Z.ai (US-hosted)",
+        "usd_per_mtok": { "in": 1.4, "out": 4.4, "as_of": "2026-10" }
+      },
+      "kimi": {
+        "model": "opencode/kimi-k3",
+        "label": "Kimi K3",
+        "effort": "max",
+        "runs_via": "opencode + OpenCode Zen",
+        "lab": "Moonshot AI (US-hosted)",
+        "usd_per_mtok": { "in": 3.0, "out": 15.0, "as_of": "2026-10" }
+      }
+    },
+    "opencode_small_model": "opencode/deepseek-v4-flash"
+  },
+
+  "debate": {
+    "codex": {
+      "model": "gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "effort": "medium",
+      "runs_via": "Codex CLI",
+      "lab": "OpenAI"
+    }
+  },
+
+  "codex_catalog": {
+    "as_of": "2026-11-11",
+    "source": "https://learn.chatgpt.com/docs/models",
+    "latest_cli": "0.167.1 (2026-11-10)",
+    "models": {
+      "gpt-6-astra": "Most capable model for complex work across code, apps, and research. The flagship; one env var away (CODEX_MODEL) on Plus or higher.",
+      "gpt-6.1-sol": "Near-Astra performance at a lower cost, for repeated, long-running work. Efforts: low, medium, high, xhigh. OpenAI's recommendation on Plus or higher.",
+      "gpt-6.1-terra": "Clear writing, visual understanding and computer use. Needs Codex CLI 0.159.0 or later. Considered and not chosen: newer than Sol, but not aimed at code review or argument.",
+      "gpt-6-luna": "Focused, high-volume tasks. The default for both skills, at medium: the only model Codex offers on ChatGPT Free."
+    }
+  },
+
+  "notes": [
+    {
+      "as_of": "2026-11-12",
+      "topic": "plans",
+      "text": "ChatGPT Free: only gpt-6-luna is offered in Codex (verified 2026-11-12). gpt-6.1-sol, gpt-6.1-terra and gpt-6-astra fail there with model_not_found (\"not supported when using Codex with a ChatGPT account\"), and the /model picker shows only GPT-6 Luna (medium).",
+      "source": "Codex CLI 0.167.1 on a ChatGPT Free account"
+    },
+    {
+      "as_of": "2026-11-12",
+      "topic": "plans",
+      "text": "Plus or higher: gpt-6.1-sol is recommended by OpenAI's docs; the flagship is gpt-6-astra. Not verified on this account.",
+      "source": "https://learn.chatgpt.com/docs/models"
+    },
+    {
+      "as_of": "2026-11-11",
+      "topic": "plans",
+      "text": "OpenAI: on Plus, Pro, Business, Enterprise, and Edu plans, choose GPT-6.1 Sol (gpt-6.1-sol) when available. GPT-6.1 Terra reached Codex on those plans on 2026-10-26. gpt-5.5 was retired from Codex with ChatGPT sign-in on 2026-10-14; the 5.4 line and older are retired too. Debate's previous default, the 5.6 Sol id, is no longer listed.",
+      "source": "https://learn.chatgpt.com/docs/models, https://learn.chatgpt.com/docs/changelog"
+    },
+    {
+      "as_of": "2026-10",
+      "topic": "plans",
+      "text": "Claude Opus 5.5 is inside Claude Pro's limits (Claude Fable 5.1 is not; it bills as usage credits there). The GPT arm runs on ChatGPT Free with the default model; the Plus-tier models need a paid ChatGPT plan.",
+      "source": "vendor plan pages, carried over from SKILL.md"
+    },
+    {
+      "as_of": "2026-10",
+      "topic": "effort: reviewer #1 at medium",
+      "text": "The Claude Opus 5.5 system card's FrontierCode Main score is 54.6% at medium and 54.4% at max: flat. The Claude Opus 5 card explains the shape: at higher effort the model makes more changes than the task asks for. One effort sweep on a code-review benchmark (CodeRabbit, Claude Opus 5) found xhigh more precise but lower recall.",
+      "source": "Anthropic system cards, CodeRabbit sweep, carried over from SKILL.md"
+    },
+    {
+      "as_of": "2026-10",
+      "topic": "Plus-tier models: Sol vs the flagship",
+      "text": "Applies on Plus or higher, not to the default. OpenAI puts GPT-6.1 Sol within a point of GPT-6 Astra on agentic coding at one-fifth the per-token price, and Artificial Analysis found no cheaper model at its level at any effort setting. OpenAI also notes Astra at low can beat Sol at high.",
+      "source": "OpenAI model notes, Artificial Analysis, carried over from SKILL.md"
+    },
+    {
+      "as_of": "2026-10",
+      "topic": "effort: mid-session changes",
+      "text": "Claude Opus 5.5 and Claude Fable 5.1 take a per-message effort change without invalidating the cached prefix.",
+      "source": "Anthropic docs, carried over from SKILL.md"
+    },
+    {
+      "as_of": "2026-08",
+      "topic": "reliability: glm vs kimi",
+      "text": "GLM-5.2 via Zen stalled repeatedly: one low-effort run on a 591-byte packet ran 44 minutes and never returned; one max-effort run on a 75KB packet returned empty after about 10 minutes. Kimi K3 returned in under three minutes on the same packet. Two observations, not a benchmark.",
+      "source": "runs on the author's machine"
+    }
+  ]
+}

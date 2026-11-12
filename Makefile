@@ -34,7 +34,12 @@ OSS_LAB_PLIST_LABEL := dev.nsega.oss-scout
 OSS_LAB_PLIST_SRC   := $(REPO_SRC)/oss-lab/$(OSS_LAB_PLIST_LABEL).plist
 OSS_LAB_PLIST_DST   := $(HOME)/Library/LaunchAgents/$(OSS_LAB_PLIST_LABEL).plist
 
-.PHONY: install uninstall status install-codex uninstall-codex status-codex install-oss-lab new test lint help
+# Model ids and defaults for the dual-model-* skills: one source, one copy per
+# skill folder (each folder is linked alone, so it cannot reach the repo root).
+MODEL_DATA   := models/dual-model.json
+MODEL_SKILLS := dual-model-review dual-model-debate
+
+.PHONY: install uninstall status install-codex uninstall-codex status-codex install-oss-lab new models test lint help
 
 help:
 	@echo "Targets:"
@@ -42,6 +47,7 @@ help:
 	@echo "  install-codex / uninstall-codex / status-codex  (target: $(CODEX_SKILLS_DIR))"
 	@echo "  install-oss-lab                         symlink oss-lab + install launchd job"
 	@echo "  new name=<skill-name>                   scaffold a new skill"
+	@echo "  models                                  copy $(MODEL_DATA) into the dual-model-* skills"
 	@echo "  test / lint                             every skill's tests (zero-token) / shellcheck"
 	@echo ""
 	@echo "Sources: $(REPO_SRC) (all)"
@@ -116,10 +122,18 @@ status-codex:
 new:
 	@scripts/new.sh "$(name)"
 
+# --- Model data (run after editing models/dual-model.json) ---
+# tests/test_models.sh fails when a copy drifts from the source.
+models:
+	@for s in $(MODEL_SKILLS); do \
+	  cp "$(MODEL_DATA)" "skills/$$s/models.json"; \
+	  echo "wrote   skills/$$s/models.json"; \
+	done
+
 # --- Tests (what CI runs) ---
 # All suites use fakes: no network, no paid calls. Paid evals are run by hand.
 test:
-	@fail=0; for t in skills/*/tests/test_*.sh; do \
+	@fail=0; for t in tests/test_*.sh skills/*/tests/test_*.sh; do \
 	  echo "==> $$t"; bash "$$t" || fail=1; \
 	done; exit $$fail
 

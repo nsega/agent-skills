@@ -55,8 +55,11 @@
   // `opencode run --variant` (always max; ZEN_VARIANT can override for
   // experiments). Setting it here too would be a second source of truth that
   // silently wins or loses depending on precedence, and the old
-  // `provider.opencode.models.glm-5.2.options.reasoningEffort` key was never
+  // `provider.opencode.models.<id>.options.reasoningEffort` key was never
   // verified against current opencode docs anyway.
+  //
+  // The ids in this file (small_model and the models below) are checked against
+  // models/dual-model.json by tests/test_models.sh. Change them there first.
   "provider": {
     "opencode": {
       "models": {

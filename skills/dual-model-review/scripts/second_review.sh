@@ -8,24 +8,25 @@
 #
 # Backends. Reviewer #2 is pluggable: the packet, rubric, schema, prompt, and
 # synthesis are identical whichever you pick; only the CLI underneath changes.
-#   codex  GPT-6.1 Sol via the Codex CLI           (default; CODEX_MODEL=gpt-6-astra
-#          for the flagship on a high-risk packet)
-#   glm    GLM-5.2 via opencode + OpenCode Zen      (alternate)
-#   kimi   Kimi K3 via opencode + OpenCode Zen      (alternate)
+#   codex  OpenAI model via the Codex CLI          (default; CODEX_MODEL=<flagship>
+#          for a high-risk packet)
+#   glm    Z.ai model via opencode + OpenCode Zen   (alternate)
+#   kimi   Moonshot model via opencode + OpenCode Zen (alternate)
 #
 # glm and kimi are ONE code path that differs only in default model, so they
-# share the preflight, the argv message, and both guards. Pick on cost and
-# behavior: glm-5.2 is $1.4/$4.4 per Mtok, kimi-k3 is $3/$15 (~3.4x on output).
+# share the preflight, the argv message, and both guards.
+#
+# Default model ids, efforts and prices live in ../models.json (a generated
+# copy of the repo's models/dual-model.json). The env vars below win over it.
 #
 # Env:
 #   REVIEW2_BACKEND  backend used when --backend is omitted (default: codex)
-#   CODEX_MODEL      codex model id                    (default: gpt-6.1-sol)
-#   CODEX_EFFORT     model_reasoning_effort            (default: medium; see
+#   CODEX_MODEL      codex model id                    (default: models.json)
+#   CODEX_EFFORT     model_reasoning_effort            (default: models.json; see
 #                    SKILL.md "Model and effort defaults" before raising it)
 #   CODEX_BIN        codex executable                  (default: codex)
 #   ZEN_MODEL        opencode model id, overrides the backend's default
-#                    (glm: opencode/glm-5.2, kimi: opencode/kimi-k3)
-#   ZEN_VARIANT      opencode reasoning-effort variant (default: max)
+#   ZEN_VARIANT      opencode reasoning-effort variant (default: models.json)
 #   OPENCODE_BIN     opencode executable               (default: opencode)
 #   OPENCODE_CONFIG  hardened opencode config          (default: <skill>/config/opencode.zen.json)
 #
@@ -71,18 +72,29 @@ while [ $# -gt 0 ]; do
 done
 [ "$NPOS" -eq 4 ] || { usage >&2; exit 2; }
 
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Defaults come from models.json; it is read only when the env var is unset.
+MODELS_JSON="$SKILL_DIR/models.json"
+model_default() {  # model_default <dotted.key>
+  python3 -c 'import json, sys
+d = json.load(open(sys.argv[1]))
+for k in sys.argv[2].split("."):
+    d = d[k]
+print(d)' "$MODELS_JSON" "$1" 2>/dev/null \
+    || { echo "cannot read '$1' from $MODELS_JSON" >&2; return 1; }
+}
+
 # Resolve the backend's model + effort BEFORE touching files or the network, so a
 # typo in either costs an exit code rather than a paid call.
 case "$BACKEND" in
   codex)
-    # gpt-6.1-sol: near-Astra on agentic coding at one-fifth the per-token price,
-    # included in a ChatGPT Plus plan via Codex, and cheap enough that the two or
-    # three passes SKILL.md asks for on a high-stakes review are affordable.
-    # gpt-6-astra stays one env var away for the packet that warrants it.
-    R2_MODEL="${CODEX_MODEL:-gpt-6.1-sol}"
-    R2_EFFORT="${CODEX_EFFORT:-medium}"
+    # Why this default and this effort: SKILL.md "Model and effort defaults".
+    # The flagship stays one env var away for the packet that warrants it.
+    R2_MODEL="${CODEX_MODEL:-$(model_default review.backends.codex.model)}" || exit 2
+    R2_EFFORT="${CODEX_EFFORT:-$(model_default review.backends.codex.effort)}" || exit 2
     # The union across the catalog (`codex debug models`): every model supports
-    # low|medium|high|xhigh, several add max, and astra/sol/terra add ultra. NO model
+    # low|medium|high|xhigh, several add max, and the newest add ultra. NO model
     # accepts "minimal" (the API rejects it with HTTP 400 after the run has
     # started). This catches typos; the codex preflight below then narrows it to
     # what THIS model actually supports.
@@ -93,16 +105,12 @@ case "$BACKEND" in
     ;;
   glm|kimi)
     # Same opencode path, different default model. ZEN_MODEL overrides either, so
-    # `ZEN_MODEL=opencode/deepseek-v4-flash --backend glm` still works, and a new
-    # Zen model is a one-line default rather than another arm.
-    case "$BACKEND" in
-      glm)  ZEN_DEFAULT_MODEL="opencode/glm-5.2" ;;
-      kimi) ZEN_DEFAULT_MODEL="opencode/kimi-k3" ;;
-    esac
-    R2_MODEL="${ZEN_MODEL:-$ZEN_DEFAULT_MODEL}"
-    R2_EFFORT="${ZEN_VARIANT:-max}"
+    # `ZEN_MODEL=opencode/<id> --backend glm` still works, and a new Zen model is
+    # a one-line default in models.json rather than another arm.
+    R2_MODEL="${ZEN_MODEL:-$(model_default "review.backends.$BACKEND.model")}" || exit 2
+    R2_EFFORT="${ZEN_VARIANT:-$(model_default "review.backends.$BACKEND.effort")}" || exit 2
     # Provider-level, not per-model: opencode's variant names are the same across
-    # Zen's reasoning models (both glm-5.2 and kimi-k3 are reasoning: true), and
+    # Zen's reasoning models (both defaults are reasoning: true), and
     # `opencode models` exposes no per-model variant list to narrow against.
     case "$R2_EFFORT" in
       minimal|low|high|max) ;;
@@ -114,7 +122,7 @@ case "$BACKEND" in
 esac
 
 # The reviewer id the model must stamp on its output: the bare model name, with
-# any provider prefix ("opencode/glm-5.2") stripped.
+# any provider prefix ("opencode/<id>") stripped.
 R2_ID="${R2_MODEL##*/}"
 
 # Check inputs BEFORE spending anything. Without this a typo'd bundle path still
@@ -138,8 +146,6 @@ OUT_PARENT="$(dirname "$OUT")"
 # Step 3 then reads $OUT as the fix review, so a survivor would be merged as if
 # it were fresh. (Typo exits above this line destroy nothing.)
 rm -f "$OUT"
-
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PROMPT=$(cat <<'EOF2'
 You are an INDEPENDENT senior reviewer. You have not seen any other reviewer's
@@ -197,8 +203,8 @@ case "$BACKEND" in
     fi
 
     # Narrow the static union to what THIS model supports. The effort set is
-    # per-model (gpt-5.5 tops out at xhigh, only astra/sol/terra reach ultra), so a
-    # valid-looking pair like CODEX_MODEL=gpt-5.5 CODEX_EFFORT=max would
+    # per-model (older models top out at xhigh, only the newest reach ultra), so a
+    # valid-looking pair like CODEX_MODEL=<older model> CODEX_EFFORT=max would
     # otherwise pass the gate and 400 mid-run, which is exactly the paid failure
     # this validation exists to prevent. `codex debug models` is a local catalog
     # read (~50ms, no spend). If it is unavailable (older codex, unreadable
@@ -345,7 +351,7 @@ case "$BACKEND" in
     # 1.18.11, but undocumented and with no delimiter between the two, which is
     # the actual failure: told the artifact "follows on stdin", the model goes
     # looking for a channel it cannot name. Verified against real opencode
-    # 1.18.11 — GLM-5.2 at --variant minimal quoted the piped sentinel back and in
+    # 1.18.11 — the glm default at --variant minimal quoted the piped sentinel back and in
     # the same breath answered "there's no artifact on stdin from my
     # perspective", then reviewed nothing. The bytes arrive; the framing breaks.
     # In argv the ordering and the header are ours, and the word never appears.
