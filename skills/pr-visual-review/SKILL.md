@@ -26,6 +26,16 @@ correctly**. From that premise, three things are non-negotiable. Understand *why
    "this PR appears to intend X" turns spec-writing from a blank page into a quick correction. If it's wrong, the
    author is motivated to fix it. This is the skill's hidden value.
 
+### When rules conflict
+
+1. **Grounding beats completeness.** Drop an edge you cannot verify, or mark it "(inferred)", since
+   principle 1 says a wrong diagram does more harm than a missing one.
+2. **The user's explicit ask beats the gate.** If they ask for a diagram on a PR that Step 1 would skip,
+   draw one small diagram and say in one line that the gate would have skipped it, since the gate exists
+   to prevent unasked fatigue.
+3. **The gate beats "use proactively".** The description loads this skill on any PR review, and a
+   gated-out PR still gets "No structural change; diagram omitted."
+
 ---
 
 ## Workflow
