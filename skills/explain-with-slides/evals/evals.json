@@ -1,0 +1,23 @@
+{
+  "skill_name": "explain-with-slides",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I keep hearing about Raft but I've never really understood it. Can you get me up to speed? I want to actually follow how leader election and log replication work, not read a wall of text.",
+      "expected_output": "A single self-contained .html deck built from assets/deck-template.html: 6 to 12 slides, each a claim title plus one inline SVG (contrast with something familiar, why consensus is needed, the three roles, election and replication built up across slides, a gotcha such as split votes or stale leaders, summary with sources such as the Raft paper). Notes of 150 to 400 words beside each slide, with numbered markers tying sentences to the figure. check_deck.py reports 0 errors.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Kueue の MultiKueue を新しく勉強したいです。図中心のスライドと、その隣に詳しいスピーカーノートがある形でまとめてください。",
+      "expected_output": "The same deck format with slides and notes written in Japanese (code, CRD names and commands left as they are). Grounded in the official Kueue docs for MultiKueue: manager and worker clusters, how a Workload is dispatched, the admission check, and when not to use it. Notes of roughly 300 to 800 Japanese characters per slide. Sources listed on the last slide.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Explain how a CDN's cache hierarchy works as slides with notes, but give it to me as Markdown I can drop into my Obsidian vault.",
+      "expected_output": "The Markdown fallback from references/slide-patterns.md: one level-2 claim heading per slide, one Mermaid flowchart or sequenceDiagram per slide (at most about seven nodes, verbs on edges), notes as prose under each diagram, slides separated by rules. No HTML file.",
+      "files": []
+    }
+  ]
+}

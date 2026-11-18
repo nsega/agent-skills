@@ -11,7 +11,9 @@ description: >-
   prose. Produces one polished, openable .html in the Anthropic visual style.
   Routing: reviewing a PR is pr-review (or pr-visual-review for its structure,
   as Mermaid that pastes into a PR comment); a whole-repo architecture wiki is
-  repo-deepwiki; this one is for a standalone file someone opens in a browser.
+  repo-deepwiki; a multi-slide learning deck with speaker notes is
+  explain-with-slides; this one is for a standalone file someone opens in a
+  browser.
   NOT for: shipped web apps, CSS/UI fixes, writing feature code, .pptx decks, or
   animated GIFs.
 ---
