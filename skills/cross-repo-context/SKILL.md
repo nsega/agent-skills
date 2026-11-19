@@ -106,6 +106,17 @@ Examples of what lives only in the home repo:
 2. Read the sibling-repo files that need to change
 3. Produce changes that reflect both sources of truth — write to `../other-repo/...` paths
 
+### When rules conflict
+
+1. Keeping home-repo material out of the sibling beats finishing the change, since a
+   public commit cannot be taken back. Apply what an ADR or strategy doc implies, but never
+   copy its text, names, secrets or reasons into the sibling's code, comments or commits.
+2. A sibling marked read-only stays read-only, even when a fix there looks obvious:
+   propose the patch instead of writing it.
+
+Example: an internal ADR caps retries at 3 for a customer contract. In the OSS repo, set
+the cap to 3 and leave any comment or commit that cites the contract out.
+
 ---
 
 ## Step 4 — Write Changes Back to the Sibling Repo
@@ -173,8 +184,8 @@ done
 
 - **Add sibling repo paths to CLAUDE.md** in the home repo so every session auto-loads
   the relationship map. E.g.: `Sibling repos: ../public-sdk (OSS, read/write), ../vendor-lib (read-only)`
-- **Never commit home-repo secrets or internal notes into the sibling repo** — Claude will
-  follow this if you state it as a constraint in CLAUDE.md
+- **State the read-only and no-internal-notes rules in CLAUDE.md** too, so every session
+  has them before this skill loads
 - **Use `rg --files --follow`** not bare `rg --files` — ripgrep silently skips symlinked
   directories without `--follow`. Add `--max-depth 10` if you have nested symlinks to
   avoid infinite loops. `find` and `cat` are symlink-transparent by default.

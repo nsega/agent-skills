@@ -251,6 +251,15 @@ and the `Result` column is left PENDING for the human to fill in later.
   directory for the packet and the saved transcript (created if missing; default
   `/tmp`).
 
+## When rules conflict
+
+1. **No secrets beats a complete packet**, since the packet goes to OpenAI. Redact or summarize the
+   part that holds one, and say so under "Provenance and assumptions".
+2. **The cost cap beats one more round.** When 3 GPT calls are spent and the debaters still disagree,
+   decide or escalate by the protocol's rule instead of making a fourth call.
+3. **Chair neutrality beats a tidy decision.** On a subjective tie, escalate (Step 4) rather than rule
+   for Claude's side, since the chair is also a debater.
+
 ## Files
 
 - `scripts/build_packet.sh`: assemble the debate packet (question + context).

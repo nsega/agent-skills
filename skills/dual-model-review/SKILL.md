@@ -279,6 +279,16 @@ was checked, not skipped.
   model) is a new `case` arm: prompt, rubric, schema, and synthesis are already
   backend-agnostic.
 
+## When rules conflict
+
+1. **Data routing beats the backend the user named.** A route that breaks a **Never** above is not
+   run, since a sent packet cannot be recalled. Say why and offer codex or another Zen model. When
+   retention or compliance is unconfirmed, say so before sending internal code.
+2. **A blind reviewer #2 beats a fuller review.** Missing context goes into the packet, never through
+   file tools, since a reviewer that reads the tree shares your blind spots.
+3. **Surfaced disagreements beat a short report.** When asked for brevity, keep every heading and the
+   "Not adopted" list and shorten the prose inside them, since a dropped finding is invisible later.
+
 ## Files
 
 - `scripts/gather_artifact.sh`: build the review packet (`--level full|minimal`, `--tests`).
