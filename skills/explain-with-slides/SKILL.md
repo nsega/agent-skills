@@ -78,7 +78,8 @@ and draw it at slide scale. Its render-then-read discipline applies here too.
   user's background when the conversation, memory, or repo reveals it.
 - **Write in the user's language.** These instructions are English, but the
   deck follows the language the user asked in. Keep code, commands, and
-  identifiers as they are.
+  identifiers as they are. Set `<html lang>` to the deck's language (`ja` for
+  Japanese).
 
 ## The arc: 6 to 12 slides
 

@@ -44,6 +44,20 @@ sed -n '/^<script>/,/^<\/script>/p' "$TEMPLATE" > "$TMP/t.js"
 sed -n '/^<script>/,/^<\/script>/p' "$EXAMPLE"  > "$TMP/e.js"
 cmp -s "$TMP/t.js" "$TMP/e.js" && ok || bad "example script drifted from the template"
 
+# 5b: the deck reads at phone width, works from the keyboard and announces
+# slide changes. The example shares this CSS and script through check 5.
+grep -q '@media screen and (max-width: 640px)' "$TEMPLATE" && ok || bad "template has no screen-only phone-width layout"
+grep -q '\.btn:focus-visible { outline: 2px solid' "$TEMPLATE" && ok || bad "focus ring missing or styled like hover"
+! grep -q '\.disabled = ' "$TEMPLATE" && ok || bad "arrows set disabled, which drops keyboard focus at the ends"
+grep -q 'inner.scrollBy(' "$TEMPLATE" && ok || bad "Up / Down never scroll the notes pane"
+grep -q 'overflow-wrap: break-word' "$TEMPLATE" && ok || bad "a long unbreakable string can widen the page"
+grep -q 'prefers-reduced-motion: reduce' "$TEMPLATE" && ok || bad "motion ignores prefers-reduced-motion"
+for f in "$TEMPLATE" "$EXAMPLE"; do
+  grep -q 'id="counter" aria-live="polite"' "$f" && ok || bad "$f: slide counter is not a live region"
+  ! grep -Eq '<title>(<!--|.*·)' "$f" && ok || bad "$f: <title> holds more than a short name"
+done
+grep -q '<html lang' "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md does not say to set <html lang>"
+
 # Decks that break one rule each. $1 = file, $2 = slide body.
 deck() {
   { echo '<!doctype html><html><body><main>'; cat; echo '</main></body></html>'; } > "$1"
