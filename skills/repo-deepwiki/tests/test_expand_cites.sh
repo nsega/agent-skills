@@ -18,13 +18,10 @@ REPO=acme/widget
 # Stdout to stdout, stderr to $1/err.
 expand() { (cd "$1" && python3 "$SCRIPT" --repo "$REPO" --sha "$SHA" wiki.md 2> err); }
 
-# 0: the script is there.
+# 0: the script is there, and SKILL.md runs it instead of carrying a copy.
 [ -x "$SCRIPT" ] && ok || bad "scripts/expand_cites.py missing or not executable"
-
-# While SKILL.md still carries the old block, its output must match the script's.
-EMBEDDED="$TMP/embedded.py"
-awk '/^   ```python$/ {f=1; next} /^   ```$/ {f=0} f' "$SKILL_DIR/SKILL.md" \
-  | sed -e 's/^   //' -e "s|\"<full-sha>\", \"<owner>/<repo>\"|\"$SHA\", \"$REPO\"|" > "$EMBEDDED"
+grep -q "scripts/expand_cites.py" "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md does not mention scripts/expand_cites.py"
+! grep -q '^ *```python' "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md still embeds a Python block"
 
 # Fixture repo: a 10-line file, a 3-line file, and two wikis.
 make_repo() {
@@ -95,16 +92,9 @@ wiki.md: unresolved {{cite:}}
 ERR
 cmp -s "$R/err" "$TMP/bad.err" && ok || bad "bad wiki stderr: $(cat "$R/err")"
 
-# 3: the embedded block, while SKILL.md still has it, writes the same bytes.
-for w in good bad; do
-  R="$TMP/e-$w"; make_repo "$R"; cp "$R/$w.md" "$R/wiki.md"
-  (cd "$R" && python3 "$EMBEDDED" > out) || true
-  cmp -s "$R/wiki.md" "$TMP/$w.golden" && ok || bad "embedded block on $w wiki differs from golden"
-done
-
-# 4: with no --repo or --sha, the facts come from git: the origin remote in
+# 3: with no --repo or --sha, the facts come from git: the origin remote in
 # git@, ssh:// or https:// form, and HEAD.
-R="$TMP/r4"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
+R="$TMP/r3"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
 git -C "$R" init -q
 git -C "$R" add src
 git -C "$R" -c user.name=t -c user.email=t@example.com commit -q -m fixture
@@ -118,8 +108,8 @@ for url in git@github.com:acme/widget.git ssh://git@github.com/acme/widget.git h
   cmp -s "$R/wiki.md" "$TMP/head.golden" && ok || bad "links not pinned to HEAD of acme/widget for $url: $(diff "$TMP/head.golden" "$R/wiki.md")"
 done
 
-# 5: no remote and no --repo is a clear error, not a guess.
-R="$TMP/r5"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
+# 4: no remote and no --repo is a clear error, not a guess.
+R="$TMP/r4"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
 git -C "$R" init -q
 if (cd "$R" && python3 "$SCRIPT" --sha "$SHA" 2> err); then bad "no remote exited 0"; else ok; fi
 grep -q "no origin remote" "$R/err" && ok || bad "no remote not reported: $(cat "$R/err")"

@@ -86,28 +86,10 @@ If the repo has no git remote, still cite `path:line` but render them as inline
    each to a full SHA-pinned link **and** verifies it: the path exists and the line
    range is within the file. This is the reliability backbone for large, multi-
    subagent runs — it guarantees consistent URLs and catches any fabricated or
-   stale range before the wiki ships. A minimal expander/validator:
-
-   ```python
-   import re, pathlib
-   SHA, OWNER_REPO = "<full-sha>", "<owner>/<repo>"
-   base = f"https://github.com/{OWNER_REPO}/blob/{SHA}/"
-   src = pathlib.Path("wiki.md").read_text(); problems = []
-   def repl(m):
-       body = m.group(1)
-       if re.search(r":\d+(-\d+)?$", body):
-           path, lines = body.rsplit(":", 1); s, _, e = lines.partition("-"); e = e or s
-           n = len(pathlib.Path(path).read_text().splitlines()) if pathlib.Path(path).exists() else None
-           if n is None: problems.append(f"missing {path}")
-           elif int(e) > n: problems.append(f"range {path}:{lines} > {n}")
-           anchor = f"#L{s}" + (f"-L{e}" if e != s else "")
-           return f"[{path}:{lines}]({base}{path}{anchor})"
-       if not pathlib.Path(body).exists(): problems.append(f"missing {body}")
-       return f"[{body}]({base}{body})"
-   out = re.sub(r"\{\{cite:([^}]+)\}\}", repl, src)
-   pathlib.Path("wiki.md").write_text(out)
-   print("UNRESOLVED:", out.count("{{cite"), "PROBLEMS:", problems or "none")
-   ```
+   stale range before the wiki ships. From the target repo's root, run
+   `python3 <this skill>/scripts/expand_cites.py --repo <owner>/<repo> --sha <full-sha> wiki.md`
+   (it rewrites the file in place, prints one line per bad citation, and exits
+   non-zero if there are any).
 
    Fix or drop anything the validator flags (and spot-check a few ranges for
    semantic accuracy — bounds-valid ≠ points at the claimed symbol). If you are
