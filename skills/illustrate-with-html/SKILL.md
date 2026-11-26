@@ -130,7 +130,9 @@ Conventions that make outputs cohere:
    For interactive detail (clickable nodes, tabs, collapse), follow the small
    vanilla-JS pattern in the flowchart example — a `data-*` key on each element
    and a `DETAIL` map keyed by it.
-5. **Render it, then read the render.** Overlap is invisible in the source and
+5. **Check it is self-contained.** Run `python3 scripts/check_html.py out.html`
+   and fix every line it prints (network loads, Mermaid) before going on.
+6. **Render it, then read the render.** Overlap is invisible in the source and
    glaring on screen. The file is self-contained, so screenshot it directly, no
    server needed:
    `npx playwright screenshot --full-page --viewport-size=1200,1400 "file:///abs/path/to/out.html" /tmp/check.png`
