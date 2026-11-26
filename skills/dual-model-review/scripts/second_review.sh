@@ -5,6 +5,7 @@
 #
 # Usage:
 #   second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm|kimi]
+#                    [--timeout SECONDS]
 #
 # Backends. Reviewer #2 is pluggable: the packet, rubric, schema, prompt, and
 # synthesis are identical whichever you pick; only the CLI underneath changes.
@@ -39,18 +40,19 @@
 #   be relied on to reject a typo that would quietly downgrade effort.
 # - For a high-stakes review, run this two or three times into different OUT_JSON
 #   files and union the findings by hand: one pass is a noisy detector.
-# - NO call timeout is built in, and a Zen backend can stall for tens of minutes.
-#   Bound it from outside when that matters: `timeout 900 second_review.sh ...`
-#   (GNU coreutils; on macOS that is `gtimeout`, and neither name exists until
-#   `brew install coreutils`). Exit 124 = stalled; $OUT is cleared before the
-#   call, so a timed-out run leaves no stale findings behind.
+# - A Zen backend can stall for tens of minutes. `--timeout SECONDS` bounds the
+#   reviewer call (not the preflight) without GNU coreutils: on expiry the CLI's
+#   whole process group is stopped and the script exits 124. With no flag there
+#   is no limit, as before. $OUT is cleared before the call, so a timed-out run
+#   leaves no stale findings behind.
 set -euo pipefail
 
 usage() {
-  echo "usage: second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm|kimi]"
+  echo "usage: second_review.sh <BUNDLE> <RUBRIC> <SCHEMA> <OUT_JSON> [--backend codex|glm|kimi] [--timeout SECONDS]"
 }
 
 BACKEND="${REVIEW2_BACKEND:-codex}"
+TIMEOUT=""
 # Scalars + a counter rather than a POS=() array: `${#arr[@]}` on an empty array
 # is an unbound-variable error under `set -u` in the bash 3.2 that macOS still
 # ships as /bin/bash, which would turn "no arguments" into a cryptic crash.
@@ -61,6 +63,11 @@ while [ $# -gt 0 ]; do
     # and the loop would spin forever.
     --backend) [ $# -ge 2 ] || { echo "--backend needs a value" >&2; exit 2; }
                BACKEND="$2"; shift 2;;
+    --timeout) [ $# -ge 2 ] || { echo "--timeout needs a value" >&2; exit 2; }
+               case "$2" in
+                 ''|*[!0-9]*|0*) echo "bad --timeout: '$2' (want whole seconds, 1 or more)" >&2; exit 2;;
+               esac
+               TIMEOUT="$2"; shift 2;;
     -h|--help) usage; exit 0;;
     *)         NPOS=$((NPOS + 1))
                case "$NPOS" in
@@ -279,7 +286,53 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-RAW="$(mktemp /tmp/r2-review-raw.XXXXXX.txt)"
+# Run "$@", bounded by --timeout when one was given. With no flag this is a plain
+# call, so the default path is unchanged. Not GNU `timeout`: macOS ships neither
+# `timeout` nor `gtimeout`. python3 is already required above, so it runs the CLI
+# in a session of its own and, on expiry, stops that whole process group: the
+# codex and opencode launchers start child processes, and killing only the
+# launcher would leave the real (paid) call running. Exit 124, as GNU timeout.
+with_timeout() {
+  if [ -z "$TIMEOUT" ]; then "$@"; return; fi
+  python3 -c '
+import os, signal, subprocess, sys
+secs, cmd = int(sys.argv[1]), sys.argv[2:]
+p = subprocess.Popen(cmd, start_new_session=True)
+
+def stop(sig):
+    try:
+        os.killpg(p.pid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+def on_signal(signum, _frame):  # Ctrl-C no longer reaches the new session
+    stop(signal.SIGTERM)
+    sys.exit(128 + signum)
+
+signal.signal(signal.SIGINT, on_signal)
+signal.signal(signal.SIGTERM, on_signal)
+try:
+    rc = p.wait(timeout=secs)
+except subprocess.TimeoutExpired:
+    stop(signal.SIGTERM)
+    try:
+        p.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    stop(signal.SIGKILL)            # whatever in the group ignored SIGTERM
+    p.wait()
+    sys.exit(124)
+sys.exit(rc if rc >= 0 else 128 - rc)
+' "$TIMEOUT" "$@"
+}
+
+timed_out() {
+  echo "reviewer #2 ($BACKEND / $R2_MODEL, effort=$R2_EFFORT) timed out after ${TIMEOUT}s and was stopped." >&2
+  echo "Nothing was written to $OUT. Retry with a larger --timeout, a smaller packet, or another --backend." >&2
+  exit 124
+}
+
+RAW="$(mktemp "${TMPDIR:-/tmp}"/r2-review-raw.XXXXXX.txt)"
 echo "reviewer #2: $BACKEND / $R2_MODEL, effort=$R2_EFFORT" >&2
 
 # The CLI's stderr goes to THIS script's stderr (not a shared /tmp file), so the
@@ -306,13 +359,13 @@ case "$BACKEND" in
     # NOTE --sandbox read-only blocks writes, NOT reads. What actually stops
     # reviewer #2 wandering into the working tree is features.shell_tool=false
     # plus the empty -C root. Treat only what you put in the bundle as exposed.
-    SCRATCH="$(mktemp -d /tmp/r2-codex-cwd.XXXXXX)"
-    OUTMSG="$(mktemp /tmp/r2-codex-msg.XXXXXX.txt)"
+    SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}"/r2-codex-cwd.XXXXXX)"
+    OUTMSG="$(mktemp "${TMPDIR:-/tmp}"/r2-codex-msg.XXXXXX.txt)"
     # codex echoes its banner AND the whole prompt (which is now prompt + rubric +
     # schema + the entire bundle) back on stderr. Letting that reach our stderr
     # dumps the full diff into the orchestrating agent's transcript and CI logs,
     # so capture it and surface only the tail, and only when the call fails.
-    CODEXERR="$(mktemp /tmp/r2-codex-err.XXXXXX.txt)"   # cleaned by the EXIT trap
+    CODEXERR="$(mktemp "${TMPDIR:-/tmp}"/r2-codex-err.XXXXXX.txt)"   # cleaned by the EXIT trap
 
     # ONE stdin stream (prompt, then artifact), read via the `-` placeholder.
     # Do NOT put the prompt in argv and pipe the bundle separately: codex's
@@ -324,7 +377,7 @@ case "$BACKEND" in
     {
       printf '%s\n\n## ARTIFACT TO REVIEW\n\n' "$FULL_PROMPT"
       cat "$BUNDLE"
-    } | "$CODEX_BIN" exec \
+    } | with_timeout "$CODEX_BIN" exec \
           --ignore-user-config \
           --skip-git-repo-check \
           --ephemeral \
@@ -335,6 +388,8 @@ case "$BACKEND" in
           -c features.shell_tool=false \
           -o "$OUTMSG" \
           - > "$RAW" 2>"$CODEXERR" || {
+      CALL_RC=$?
+      if [ -n "$TIMEOUT" ] && [ "$CALL_RC" -eq 124 ]; then timed_out; fi
       echo "codex exec failed; last 20 lines of its stderr:" >&2
       tail -20 "$CODEXERR" >&2
       exit 1;
@@ -397,8 +452,10 @@ $(cat "$BUNDLE")"
     # prompt no longer mentions stdin, so the model cannot notice the
     # contamination either: the run returns schema-valid findings over a corrupt
     # artifact and exits 0. Same reason the codex preflight pins its stdin.
-    "$OPENCODE_BIN" run --variant "$R2_EFFORT" --model "$R2_MODEL" "$ZEN_MSG" \
+    with_timeout "$OPENCODE_BIN" run --variant "$R2_EFFORT" --model "$R2_MODEL" "$ZEN_MSG" \
       < /dev/null > "$RAW" || {
+      CALL_RC=$?
+      if [ -n "$TIMEOUT" ] && [ "$CALL_RC" -eq 124 ]; then timed_out; fi
       echo "opencode run failed (its stderr is above)" >&2; exit 1;
     }
     ;;

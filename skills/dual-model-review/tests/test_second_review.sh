@@ -29,12 +29,13 @@ skipped() { skip=$((skip+1)); echo "SKIP: $1" >&2; }
 TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 
 WORK="$(mktemp -d)"
-# The validation-failure cases deliberately leave their raw output in /tmp for
-# inspection, which is correct for a real run but would make the suite litter a
-# file per run. Clean up only what this run created (files newer than a marker),
-# never a concurrent real review's output.
+# The validation-failure cases deliberately leave their raw output in $TMPDIR
+# (or /tmp) for inspection, which is correct for a real run but would make the
+# suite litter a file per run. Clean up only what this run created (files newer
+# than a marker), never a concurrent real review's output. The script makes its
+# temp files under ${TMPDIR:-/tmp}, so look in the same place.
 MARKER="$WORK/.started"; : > "$MARKER"
-TMPREAL="$(cd /tmp && pwd -P)"
+TMPREAL="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
 trap 'find "$TMPREAL" -maxdepth 1 -name "r2-review-raw.*" -newer "$MARKER" -delete 2>/dev/null; rm -rf "$WORK"' EXIT
 BUNDLE="$WORK/bundle.md"; printf '# Review packet\nBUNDLE_SENTINEL\n' > "$BUNDLE"
 OUT="$WORK/out.json"
@@ -57,10 +58,11 @@ if [ -n "${3:-}" ]; then
     prev="\$a"
   done
 fi
-{
-  echo "I reviewed the packet at provider.{p}.models.{m} and found issues."
-  cat "$2"
-} > "\${dest:-/dev/stdout}"
+# Redirect only when -o named a file. Not \`> "\${dest:-/dev/stdout}"\`: reopening
+# /dev/stdout onto a redirected file is denied inside a macOS sandbox.
+if [ -n "\$dest" ]; then exec > "\$dest"; fi
+echo "I reviewed the packet at provider.{p}.models.{m} and found issues."
+cat "$2"
 EOF
   chmod +x "$1"
 }
@@ -115,6 +117,57 @@ rc=0; "$SR" "$WORK/empty.md" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
 rc=0; CODEX_BIN="$WORK/no-such-codex" "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 127 ] && ok || bad "absent codex should exit 127 (got $rc)"
 
+# 7: --timeout takes whole seconds, 1 or more; anything else exits 2 up front.
+for v in abc 0 1.5 -3; do
+  rc=0; "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --timeout "$v" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] && ok || bad "--timeout '$v' should exit 2 (got $rc)"
+done
+if [ -n "$TIMEOUT_BIN" ]; then
+  rc=0; "$TIMEOUT_BIN" 10 "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --timeout >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] && ok || bad "trailing --timeout should exit 2, not hang (got $rc)"
+else
+  skipped "no timeout/gtimeout on PATH (brew install coreutils): skipped the trailing --timeout no-hang assertion"
+fi
+
+# 8: a stalled reviewer is stopped at --timeout, with exit 124 and a message
+# that says so, and no OUT_JSON (not even a previous run's). The fake CLI
+# answers `debug models` at once (the codex preflight is not bounded), then
+# parks a child process: the whole process group must go, not just the CLI,
+# because the real launchers start children that make the paid call. These
+# cases exit before schema validation, so they need no jsonschema.
+STALL="$WORK/stall"
+cat > "$STALL" <<EOF
+#!/usr/bin/env bash
+[ "\${1:-}" = debug ] && exit 1
+cat > /dev/null
+sleep 30 &
+echo \$! > "$STALL.child"
+wait
+EOF
+chmod +x "$STALL"
+for be in codex glm; do
+  rm -f "$STALL.child"; STERR="$WORK/stall-$be.txt"
+  printf '{"reviewer":"stale","summary":"previous run","overall":"approve","findings":[]}\n' > "$OUT"
+  started=$SECONDS
+  rc=0; CODEX_BIN="$STALL" OPENCODE_BIN="$STALL" CODEX_API_KEY=test OPENCODE_API_KEY=test \
+    "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --backend "$be" --timeout 1 >/dev/null 2>"$STERR" || rc=$?
+  [ "$rc" -eq 124 ] && ok || bad "$be: a stalled reviewer should exit 124 at --timeout (got $rc)"
+  [ $((SECONDS - started)) -lt 15 ] && ok || bad "$be: --timeout 1 took $((SECONDS - started))s"
+  grep -q "timed out after 1s" "$STERR" && ok || bad "$be: the timeout message should name the limit: $(cat "$STERR")"
+  [ ! -f "$OUT" ] && ok || bad "$be: a timed-out run must not leave OUT_JSON behind"
+  # The parked child must be gone too. Allow it a moment to be reaped.
+  child="$(cat "$STALL.child" 2>/dev/null || true)"
+  alive=1
+  if [ -n "$child" ]; then
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 "$child" 2>/dev/null || { alive=0; break; }
+      sleep 0.2
+    done
+  fi
+  [ -n "$child" ] && [ "$alive" -eq 0 ] && ok || bad "$be: the reviewer's child process survived the timeout"
+  [ -z "$child" ] || kill "$child" 2>/dev/null || true
+done
+
 # --- the extract + validate pipeline, against a fake CLI ---
 
 VALID="$WORK/valid.json"
@@ -153,7 +206,7 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   # The raw dump is reviewer #2's full output for a sensitive packet: keep it on
   # a parse/validate failure (the error points at it), delete it on success.
   rawafter=$(count_raw)
-  [ "$rawafter" -le "$rawbefore" ] && ok || bad "a successful run must not leave its raw output in /tmp"
+  [ "$rawafter" -le "$rawbefore" ] && ok || bad "a successful run must not leave its raw output in the temp dir"
 
   # codex echoes the whole prompt+bundle on stderr; that must not reach ours.
   grep -q "SHIM_STDERR_NOISE" "$ERR" && bad "the backend's stderr must not be relayed on success (it contains the packet)" || ok
@@ -242,6 +295,22 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
     [ "$rc" -eq 0 ] && ok || bad "$be: ZEN_MODEL override should exit 0 (got $rc)"
     grep -qx -- "opencode/deepseek-v4-flash" "$GSHIM.args" && ok || bad "$be: ZEN_MODEL should override the default model"
     grep -qx -- "low" "$GSHIM.args" && ok || bad "$be: ZEN_VARIANT should override the default variant"
+  done
+
+  # --timeout with a reviewer that answers in time changes nothing: the packet
+  # still reaches the CLI on its usual channel (codex stdin, opencode argv), and
+  # the findings are written.
+  for be in codex glm; do
+    TSHIM="$WORK/timed-$be"; make_shim "$TSHIM" "$VALID" honour-o
+    rm -f "$OUT"
+    rc=0; CODEX_BIN="$TSHIM" OPENCODE_BIN="$TSHIM" CODEX_API_KEY=test OPENCODE_API_KEY=test \
+      "$SR" "$BUNDLE" "$RUBRIC" "$SCHEMA" "$OUT" --timeout 60 --backend "$be" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] && ok || bad "$be: --timeout with a prompt reviewer should exit 0 (got $rc)"
+    [ -f "$OUT" ] && grep -q '"R2-001"' "$OUT" && ok || bad "$be: --timeout run should still write OUT_JSON"
+    case "$be" in
+      codex) grep -q "BUNDLE_SENTINEL" "$TSHIM.stdin" && ok || bad "codex: bundle never reached stdin under --timeout" ;;
+      glm)   grep -q "BUNDLE_SENTINEL" "$TSHIM.args"  && ok || bad "glm: bundle never reached argv under --timeout" ;;
+    esac
   done
 
   # An empty answer must fail HERE, loudly, naming the backend. opencode exits 0

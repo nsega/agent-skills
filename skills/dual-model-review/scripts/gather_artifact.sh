@@ -24,7 +24,7 @@ while [ $# -gt 0 ]; do
 done
 case "$LEVEL" in full|minimal) ;; *) echo "bad --level: $LEVEL" >&2; exit 2;; esac
 
-OUT="$(mktemp /tmp/dual-model-review-packet.XXXXXX.md)"
+OUT="$(mktemp "${TMPDIR:-/tmp}"/dual-model-review-packet.XXXXXX.md)"
 
 # Wrap a file in a backtick fence long enough that no backtick run inside it can
 # close the fence early (CommonMark: the opening fence must exceed the longest
