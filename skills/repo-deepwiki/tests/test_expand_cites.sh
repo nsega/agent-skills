@@ -15,6 +15,11 @@ bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 SHA=0123456789abcdef0123456789abcdef01234567
 REPO=acme/widget
 
+# Fixture repos must not inherit the user's git config (signing, insteadOf
+# rewrites, hooks): every git call here, and in the script, sees only the
+# fixture's own config.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+
 # Stdout to stdout, stderr to $1/err.
 expand() { (cd "$1" && python3 "$SCRIPT" --repo "$REPO" --sha "$SHA" wiki.md 2> err); }
 
@@ -97,7 +102,8 @@ cmp -s "$R/err" "$TMP/bad.err" && ok || bad "bad wiki stderr: $(cat "$R/err")"
 R="$TMP/r3"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
 git -C "$R" init -q
 git -C "$R" add src
-git -C "$R" -c user.name=t -c user.email=t@example.com commit -q -m fixture
+git -C "$R" -c user.name=t -c user.email=t@example.com \
+  -c commit.gpgsign=false -c tag.gpgsign=false commit -q -m fixture
 head_sha="$(git -C "$R" rev-parse HEAD)"
 git -C "$R" remote add origin git@github.com:acme/widget.git
 for url in git@github.com:acme/widget.git ssh://git@github.com/acme/widget.git https://github.com/acme/widget; do
