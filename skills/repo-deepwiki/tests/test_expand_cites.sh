@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Zero-token checks for repo-deepwiki's citation expander/validator: a fixture
-# repo with good and bad {{cite:...}} macros, expanded and compared with golden
+# Zero-token checks for repo-deepwiki's scripts/expand_cites.py: a fixture repo
+# with good and bad {{cite:...}} macros, expanded and compared with golden
 # output made once from the code block that used to live in SKILL.md step 6.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$HERE/.." && pwd)"
+SCRIPT="$SKILL_DIR/scripts/expand_cites.py"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/expand_cites.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 pass=0; fail=0
@@ -14,11 +15,16 @@ bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 SHA=0123456789abcdef0123456789abcdef01234567
 REPO=acme/widget
 
-# The embedded block from SKILL.md, with the placeholders filled in.
+# Stdout to stdout, stderr to $1/err.
+expand() { (cd "$1" && python3 "$SCRIPT" --repo "$REPO" --sha "$SHA" wiki.md 2> err); }
+
+# 0: the script is there.
+[ -x "$SCRIPT" ] && ok || bad "scripts/expand_cites.py missing or not executable"
+
+# While SKILL.md still carries the old block, its output must match the script's.
 EMBEDDED="$TMP/embedded.py"
 awk '/^   ```python$/ {f=1; next} /^   ```$/ {f=0} f' "$SKILL_DIR/SKILL.md" \
   | sed -e 's/^   //' -e "s|\"<full-sha>\", \"<owner>/<repo>\"|\"$SHA\", \"$REPO\"|" > "$EMBEDDED"
-expand() { (cd "$1" && python3 "$EMBEDDED"); }
 
 # Fixture repo: a 10-line file, a 3-line file, and two wikis.
 make_repo() {
@@ -67,19 +73,56 @@ cat > "$TMP/bad.golden" <<'MD'
 - empty {{cite:}}
 MD
 
-# 1: good citations expand to SHA-pinned links, and nothing is flagged.
+# 1: good citations expand to SHA-pinned links, nothing is flagged, exit 0.
 R="$TMP/r1"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
-out="$(expand "$R")" && ok || bad "good wiki failed: $out"
+out="$(expand "$R")" && ok || bad "good wiki exited non-zero: $out $(cat "$R/err")"
 [ "$out" = "UNRESOLVED: 0 PROBLEMS: none" ] && ok || bad "good wiki summary: $out"
+[ ! -s "$R/err" ] && ok || bad "good wiki wrote to stderr: $(cat "$R/err")"
 cmp -s "$R/wiki.md" "$TMP/good.golden" && ok || bad "good wiki differs from golden: $(diff "$TMP/good.golden" "$R/wiki.md")"
 
-# 2: a bad range, a missing path and an empty macro are reported; the links
-# are still written, the same as the embedded code wrote them.
+# 2: a bad range, a missing path and an empty macro fail the run with one
+# stderr line each; the links are still written, as the embedded code wrote them.
 R="$TMP/r2"; make_repo "$R"; cp "$R/bad.md" "$R/wiki.md"
-out="$(expand "$R" || true)"
+if out="$(expand "$R")"; then bad "bad wiki exited 0"; else ok; fi
 [ "$out" = "UNRESOLVED: 1 PROBLEMS: ['range src/a.py:9-20 > 10', 'missing src/missing.py', 'missing docs/gone.md']" ] \
   && ok || bad "bad wiki summary: $out"
 cmp -s "$R/wiki.md" "$TMP/bad.golden" && ok || bad "bad wiki differs from golden: $(diff "$TMP/bad.golden" "$R/wiki.md")"
+cat > "$TMP/bad.err" <<'ERR'
+wiki.md: range src/a.py:9-20 > 10
+wiki.md: missing src/missing.py
+wiki.md: missing docs/gone.md
+wiki.md: unresolved {{cite:}}
+ERR
+cmp -s "$R/err" "$TMP/bad.err" && ok || bad "bad wiki stderr: $(cat "$R/err")"
+
+# 3: the embedded block, while SKILL.md still has it, writes the same bytes.
+for w in good bad; do
+  R="$TMP/e-$w"; make_repo "$R"; cp "$R/$w.md" "$R/wiki.md"
+  (cd "$R" && python3 "$EMBEDDED" > out) || true
+  cmp -s "$R/wiki.md" "$TMP/$w.golden" && ok || bad "embedded block on $w wiki differs from golden"
+done
+
+# 4: with no --repo or --sha, the facts come from git: the origin remote in
+# git@, ssh:// or https:// form, and HEAD.
+R="$TMP/r4"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
+git -C "$R" init -q
+git -C "$R" add src
+git -C "$R" -c user.name=t -c user.email=t@example.com commit -q -m fixture
+head_sha="$(git -C "$R" rev-parse HEAD)"
+git -C "$R" remote add origin git@github.com:acme/widget.git
+for url in git@github.com:acme/widget.git ssh://git@github.com/acme/widget.git https://github.com/acme/widget; do
+  git -C "$R" remote set-url origin "$url"
+  cp "$R/good.md" "$R/wiki.md"
+  (cd "$R" && python3 "$SCRIPT" > /dev/null) && ok || bad "fact resolution failed for $url"
+  sed "s/$SHA/$head_sha/" "$TMP/good.golden" > "$TMP/head.golden"
+  cmp -s "$R/wiki.md" "$TMP/head.golden" && ok || bad "links not pinned to HEAD of acme/widget for $url: $(diff "$TMP/head.golden" "$R/wiki.md")"
+done
+
+# 5: no remote and no --repo is a clear error, not a guess.
+R="$TMP/r5"; make_repo "$R"; cp "$R/good.md" "$R/wiki.md"
+git -C "$R" init -q
+if (cd "$R" && python3 "$SCRIPT" --sha "$SHA" 2> err); then bad "no remote exited 0"; else ok; fi
+grep -q "no origin remote" "$R/err" && ok || bad "no remote not reported: $(cat "$R/err")"
 
 echo "repo-deepwiki: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
