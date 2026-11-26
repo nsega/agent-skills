@@ -147,18 +147,9 @@ Prereqs: `codex` on PATH and logged in (`codex login`), or `opencode` plus an
 OpenCode Zen key for `--backend glm|kimi`; and `python3` with `jsonschema`, without
 which the run **fails closed** rather than accepting unchecked findings.
 
-**No call timeout is built in**, and a Zen backend can stall for tens of minutes
-(see the reliability note above). Bound it yourself when that matters:
-
-```bash
-timeout  900 scripts/second_review.sh ... --backend kimi   # GNU coreutils
-gtimeout 900 scripts/second_review.sh ... --backend kimi   # macOS + brew coreutils
-```
-
-`timeout` is GNU coreutils and **macOS ships neither name** until you
-`brew install coreutils`, so check before relying on it. Exit 124 means it
-stalled; nothing is written to `OUT_JSON`, which is cleared before the call, so a
-timed-out run cannot leave stale findings behind.
+A Zen backend can stall for tens of minutes (see the reliability note above), so
+add `--timeout 900` (seconds) when that matters: exit 124 means the call was
+stopped, and nothing is written to `OUT_JSON`.
 
 Reviewer #2 runs blind, and its output is schema-validated (a finding missing
 required Evidence / failure_case / recommendation is rejected, not silently
@@ -297,7 +288,7 @@ and on an `R2-###` id that is in neither a merged finding (cite it there, as in
 ## Files
 
 - `scripts/gather_artifact.sh`: build the review packet (`--level full|minimal`, `--tests`).
-- `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm|kimi`, one blind, schema-validated pass).
+- `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm|kimi`, `--timeout`, one blind, schema-validated pass).
 - `scripts/check_report.py`: check the merged report for missing headings and unaccounted `R2-###` ids.
 - `models.json`: current model ids, effort defaults, prices and dated notes. A generated copy of the repo's `models/dual-model.json`; edit that file and run `make models`.
 - `references/rubric.md`: severity/category source of truth + review lenses.
