@@ -239,6 +239,11 @@ regressed anything); do not re-send the whole artifact.
 Keep every heading. If a section is empty, write "None": its presence proves it
 was checked, not skipped.
 
+Before handing the report over, run `scripts/check_report.py <report.md>
+/tmp/r2-findings.json` and fix what it prints. It fails on a missing heading,
+and on an `R2-###` id that is in neither a merged finding (cite it there, as in
+"from R2-003") nor "Not adopted".
+
 ## Governance & operating rules
 
 - **Read-only reviewers.** They analyze; they do not edit the repo. Both backends
@@ -293,6 +298,7 @@ was checked, not skipped.
 
 - `scripts/gather_artifact.sh`: build the review packet (`--level full|minimal`, `--tests`).
 - `scripts/second_review.sh`: run reviewer #2 (`--backend codex|glm|kimi`, one blind, schema-validated pass).
+- `scripts/check_report.py`: check the merged report for missing headings and unaccounted `R2-###` ids.
 - `models.json`: current model ids, effort defaults, prices and dated notes. A generated copy of the repo's `models/dual-model.json`; edit that file and run `make models`.
 - `references/rubric.md`: severity/category source of truth + review lenses.
 - `references/findings.schema.json`: the per-reviewer findings contract.
