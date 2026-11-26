@@ -11,6 +11,9 @@ pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL: $1" >&2; }
 
+# 0: SKILL.md points at the script.
+grep -q "scripts/stale_refs.sh" "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md does not mention scripts/stale_refs.sh"
+
 # 1: a fixture repo with the removed name `oldpkg` in one file of every listed kind.
 R="$TMP/repo"
 put() { mkdir -p "$(dirname "$R/$1")"; printf '%s\n' "$2" > "$R/$1"; }
