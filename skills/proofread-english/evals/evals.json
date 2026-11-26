@@ -1,0 +1,29 @@
+{
+  "skill_name": "proofread-english",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Can you proofread this Slack message before I send it?\n\n@Priya I looked at the flaky test — its failing because of timezone, not because of the scheduler logic. I will push fix today, it's not a big change; just one line.",
+      "expected_output": "Polish mode, Slack register. Corrected text in one fenced block, still short and casual, with the @mention kept and no greeting or sign-off added. No em dash, no semicolon, and no \"it's not X, it's Y\" construction anywhere in the corrected text. Fixes include its -> it's, the timezone, push a fix, and the dash and semicolon rewrites. A numbered fix list in English with one short reason per line. check_style.py on the corrected text reports 0 errors.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "この英語のメール、校正して。間違いだけ直してほしい。\n\nHi Mark,\n\nThank you for quick response. I would like to confirm about the schedule of next week. Is it possible to move our meeting to Thursday 3pm? I have a doctor appointment in Wednesday.\n\nBest regards,\nNaoki",
+      "expected_output": "Light mode (the user asked for errors only), email register. The corrected English email in one fenced block with the greeting and sign-off kept, sentences otherwise left as written. Fixes limited to errors: thank you for your quick response, confirm the schedule (no 'about'), next week's schedule or the schedule for next week, a doctor's appointment, on Wednesday. The fix list is written in Japanese. No rephrasing for style beyond errors.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Polish this PR description. Keep the code as is.\n\n## Summary\nThis PR add the `--dry-run` flag to `kueuectl stop` — it's not a new feature, it's a missing option that other commands has.\n\n```sh\nkueuectl stop workload my-wl --dry-run=server\n```\n\nAlso I fixed typo in `pkg/cmd/stop/stop.go`; the help text said 'worklaod'.",
+      "expected_output": "Polish mode, PR register. Markdown heading kept, the fenced sh block and every inline code span unchanged (flag, command and path). Fixes: add -> adds, has -> have, fixed a typo, present tense throughout. The em dash, the \"it's not X, it's Y\" construction and the semicolon are rewritten in the prose. The quoted typo 'worklaod' stays as the quoted wrong spelling. Corrected text in a markdown fenced block using four backticks, since the draft contains a fenced block.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Does this sound natural? \"I'm looking forward to work with you.\"",
+      "expected_output": "Treated as a tiny draft: corrected sentence 'I'm looking forward to working with you.' in a fenced block, and one fix line explaining that 'look forward to' takes a noun or -ing form. No long explanation.",
+      "files": []
+    }
+  ]
+}
