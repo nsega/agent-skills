@@ -15,6 +15,7 @@ same() { diff -u "$2" "$3" > "$TMP/diff" && ok || bad "$1: $(cat "$TMP/diff")"; 
 
 # 1: SKILL.md runs the script for the stats block and keeps the write rule.
 [ -f "$STATS" ] && ok || bad "scripts/stats.py missing"
+grep -q "scripts/stats.py" "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md does not mention scripts/stats.py"
 grep -q "Use Read + Edit, not Bash" "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md lost the Read + Edit rule"
 
 # 2: an empty log (the bootstrap template) prints zeros and no Aged list.

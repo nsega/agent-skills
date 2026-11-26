@@ -65,15 +65,7 @@ Trigger phrases: "show friction log", "what's in the friction log", "weekly fric
 
 **Stats block (weekly review only):**
 
-Parse the leading `YYYY-MM-DD` from each `- ` line in each section. "This week" means the date is within the last 7 days from today (use `date +%Y-%m-%d` for today). Print:
-
-```
-Open: <N>   (aged >2w: <K>)
-This week: +<captured> captured, <shipped> shipped, <dropped> dropped
-Lifetime: <total_shipped> shipped, <total_dropped> dropped
-```
-
-Then list the aged-Open items (capture date >14 days ago) under a `Aged (>2w):` heading — these are the ones that have proven recurrence. They're the automation candidates. Limit to 5; if more, say so.
+Run `python3 scripts/stats.py "<friction log path>"` from this skill's folder and print its output as-is. It only reads the log. Its `Aged (>2w):` list holds the Open items with proven recurrence: the automation candidates.
 
 Do not write the stats into the markdown file. Git history on the vault is the time series — printing to the chat is enough.
 
