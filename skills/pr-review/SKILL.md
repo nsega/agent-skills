@@ -27,24 +27,11 @@ line of why. Do not silently skip sections.
 
 ### 2. Stale-config sweep
 
-Check ALL of these for references to the deleted path, package, workflow, or task. Do not rely on
-a single grep; enumerate the files:
-
-- `.idea/*` (IDE module configs)
-- `.vscode/*` (workspace settings)
-- `.gitignore`
-- `Makefile`, `makefile`
-- `.github/dependabot.yml`
-- every file under `.github/workflows/`
-- `README.md` and any architecture/tree docs
-- task-runner configs at the root and per package (`justfile`, `dodo.py`, npm scripts): task
-  discovery may reference the deleted package
-- `.editorconfig`
-- the package manifest of every package (`pyproject.toml`, `package.json`, `Cargo.toml`), not
-  just the affected one
-- deployment manifests, if the repo deploys services (helm `values.yaml`, kustomize overlays,
-  compose files)
-- `AGENTS.md`, `CLAUDE.md`, or any agent instruction files
+For each deleted path, package, workflow, or task, run `scripts/stale_refs.sh <name> <repo-root>`
+(path relative to this skill's folder) and read its output: one `file:line: text` per hit in the
+fixed file list in the script's header, then a summary line. Then grep any architecture/tree
+docs, task-runner configs, deployment manifests or agent instruction files the repo keeps under
+other names.
 
 Report any file that still references the deleted entity with `file:line` and the stale content.
 
