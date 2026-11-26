@@ -40,7 +40,10 @@ problems() { grep -cv "mappings checked" "$TMP/out" || true; }
 
 # 1: SKILL.md points at the script.
 grep -q "scripts/check_mapping.py" "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md does not mention scripts/check_mapping.py"
-grep -q "check_mapping.py.*--base" "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md does not pass --base"
+# The default command has no --base (an unsided node would pass from either
+# commit); --base is for before/after reviews, with the merge base.
+grep -q 'check_mapping.py <review.md> --repo <repo>`' "$SKILL_DIR/SKILL.md" && ok || bad "SKILL.md default command should not pass --base"
+grep -q '#### Before.*#### After.*--base <merge-base>' <(tr '\n' ' ' < "$SKILL_DIR/SKILL.md") && ok || bad "SKILL.md does not tie --base <merge-base> to Before/After headings"
 
 # 2: all present passes, including Type.method, a call suffix and an inferred note.
 review present '| OrderService | `order/service.go:CreateOrder` | |
@@ -162,6 +165,19 @@ runb either
 printf '#### Before\n| Element in diagram | Maps to | Note |\n|---|---|---|\n| Gone | `order/service.go:neverThere` | |\n' > "$TMP/beforemiss.md"
 runb beforemiss --base base
 [ "$rc" -eq 1 ] && grep -q "missing symbol: neverThere not found in order/service.go at base$" "$TMP/out" && ok || bad "before-side miss not reported: $(cat "$TMP/out")"
+
+# 12b: the path SKILL.md gives for a single-state review (no --base) fails on
+# nodes the PR deleted.
+review single '| Validate | `order/service.go:validateLegacy` | |
+| LegacyCharge | `payment/legacy.go:ChargeOld` | |
+| PaymentClient | `payment/client.go:Charge` | |'
+runb single
+[ "$rc" -eq 1 ] && [ "$(problems)" -eq 2 ] && ok || bad "single-state review with deleted nodes: want 2 problems: $(cat "$TMP/out")"
+
+# 12c: a directory is not a file at the base either.
+printf '#### Before\n| Element in diagram | Maps to | Note |\n|---|---|---|\n| Order | `order:CreateOrder` | |\n' > "$TMP/basedir.md"
+runb basedir --base base
+[ "$rc" -eq 1 ] && grep -q "missing file at base: order$" "$TMP/out" && ok || bad "directory at base counted as a file: $(cat "$TMP/out")"
 
 # 13: a --base git cannot resolve exits 2.
 runb ba --base no-such-ref

@@ -169,8 +169,9 @@ flowchart TD
 
 Evaluate two distinct kinds of correctness separately.
 
-- **Consistency (no spec required, automatable):** Run `scripts/check_mapping.py <review.md> --repo <repo> --base <base-ref>`;
-  it fails on any node-mapping `file:function` missing from the code. Does the diagram contradict the diff?
+- **Consistency (no spec required, automatable):** Run `scripts/check_mapping.py <review.md> --repo <repo>`; it fails on
+  any node-mapping `file:function` missing from the code. For a before/after review, put the node mapping under
+  `#### Before` and `#### After` headings and add `--base <merge-base>`. Does the diagram contradict the diff?
 - **Intent fit (measurable when a spec exists):** Did the inferred intent match the author's intent? Use the subset of
   PRs that already carry a spec as a pilot cohort to measure this.
 

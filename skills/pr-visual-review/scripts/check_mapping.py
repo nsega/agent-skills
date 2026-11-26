@@ -16,14 +16,14 @@ Each backticked `path:symbol` in the "Maps to" cell (or the second column
 when no header says "Maps to") is checked. The path is split at the first
 colon, so `a.rs:Foo::bar` keeps its `::`.
 
-Before/after reviews: with --base REF (the PR's base, read with
-`git show REF:path`, no checkout), a node on the "before" side is checked
+Before/after reviews: with --base REF (the PR's merge base, read with
+`git cat-file blob REF:path`, no checkout), a node on the "before" side is checked
 against REF and a node on the "after" side against DIR. The side comes from
 the row (a "Side" column, or "(before)" / "(after)" in a cell), else from the
 nearest heading above the table that names one side only ("#### Before",
 "### Node mapping (after)"). A node whose side cannot be told passes when it
-exists at either the head or REF. Without --base every node is checked
-against DIR.
+exists at either the head or REF, so pass --base only for a review that
+splits its nodes into sides. Without --base every node is checked against DIR.
 
 Prints one line per problem and exits 1 when there is any:
   - the file does not exist
@@ -191,7 +191,9 @@ class Sources:
                 return None
             with open(full, encoding="utf-8", errors="replace") as f:
                 return f.read()
-        r = subprocess.run(["git", "-C", self.repo, "show", f"{self.base}:./{path}"],
+        # cat-file blob, not show: a directory path is a tree at REF and must
+        # count as a missing file, as it does at the head.
+        r = subprocess.run(["git", "-C", self.repo, "cat-file", "blob", f"{self.base}:./{path}"],
                            capture_output=True)
         return r.stdout.decode("utf-8", errors="replace") if r.returncode == 0 else None
 
