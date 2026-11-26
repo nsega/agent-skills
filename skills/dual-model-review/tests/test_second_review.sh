@@ -29,12 +29,13 @@ skipped() { skip=$((skip+1)); echo "SKIP: $1" >&2; }
 TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 
 WORK="$(mktemp -d)"
-# The validation-failure cases deliberately leave their raw output in /tmp for
-# inspection, which is correct for a real run but would make the suite litter a
-# file per run. Clean up only what this run created (files newer than a marker),
-# never a concurrent real review's output.
+# The validation-failure cases deliberately leave their raw output in $TMPDIR
+# (or /tmp) for inspection, which is correct for a real run but would make the
+# suite litter a file per run. Clean up only what this run created (files newer
+# than a marker), never a concurrent real review's output. The script makes its
+# temp files under ${TMPDIR:-/tmp}, so look in the same place.
 MARKER="$WORK/.started"; : > "$MARKER"
-TMPREAL="$(cd /tmp && pwd -P)"
+TMPREAL="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
 trap 'find "$TMPREAL" -maxdepth 1 -name "r2-review-raw.*" -newer "$MARKER" -delete 2>/dev/null; rm -rf "$WORK"' EXIT
 BUNDLE="$WORK/bundle.md"; printf '# Review packet\nBUNDLE_SENTINEL\n' > "$BUNDLE"
 OUT="$WORK/out.json"
@@ -57,10 +58,11 @@ if [ -n "${3:-}" ]; then
     prev="\$a"
   done
 fi
-{
-  echo "I reviewed the packet at provider.{p}.models.{m} and found issues."
-  cat "$2"
-} > "\${dest:-/dev/stdout}"
+# Redirect only when -o named a file. Not \`> "\${dest:-/dev/stdout}"\`: reopening
+# /dev/stdout onto a redirected file is denied inside a macOS sandbox.
+if [ -n "\$dest" ]; then exec > "\$dest"; fi
+echo "I reviewed the packet at provider.{p}.models.{m} and found issues."
+cat "$2"
 EOF
   chmod +x "$1"
 }
@@ -153,7 +155,7 @@ if python3 -c 'import jsonschema' 2>/dev/null; then
   # The raw dump is reviewer #2's full output for a sensitive packet: keep it on
   # a parse/validate failure (the error points at it), delete it on success.
   rawafter=$(count_raw)
-  [ "$rawafter" -le "$rawbefore" ] && ok || bad "a successful run must not leave its raw output in /tmp"
+  [ "$rawafter" -le "$rawbefore" ] && ok || bad "a successful run must not leave its raw output in the temp dir"
 
   # codex echoes the whole prompt+bundle on stderr; that must not reach ours.
   grep -q "SHIM_STDERR_NOISE" "$ERR" && bad "the backend's stderr must not be relayed on success (it contains the packet)" || ok

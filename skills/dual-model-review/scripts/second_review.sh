@@ -279,7 +279,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-RAW="$(mktemp /tmp/r2-review-raw.XXXXXX.txt)"
+RAW="$(mktemp "${TMPDIR:-/tmp}"/r2-review-raw.XXXXXX.txt)"
 echo "reviewer #2: $BACKEND / $R2_MODEL, effort=$R2_EFFORT" >&2
 
 # The CLI's stderr goes to THIS script's stderr (not a shared /tmp file), so the
@@ -306,13 +306,13 @@ case "$BACKEND" in
     # NOTE --sandbox read-only blocks writes, NOT reads. What actually stops
     # reviewer #2 wandering into the working tree is features.shell_tool=false
     # plus the empty -C root. Treat only what you put in the bundle as exposed.
-    SCRATCH="$(mktemp -d /tmp/r2-codex-cwd.XXXXXX)"
-    OUTMSG="$(mktemp /tmp/r2-codex-msg.XXXXXX.txt)"
+    SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}"/r2-codex-cwd.XXXXXX)"
+    OUTMSG="$(mktemp "${TMPDIR:-/tmp}"/r2-codex-msg.XXXXXX.txt)"
     # codex echoes its banner AND the whole prompt (which is now prompt + rubric +
     # schema + the entire bundle) back on stderr. Letting that reach our stderr
     # dumps the full diff into the orchestrating agent's transcript and CI logs,
     # so capture it and surface only the tail, and only when the call fails.
-    CODEXERR="$(mktemp /tmp/r2-codex-err.XXXXXX.txt)"   # cleaned by the EXIT trap
+    CODEXERR="$(mktemp "${TMPDIR:-/tmp}"/r2-codex-err.XXXXXX.txt)"   # cleaned by the EXIT trap
 
     # ONE stdin stream (prompt, then artifact), read via the `-` placeholder.
     # Do NOT put the prompt in argv and pipe the bundle separately: codex's
